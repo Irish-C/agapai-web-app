@@ -1,53 +1,72 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { FaHeartbeat } from 'react-icons/fa'; // Assuming you installed react-icons
+import React, { useState, useEffect } from 'react';
+import { FaVideo, FaTimesCircle, FaLink } from 'react-icons/fa';
 
-export default function VideoFeed({ socket, camera_id, location }) {
-  const [imageSrc, setImageSrc] = useState(null);
-  const [status, setStatus] = useState('Connecting...');
+/**
+ * Converts a Base64 string to a data URL (image).
+ * @param {string} base64String - The Base64 encoded image data.
+ * @returns {string} The full data URL string.
+ */
+const convertBase64ToDataURL = (base64String) => {
+    return `data:image/jpeg;base64,${base64String}`;
+};
 
-  // --- Listener for Video Frames ---
-  useEffect(() => {
-    if (!socket) return;
-    
-    // Listen for the 'video_frame' event
-    socket.on('video_frame', (data) => {
-      // Check if the frame belongs to THIS specific camera
-      if (data.camera_id === camera_id) { 
-        setImageSrc(`data:image/jpeg;base64,${data.image}`);
-        setStatus('Live');
-      }
-    });
+/**
+ * Renders a single video feed for a camera.
+ * It receives the current frame and connection status via props.
+ */
+export default function VideoFeed({ camId, location, frameData, isConnected }) {
+    const [imageSrc, setImageSrc] = useState(null);
 
-    // Cleanup listener on unmount
-    return () => {
-      socket.off('video_frame');
-    };
-  }, [socket, camera_id]); 
+    useEffect(() => {
+        if (frameData) {
+            // Update the image source whenever a new frame is received
+            setImageSrc(convertBase64ToDataURL(frameData));
+        } else {
+            // Clear image if no frame is available
+            setImageSrc(null);
+        }
+    }, [frameData]);
 
-  // Render the video feed
-  return (
-    <div 
-      className="bg-black rounded-lg shadow-xl flex items-center justify-center relative overflow-hidden"
-      style={{ minHeight: '300px' }}
-    >
-      {imageSrc ? (
-        <img 
-          src={imageSrc} 
-          alt={`Live feed from ${location}`} 
-          className="w-full h-full object-cover"
-        />
-      ) : (
-        <span className="text-white text-sm">{status}</span>
-      )}
+    const statusIcon = isConnected ? 
+        <FaLink className="text-green-500" title="Connected" /> : 
+        <FaTimesCircle className="text-red-500" title="Disconnected" />;
 
-      {/* Status Overlay */}
-      <div className="absolute bottom-0 left-0 right-0 p-2 bg-black bg-opacity-70 text-white flex justify-between items-center">
-        <span className="font-semibold">{location}</span>
-        <div className={`text-sm font-medium flex items-center text-green-400`}>
-          <FaHeartbeat className="mr-1" />
-          {status}
+    const placeholderContent = (
+        <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-900 bg-opacity-70 text-white p-4">
+            <FaVideo className="text-5xl mb-3 text-gray-400" />
+            <p className="text-lg font-semibold text-gray-300">Awaiting Video Stream...</p>
+            <p className="text-sm text-gray-500 mt-1">Check Flask server status.</p>
         </div>
-      </div>
-    </div>
-  );
+    );
+
+    return (
+        <div className="bg-gray-800 rounded-xl shadow-lg overflow-hidden border-2 border-gray-700 hover:border-teal-500 transition duration-300">
+            {/* Header */}
+            <div className="flex justify-between items-center bg-gray-900 p-3 text-white border-b border-gray-700">
+                <h4 className="text-md font-semibold flex items-center">
+                    {statusIcon}
+                    <span className="ml-2">{location} ({camId})</span>
+                </h4>
+                <span className="text-xs text-gray-400">Stream Status: {isConnected ? 'Live' : 'Offline'}</span>
+            </div>
+
+            {/* Video/Image Area */}
+            <div className="relative w-full h-64 bg-black flex items-center justify-center">
+                {imageSrc ? (
+                    <img 
+                        src={imageSrc} 
+                        alt={`Live stream from ${location}`}
+                        className="w-full h-full object-contain" // Use object-contain to prevent stretching
+                    />
+                ) : (
+                    placeholderContent
+                )}
+            </div>
+
+            {/* Footer / Controls Placeholder */}
+            <div className="p-2 text-center text-xs text-gray-400 bg-gray-700">
+                Last Update: {frameData ? new Date().toLocaleTimeString() : 'N/A'}
+            </div>
+        </div>
+    );
 }
