@@ -4,6 +4,17 @@ import VideoFeed from './VideoFeed.jsx';
 // Import the component that will display the real-time incident log
 // (Assuming you have a placeholder component for the sidebar)
 import TodayReport from './TodayReport.jsx'; 
+import ErrorBoundary from './ErrorBoundary';
+
+// Inside render:
+<ErrorBoundary>
+  <VideoFeed 
+    key={camera.id} 
+    socket={socket} 
+    camera_id={camera.id} 
+    location={camera.location} 
+  />
+</ErrorBoundary>
 
 // --- CONFIGURATION ---
 // IMPORTANT: Use the actual IP address of your central server/RPi if running on separate machines
@@ -16,12 +27,15 @@ export default function CameraGrid({ layout }) {
 
   // --- 1. Establish WebSocket Connection and Listeners ---
   useEffect(() => {
-    const newSocket = io(SOCKET_SERVER_URL);
-    setSocket(newSocket);
-    console.log("Connecting to WebSocket server...");
+    const newSocket = io(SOCKET_SERVER_URL, {
+      reconnectionAttempts: 5,
+      timeout: 10000,
+      transports: ['websocket', 'polling']
+    });
 
-    newSocket.on('connect', () => {
-      console.log('WS: Successfully connected to Flask!');
+    newSocket.on('connect_error', (error) => {
+      console.error('Socket connection error:', error);
+      setStatus('Connection error');
     });
 
     // 2. Listener for INSTANT ALERTS (from FuzzyLogic)
