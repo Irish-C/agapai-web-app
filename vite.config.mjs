@@ -1,7 +1,8 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
-import os from 'os'; // <--- We need the OS module to find the home directory
-import path from 'path';
+// Use 'node:' protocol for built-in modules in ESM config
+import os from 'node:os'; 
+import path from 'node:path';
 
 // Get the absolute path to the user's home directory (C:\Users\IrishC)
 const homedir = os.homedir(); 
