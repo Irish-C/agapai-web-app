@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
+// Import loginUser from your apiService
+import { loginUser } from './services/apiService.js'; 
 
 // Common components
 import Header from './components/common/Header.jsx';
@@ -29,23 +31,43 @@ export default function App() {
   ]);
 
   /**
-   * Mock login function
+   * Real login function that calls the API.
+   * This function is passed to LoginPage.
    * @param {string} username 
    * @param {string} password 
-   * @returns {boolean} True if login succeeds
+   * @returns {Promise<object>} An object { success: boolean, message?: string }
    */
-  const login = (username, password) => {
-    if (username === 'admin' && password === 'password') {
-      setUser({ username: 'Admin User', role: 'admin' });
-      return true;
+  const login = async (username, password) => {
+    try {
+      // Call the API service
+      const data = await loginUser(username, password);
+
+      if (data.status === 'success') {
+        // API call was successful, set the user state
+        setUser({ 
+          username: data.username, 
+          role: 'admin', // You might want to get this from the API response too
+          userId: data.user_id,
+          token: data.access_token 
+        });
+        return { success: true };
+      } else {
+        // Handle cases where the API returns a 200 but logical error
+        return { success: false, message: data.message || 'Login failed.' };
+      }
+
+    } catch (error) {
+      // Handle network errors or 401/500 errors from fetchApi
+      console.error('Login API error:', error);
+      return { success: false, message: error.message || 'Invalid credentials or server error.' };
     }
-    return false;
   };
 
   /**
    * Logout function
    */
   const logout = () => {
+    // In a real app, you might also call a '/api/logout' endpoint
     setUser(null);
   };
 
@@ -63,7 +85,13 @@ export default function App() {
         <Routes>
           {/* Public Routes */}
           <Route path="/" element={<LandingPage />} />
-          <Route path="/login" element={<LoginPage login={login} />} />
+          {/* Pass the new async login function to LoginPage.
+            If the user is already logged in, redirect from /login to /dashboard.
+          */}
+          <Route 
+            path="/login" 
+            element={!user ? <LoginPage login={login} /> : <Navigate to="/dashboard" replace />} 
+          />
 
           {/* Protected Routes */}
           <Route 
