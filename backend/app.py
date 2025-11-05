@@ -1,5 +1,5 @@
 import eventlet
-eventlet.monkey_patch()  # Must be first, before any other imports
+eventlet.monkey_patch()
 
 from flask import Flask, request, jsonify, send_from_directory
 from flask_socketio import SocketIO, emit
@@ -118,14 +118,14 @@ def mock_stream_loop():
 # --- SocketIO Event Handlers ---
 
 @socketio.on('connect')
-def handle_connect(auth=None):  # <--- FIX 1: Add parameter to avoid TypeError
+def handle_connect():
     """Handles new client connections."""
     print(f'Client connected: {request.sid}')
 
     global MOCK_STREAM_THREAD
-    # Check if the thread is None (first run) OR if the Eventlet thread is dead
-    if MOCK_STREAM_RUNNING and MOCK_STREAM_THREAD is None:
-        MOCK_STREAM_THREAD = socketio.start_background_task(target=mock_stream_loop)
+    if MOCK_STREAM_THREAD and MOCK_STREAM_THREAD.is_alive():
+        MOCK_STREAM_THREAD.join()
+
 
 @socketio.on('disconnect')
 def handle_disconnect():
@@ -165,7 +165,6 @@ if __name__ == '__main__':
     finally:
         MOCK_STREAM_RUNNING = False
         mock_stream_event.set()
-        if MOCK_STREAM_THREAD:
-            print("Waiting for mock stream thread to finish...")
-            MOCK_STREAM_THREAD.wait()
+        if MOCK_STREAM_THREAD and MOCK_STREAM_THREAD.is_alive():
+            MOCK_STREAM_THREAD.join()
         print("Server shutdown complete.")

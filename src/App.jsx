@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
-// Import loginUser from your apiService
+// Import the real login function
 import { loginUser } from './services/apiService.js'; 
 
 // Common components
@@ -46,13 +46,13 @@ export default function App() {
         // API call was successful, set the user state
         setUser({ 
           username: data.username, 
-          role: 'admin', // You might want to get this from the API response too
+          role: 'admin', // You can get this from the API response
           userId: data.user_id,
           token: data.access_token 
         });
         return { success: true };
       } else {
-        // Handle cases where the API returns a 200 but logical error
+        // Handle cases where the API returns a logical error
         return { success: false, message: data.message || 'Login failed.' };
       }
 
@@ -67,7 +67,6 @@ export default function App() {
    * Logout function
    */
   const logout = () => {
-    // In a real app, you might also call a '/api/logout' endpoint
     setUser(null);
   };
 
@@ -79,15 +78,13 @@ export default function App() {
       <ConnectionStatus />
 
       {/* Conditionally render Header for authenticated users */}
-      {user && <Header username={user.username} logout={logout} />}
+      {user && <Header user={user} logout={logout} />}
       
-      <main className="flex-grow">
+      {/* This <main> tag wraps all pages and makes them grow to fill space */}
+      <main className="flex-grow bg-gray-100">
         <Routes>
           {/* Public Routes */}
           <Route path="/" element={<LandingPage />} />
-          {/* Pass the new async login function to LoginPage.
-            If the user is already logged in, redirect from /login to /dashboard.
-          */}
           <Route 
             path="/login" 
             element={!user ? <LoginPage login={login} /> : <Navigate to="/dashboard" replace />} 
@@ -108,9 +105,7 @@ export default function App() {
           />
 
           {/* Fallbacks */}
-          {/* Non-authenticated users redirect to the LandingPage at the root */}
           {!user && <Route path="*" element={<Navigate to="/" replace />} />} 
-          {/* Authenticated users redirect to the Dashboard on invalid path */}
           {user && <Route path="*" element={<Navigate to="/dashboard" replace />} />}
         </Routes>
       </main>

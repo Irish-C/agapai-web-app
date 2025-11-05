@@ -1,9 +1,10 @@
+//CameraGrid.jsx
 import React, { useState, useEffect, useMemo } from 'react';
 import VideoFeed from './VideoFeed.jsx';
 import TodayReport from './TodayReport.jsx';
-import { useCameraSocket } from '../hooks/useCamera.js'; // Updated import path
-import { fetchCameraList } from '../services/apiService.js'; // Updated import path
-import { FaCameraRetro, FaPlug } from 'react-icons/fa';
+import { useCameraSocket } from '../hooks/useCamera.js'; 
+import { fetchCameraList } from '../services/apiService.js'; 
+import { FaCameraRetro, FaPlug, FaSpinner } from 'react-icons/fa';
 
 export default function CameraGrid() {
     const { cameraData, incidents, isConnected } = useCameraSocket();
@@ -11,7 +12,6 @@ export default function CameraGrid() {
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState(null);
     
-    // Hardcoded initial list while fetching the real list
     const defaultCameras = useMemo(() => [
         { id: 'cam1', location: 'Initializing...' },
         { id: 'cam2', location: 'Initializing...' },
@@ -19,12 +19,10 @@ export default function CameraGrid() {
         { id: 'cam4', location: 'Initializing...' },
     ], []);
 
-    // Effect to fetch the camera list from the REST API on component mount
     useEffect(() => {
         const getCameras = async () => {
             setIsLoading(true);
             try {
-                // Fetches the list from the mocked API service
                 const response = await fetchCameraList();
                 if (response.cameras) {
                     setCameraList(response.cameras);
@@ -34,7 +32,7 @@ export default function CameraGrid() {
             } catch (err) {
                 console.error("Failed to fetch camera list:", err);
                 setError('Failed to load camera list from the server.');
-                setCameraList(defaultCameras); // Fallback to default list
+                setCameraList(defaultCameras); 
             } finally {
                 setIsLoading(false);
             }
@@ -58,6 +56,7 @@ export default function CameraGrid() {
                     </span>
                 </div>
                 
+                {/* This block will no longer crash */}
                 {isLoading && (
                      <div className='flex items-center justify-center p-12 text-xl text-gray-700'>
                         <FaSpinner className='animate-spin mr-2' /> Loading camera configurations...
@@ -67,13 +66,12 @@ export default function CameraGrid() {
                 {error && <div className="p-4 bg-red-100 border border-red-400 text-red-700 rounded-lg mb-4">{error}</div>}
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {/* Render up to 4 cameras */}
                     {camerasToRender.slice(0, 4).map(camera => (
                         <VideoFeed
                             key={camera.id}
                             camId={camera.id}
                             location={camera.location}
-                            frameData={cameraData[camera.id]} // Pass base64 frame data
+                            frameData={cameraData[camera.id]}
                             isConnected={isConnected}
                         />
                     ))}

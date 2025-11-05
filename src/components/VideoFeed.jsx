@@ -1,72 +1,62 @@
-import React, { useState, useEffect } from 'react';
-import { FaVideo, FaTimesCircle, FaLink } from 'react-icons/fa';
+import React from 'react';
+// Import icons for status messages
+import { FaVideo, FaVideoSlash, FaSpinner } from 'react-icons/fa';
 
 /**
- * Converts a Base64 string to a data URL (image).
- * @param {string} base64String - The Base64 encoded image data.
- * @returns {string} The full data URL string.
- */
-const convertBase64ToDataURL = (base64String) => {
-    return `data:image/jpeg;base64,${base64String}`;
-};
-
-/**
- * Renders a single video feed for a camera.
- * It receives the current frame and connection status via props.
+ * Renders a single camera feed box.
+ * Receives props from CameraGrid.jsx
  */
 export default function VideoFeed({ camId, location, frameData, isConnected }) {
-    const [imageSrc, setImageSrc] = useState(null);
-
-    useEffect(() => {
-        if (frameData) {
-            // Update the image source whenever a new frame is received
-            setImageSrc(convertBase64ToDataURL(frameData));
-        } else {
-            // Clear image if no frame is available
-            setImageSrc(null);
-        }
-    }, [frameData]);
-
-    const statusIcon = isConnected ? 
-        <FaLink className="text-green-500" title="Connected" /> : 
-        <FaTimesCircle className="text-red-500" title="Disconnected" />;
-
-    const placeholderContent = (
-        <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-900 bg-opacity-70 text-white p-4">
-            <FaVideo className="text-5xl mb-3 text-gray-400" />
-            <p className="text-lg font-semibold text-gray-300">Awaiting Video Stream...</p>
-            <p className="text-sm text-gray-500 mt-1">Check Flask server status.</p>
-        </div>
+  
+  let content;
+  if (!isConnected) {
+    // WebSocket is globally disconnected
+    content = (
+      <div className="flex flex-col items-center justify-center h-full text-red-500">
+        <FaVideoSlash className="text-4xl mb-2" />
+        <span>Disconnected</span>
+      </div>
     );
-
-    return (
-        <div className="bg-gray-800 rounded-xl shadow-lg overflow-hidden border-2 border-gray-700 hover:border-teal-500 transition duration-300">
-            {/* Header */}
-            <div className="flex justify-between items-center bg-gray-900 p-3 text-white border-b border-gray-700">
-                <h4 className="text-md font-semibold flex items-center">
-                    {statusIcon}
-                    <span className="ml-2">{location} ({camId})</span>
-                </h4>
-                <span className="text-xs text-gray-400">Stream Status: {isConnected ? 'Live' : 'Offline'}</span>
-            </div>
-
-            {/* Video/Image Area */}
-            <div className="relative w-full h-64 bg-black flex items-center justify-center">
-                {imageSrc ? (
-                    <img 
-                        src={imageSrc} 
-                        alt={`Live stream from ${location}`}
-                        className="w-full h-full object-contain" // Use object-contain to prevent stretching
-                    />
-                ) : (
-                    placeholderContent
-                )}
-            </div>
-
-            {/* Footer / Controls Placeholder */}
-            <div className="p-2 text-center text-xs text-gray-400 bg-gray-700">
-                Last Update: {frameData ? new Date().toLocaleTimeString() : 'N/A'}
-            </div>
-        </div>
+  } else if (!frameData) {
+    // WebSocket is connected, but no frame received for *this* camera yet
+    content = (
+      <div className="flex flex-col items-center justify-center h-full text-gray-500">
+        <FaSpinner className="animate-spin text-4xl mb-2" />
+        <span>Connecting...</span>
+      </div>
     );
+  } else {
+    // We have data! Show the image from the base64 string.
+    content = (
+      <img 
+        src={`data:image/jpeg;base64,${frameData}`} 
+        alt={`${location} Feed`}
+        className="w-full h-full object-cover"
+      />
+    );
+  }
+
+  return (
+    <div className="bg-black rounded-lg shadow-lg overflow-hidden border-2 border-gray-700">
+      {/* Header Bar */}
+      <div className="bg-gray-800 text-white p-2 flex items-center justify-between">
+        <h4 className="font-semibold text-sm truncate">
+          <FaVideo className="inline-block mr-2 text-teal-400" />
+          {location}
+        </h4>
+        {/* Status light */}
+        <span 
+          title={frameData && isConnected ? 'Live' : 'Offline'}
+          className={`w-3 h-3 rounded-full transition-colors ${
+            frameData && isConnected ? 'bg-green-500' : 'bg-red-500'
+          }`}
+        ></span>
+      </div>
+
+      {/* Video Area (maintains 16:9 aspect ratio) */}
+      <div className="aspect-video w-full bg-gray-900 flex items-center justify-center">
+        {content}
+      </div>
+    </div>
+  );
 }
