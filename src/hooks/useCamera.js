@@ -1,3 +1,4 @@
+//useCamera.js
 import { useState, useEffect, useCallback } from 'react';
 import io from 'socket.io-client';
 
@@ -46,7 +47,7 @@ export const useCameraSocket = () => {
                 return [alert, ...prev];
             });
             
-            // Optionally, cap the size of the incidents array for memory management
+            // Cap the size of the incidents array for memory management
             setIncidents(prev => prev.slice(0, 10)); // Keep only the 10 most recent alerts
         });
 
