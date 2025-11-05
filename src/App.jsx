@@ -11,7 +11,7 @@ import LandingPage from './pages/LandingPage.jsx';
 import LoginPage from './pages/LoginPage.jsx';
 import MainPage from './pages/MainPage.jsx';
 import ReportsPage from './pages/ReportsPage.jsx';
-import Settings from './pages/Settings.jsx';
+import Settings from './pages/SettingsPage.jsx';
 
 /**
  * Main application component responsible for state management and routing.
