@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { FaUserCircle, FaSignInAlt, FaCamera, FaChartLine } from 'react-icons/fa';
 
 // Assets path updated based on the new hierarchy
-const logoPath = '/assets/images/logos/agapai-logo.png'; 
+const logoPath = '/assets/images/logo/agapai-logo.png'; 
 const bgImagePath = '/assets/images/bg/og-bg.jpg'; 
 
 export default function LandingPage() {
