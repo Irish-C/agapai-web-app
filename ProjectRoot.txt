@@ -1,17 +1,14 @@
 agapai-web-app/
 │
 ├── public/ 
-│   ├── index.html
 │   ├── favicon.ico**
 │   └── assets/ 
-│       ├── styles/ 
-│       │   └── index.css 
 │       └── images/ 
 │           ├── bg/
 │           │   ├── filter-bg.jpg
 │           │   ├── gray-bg.jpg
 │           │   └── og-bg.jpg
-│           └── logos/ 
+│           └── logo/ 
 │               ├── agapai-logo.png
 │               ├── dswd-logo.png
 │               └── pup-logo.png
@@ -35,16 +32,21 @@ agapai-web-app/
 │   │   └── Settings.jsx
 │   │
 │   ├── assets/
-│   │   └── images/
+│   │   └── styles
+│   │         └──index.css
 │   │
 │   ├── hooks/
-│   │   └── useCamera.js    // Good naming convention!
+│   │   └── useCamera.js
 │   │
-│   ├── services/           // Renamed from 'utils' for API/fetch logic
-│   │   └── apiService.js   // Renamed for clarity on its purpose
+│   ├── services/           // API/fetch logic
+│   │   └── apiService.js
 │   │
 │   ├── App.jsx
-│   └── main.jsx
+│   ├── main.jsx
+│   ├── Navbar.jsx
+│   ├── socket.js
+│   ├── SubNavbar.js
+│   └── index.html
 │
 ├── backend/
 │   ├── app.py
