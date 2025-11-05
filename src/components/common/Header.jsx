@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { FaUserCircle, FaSignOutAlt, FaTachometerAlt, FaChartBar, FaCog, FaBars, FaTimes } from 'react-icons/fa';
 
-const logoPath = '/assets/images/logos/agapai-logo.png'; 
+const logoPath = '/assets/images/logos/agapai-logo.png';
 
 export default function Header({ user, logout }) {
     const [isMenuOpen, setIsMenuOpen] = useState(false);
+    const location = useLocation(); // current URL path
 
     const navItems = [
         { name: 'Dashboard', path: '/dashboard', icon: FaTachometerAlt },
@@ -15,24 +16,32 @@ export default function Header({ user, logout }) {
 
     const toggleMenu = () => setIsMenuOpen(!isMenuOpen);
 
+    const isActive = (path) => location.pathname === path;
+
     return (
         <header className="bg-gray-800 text-white shadow-lg sticky top-0 z-20">
             <div className="container mx-auto px-4 sm:px-6 lg:px-8 flex justify-between items-center h-16">
-                
+
                 {/* Logo and App Title */}
                 <Link to="/dashboard" className="flex items-center space-x-3 transition duration-300 hover:opacity-90">
-                    <img src={logoPath} alt="AGAPAI Logo" className="h-8 w-auto rounded-full" 
-                         onError={(e) => { e.target.onerror = null; e.target.src="https://placehold.co/32x32/14b8a6/ffffff?text=A" }}/>
+                    <img
+                        src={logoPath}
+                        alt="AGAPAI Logo"
+                        className="h-8 w-auto rounded-full"
+                        onError={(e) => { e.target.onerror = null; e.target.src = "https://placehold.co/32x32/14b8a6/ffffff?text=A" }}
+                    />
                     <span className="text-xl font-bold tracking-wider">AGAPAI</span>
                 </Link>
 
                 {/* Desktop Navigation Links */}
                 <nav className="hidden md:flex space-x-6">
                     {navItems.map((item) => (
-                        <Link 
-                            key={item.name} 
-                            to={item.path} 
-                            className="flex items-center text-sm font-medium hover:text-teal-400 transition duration-150"
+                        <Link
+                            key={item.name}
+                            to={item.path}
+                            className={`flex items-center text-sm font-medium transition duration-150 ${
+                                isActive(item.path) ? 'text-teal-400 border-b-2 border-teal-400' : 'hover:text-teal-400'
+                            }`}
                         >
                             <item.icon className="mr-1" />
                             {item.name}
@@ -56,24 +65,28 @@ export default function Header({ user, logout }) {
                 </div>
 
                 {/* Mobile Menu Button */}
-                <button 
-                    onClick={toggleMenu} 
+                <button
+                    onClick={toggleMenu}
                     className="md:hidden p-2 rounded-lg hover:bg-gray-700 transition duration-150"
                 >
                     {isMenuOpen ? <FaTimes className="w-6 h-6" /> : <FaBars className="w-6 h-6" />}
                 </button>
             </div>
-            
+
             {/* Mobile Menu Dropdown */}
             {isMenuOpen && (
                 <div className="md:hidden bg-gray-900 p-4 border-t border-gray-700">
                     <nav className="flex flex-col space-y-2 mb-4">
                         {navItems.map((item) => (
-                            <Link 
-                                key={item.name} 
-                                to={item.path} 
+                            <Link
+                                key={item.name}
+                                to={item.path}
                                 onClick={() => setIsMenuOpen(false)}
-                                className="flex items-center px-3 py-2 text-base font-medium text-gray-200 rounded-lg hover:bg-gray-700 hover:text-teal-400 transition duration-150"
+                                className={`flex items-center px-3 py-2 text-base font-medium rounded-lg transition duration-150 ${
+                                    isActive(item.path)
+                                        ? 'bg-gray-700 text-teal-400'
+                                        : 'text-gray-200 hover:bg-gray-700 hover:text-teal-400'
+                                }`}
                             >
                                 <item.icon className="mr-3 w-5 h-5" />
                                 {item.name}
