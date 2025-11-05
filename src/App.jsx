@@ -80,7 +80,9 @@ export default function App() {
           />
 
           {/* Fallbacks */}
-          {!user && <Route path="*" element={<Navigate to="/login" replace />} />}
+          {/* Non-authenticated users redirect to the LandingPage at the root */}
+          {!user && <Route path="*" element={<Navigate to="/" replace />} />} 
+          {/* Authenticated users redirect to the Dashboard on invalid path */}
           {user && <Route path="*" element={<Navigate to="/dashboard" replace />} />}
         </Routes>
       </main>

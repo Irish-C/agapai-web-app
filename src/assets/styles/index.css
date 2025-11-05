@@ -1,7 +1,7 @@
 /* 1. Import Tailwind’s base framework for v4 */
 @import "tailwindcss";
 
-/* 2. Set default styles for your entire app */
+/* 2. Set default styles for entire app */
 @layer base {
   html, body, #root {
     @apply h-full;
