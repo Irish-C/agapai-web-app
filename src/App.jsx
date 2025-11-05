@@ -5,7 +5,6 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import Header from './components/common/Header.jsx';
 import Footer from './components/common/Footer.jsx';
 import ConnectionStatus from "./components/ConnectionStatus.jsx";
-import { loginUser } from './services/apiService.js';
 
 // Pages
 import LandingPage from './pages/LandingPage.jsx';
@@ -13,7 +12,6 @@ import LoginPage from './pages/LoginPage.jsx';
 import MainPage from './pages/MainPage.jsx';
 import ReportsPage from './pages/ReportsPage.jsx';
 import Settings from './pages/SettingsPage.jsx';
-
 
 /**
  * Main application component responsible for state management and routing.
