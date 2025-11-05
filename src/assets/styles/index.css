@@ -1,0 +1,58 @@
+/* 1. Import Tailwind’s base framework for v4 */
+@import "tailwindcss";
+
+/* 2. Set default styles for your entire app */
+@layer base {
+  html, body, #root {
+    @apply h-full;
+  }
+  body {
+    @apply bg-gray-100;
+    font-family: 'Inter', system-ui, sans-serif;
+  }
+}
+#root {
+  background-image: url('./images/bg/gray-bg.png');
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: cover;
+  background-attachment: fixed;
+}
+
+/* 3. Reusable AGAPAI component classes */
+@layer components {
+  .header-main {
+    @apply flex justify-between items-center px-4 h-16;
+    background-color: #1E3A5F;
+  }
+
+  .navbar-main {
+    @apply flex justify-between items-center px-4 h-14;
+    background-color: #3FA7A0;
+  }
+
+  .subnavbar-main {
+    @apply px-4 py-2;
+    background-color: #E0E0E0;
+  }
+
+  .btn-subnav {
+    @apply px-3 py-1 bg-white rounded-md shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50;
+  }
+
+  .btn-nav-active {
+    @apply px-3 py-1 rounded-md text-sm font-medium shadow-inner bg-teal-700 text-white;
+  }
+
+  .btn-nav-inactive {
+    @apply px-3 py-1 rounded-md text-sm font-medium text-white hover:bg-teal-600;
+  }
+
+  .btn-nav-admin {
+     @apply px-3 py-1 rounded-md text-sm font-medium transition-colors text-yellow-300 hover:bg-teal-600 hover:text-white;
+  }
+
+  .btn-logout {
+    @apply px-3 py-1 rounded-md text-sm font-medium transition-colors text-white bg-red-600 hover:bg-red-700;
+  }
+}
