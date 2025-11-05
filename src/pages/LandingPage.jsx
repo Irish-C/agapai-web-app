@@ -4,7 +4,7 @@ import { FaUserCircle, FaSignInAlt, FaCamera, FaChartLine } from 'react-icons/fa
 
 // Assets path updated based on the new hierarchy
 const logoPath = '/assets/images/logo/agapai-logo.png'; 
-const bgImagePath = '/assets/images/bg/og-bg.jpg'; 
+const bgImagePath = '/assets/images/bg/og-bg.png'; 
 
 export default function LandingPage() {
   return (
@@ -17,7 +17,7 @@ export default function LandingPage() {
             backgroundAttachment: 'fixed'
         }}
     >
-        <div className="absolute inset-0 bg-black opacity-60"></div>
+        <div className="relative z-10 w-full max-w-md bg-white p-8 rounded-2xl shadow-2xl backdrop-blur-sm"></div>
         
         <div className="relative text-center text-white z-10 p-8 md:p-12 bg-gray-900 bg-opacity-80 rounded-2xl shadow-2xl max-w-4xl mx-auto backdrop-blur-sm">
             <img src={logoPath} alt="AGAPAI Logo" className="w-24 h-24 mx-auto mb-6 rounded-full border-4 border-teal-500 shadow-lg" 

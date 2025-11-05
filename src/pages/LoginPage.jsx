@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { FaLock, FaSignInAlt, FaUser, FaKey, FaSpinner } from 'react-icons/fa';
-import { loginUser } from '../services/apiService'; // Updated import path
+// ⬅️ REMOVED DIRECT IMPORT: loginUser is no longer needed here
 
 // Assets path updated based on the new hierarchy
 const bgImagePath = '/assets/images/bg/filter-bg.jpg';
@@ -8,7 +8,7 @@ const logoPath = '/assets/images/logos/agapai-logo.png';
 const dswdLogoPath = '/assets/images/logos/dswd-logo.png'; 
 const pupLogoPath = '/assets/images/logos/pup-logo.png'; 
 
-
+// LoginPage now receives the asynchronous 'login' function from App.jsx
 export default function LoginPage({ login }) {
     const [username, setUsername] = useState('admin');
     const [password, setPassword] = useState('password');
@@ -21,25 +21,21 @@ export default function LoginPage({ login }) {
         setIsLoading(true);
 
         try {
-            // Call the login API service
-            const userData = await loginUser(username, password);
-            
-            if (userData && userData.user_id) {
-                // Use the login function passed from App.jsx to set state and redirect
-                login({ 
-                    id: userData.user_id, 
-                    username: userData.username,
-                    token: userData.access_token // Store token if API sends one
-                });
-            } else {
-                // This shouldn't be hit if fetchApi handles HTTP errors correctly, 
-                // but acts as a safeguard.
-                setError('Invalid response from server.');
+            // ⬅️ CRITICAL CHANGE: Call the login prop (from App.jsx) with username and password.
+            // App.jsx now handles the API call and the setUser state update.
+            const result = await login(username, password);
+
+            if (!result.success) {
+                // Display error message returned by the App.jsx login function
+                setError(result.message || 'Login failed. Invalid credentials.');
             }
+            // If result.success is true, App.jsx handles the user state change,
+            // triggering a re-render and automatic redirect to /dashboard via Routes.
+
         } catch (err) {
-            // Catch authentication/network errors from apiService
-            console.error('Login failed:', err);
-            setError(err.message || 'Login failed. Please check your network connection.');
+            // Catch any unhandled errors (e.g., network timeout)
+            console.error('Login submission error:', err);
+            setError(err.message || 'An unexpected error occurred during login.');
         } finally {
             setIsLoading(false);
         }
@@ -52,6 +48,7 @@ export default function LoginPage({ login }) {
                 backgroundImage: `url(${bgImagePath})`,
                 backgroundSize: 'cover',
                 backgroundPosition: 'center',
+                backgroundAttachment: 'fixed',
             }}
         >
             <div className="absolute inset-0 bg-gray-900 opacity-70"></div>
@@ -137,9 +134,9 @@ export default function LoginPage({ login }) {
                 {/* Affiliation Logos */}
                 <div className="mt-8 pt-6 border-t border-gray-200 flex justify-around items-center space-x-4">
                     <img src={dswdLogoPath} alt="DSWD Logo" className="h-10 w-auto opacity-70"
-                         onError={(e) => { e.target.onerror = null; e.target.src="https://placehold.co/40x40/cccccc/000000?text=DSWD" }}/>
+                            onError={(e) => { e.target.onerror = null; e.target.src="/placeholder-logo.png" }}/>
                     <img src={pupLogoPath} alt="PUP Logo" className="h-10 w-auto opacity-70" 
-                         onError={(e) => { e.target.onerror = null; e.target.src="https://placehold.co/40x40/cccccc/000000?text=PUP" }}/>
+                            onError={(e) => { e.target.onerror = null; e.target.src="/placeholder-logo.png" }}/>
                 </div>
             </div>
         </div>
