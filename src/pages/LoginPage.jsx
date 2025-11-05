@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { FaLock, FaSignInAlt, FaUser, FaKey, FaSpinner } from 'react-icons/fa';
-// ⬅️ REMOVED DIRECT IMPORT: loginUser is no longer needed here
 
 // Assets path updated based on the new hierarchy
 const bgImagePath = '/assets/images/bg/filter-bg.jpg';
@@ -21,7 +20,7 @@ export default function LoginPage({ login }) {
         setIsLoading(true);
 
         try {
-            // ⬅️ CRITICAL CHANGE: Call the login prop (from App.jsx) with username and password.
+            // Call the login prop (from App.jsx) with username and password.
             // App.jsx now handles the API call and the setUser state update.
             const result = await login(username, password);
 
@@ -33,7 +32,7 @@ export default function LoginPage({ login }) {
             // triggering a re-render and automatic redirect to /dashboard via Routes.
 
         } catch (err) {
-            // Catch any unhandled errors (e.g., network timeout)
+            // Catch any unhandled errors like network timeout
             console.error('Login submission error:', err);
             setError(err.message || 'An unexpected error occurred during login.');
         } finally {
