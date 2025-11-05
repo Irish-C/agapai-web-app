@@ -4,8 +4,9 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "start-all": "concurrently \"npm run dev\" \"cd ../agapai-backend && python app.py\"",
     "dev": "vite",
+    "start-backend": "cd backend && python app.py",
+    "start-all": "concurrently \"npm run dev\" \"npm run start-backend\"",
     "build": "vite build",
     "lint": "eslint . --ext js,jsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview"

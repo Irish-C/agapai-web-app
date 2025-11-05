@@ -5,6 +5,7 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import Header from './components/common/Header.jsx';
 import Footer from './components/common/Footer.jsx';
 import ConnectionStatus from "./components/ConnectionStatus.jsx";
+import { loginUser } from './services/apiService.js';
 
 // Pages
 import LandingPage from './pages/LandingPage.jsx';
@@ -12,6 +13,7 @@ import LoginPage from './pages/LoginPage.jsx';
 import MainPage from './pages/MainPage.jsx';
 import ReportsPage from './pages/ReportsPage.jsx';
 import Settings from './pages/SettingsPage.jsx';
+
 
 /**
  * Main application component responsible for state management and routing.
@@ -22,10 +24,10 @@ export default function App() {
 
   // Mock cameras data (can be replaced with an API call later)
   const [cameras] = useState([
-    { id: 'cam1', name: 'Living Room', location: 'Living Room' },
-    { id: 'cam2', name: 'Kitchen', location: 'Kitchen' },
-    { id: 'cam3', name: 'Bedroom', location: 'Bedroom' },
-    { id: 'cam4', name: 'Hallway', location: 'Hallway' },
+    { id: 'cam1', name: 'House Sebastian', location: 'House Sebastian' },
+    { id: 'cam2', name: 'House Charbel', location: 'House Charbel' },
+    { id: 'cam3', name: 'House Emmanuel', location: 'House Emmanuel' },
+    { id: 'cam4', name: 'House Gabriel', location: 'House Gabriel' },
   ]);
 
   /**
