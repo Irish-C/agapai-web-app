@@ -39,7 +39,6 @@ export default function ReportsPage({ user, logout }) {
 
     return (
         <div className="flex flex-col min-h-screen bg-gray-100">
-            <Header user={user} logout={logout} />
             
             <main className="flex-grow container mx-auto p-6">
                 <h1 className="text-3xl font-extrabold text-gray-900 flex items-center mb-6">
@@ -111,8 +110,6 @@ export default function ReportsPage({ user, logout }) {
                 )}
 
             </main>
-
-            <Footer />
         </div>
     );
 }
