@@ -54,7 +54,7 @@ export default function LandingPage() {
             </div>
 
             <div className="mt-12 grid grid-cols-1 md:grid-cols-2 gap-8 text-left">
-                <div className="p-4 bg-opacity-70 rounded-xl border border-white">
+                <div className="p-4 bg-opacity-70 rounded-xl bg-gradient-to-b from-[#2d3092] to-[#015954] border border-teal-400">
                     <h3 className="flex items-center text-xl font-bold text-teal-400 mb-2">
                         <FaCamera className="mr-2" /> Real-Time Monitoring
                     </h3>
@@ -62,7 +62,7 @@ export default function LandingPage() {
                         Secure video streaming with low-latency AI processing for immediate incident detection.
                     </p>
                 </div>
-                <div className="p-4 bg-opacity-70 rounded-xl border border-white">
+                <div className="p-4 bg-opacity-70 rounded-xl bg-gradient-to-b from-[#2d3092] to-[#015954] border border-teal-400">
                     <h3 className="flex items-center text-xl font-bold text-teal-400 mb-2">
                         <FaChartLine className="mr-2" /> Comprehensive Reporting
                     </h3>
@@ -80,3 +80,4 @@ export default function LandingPage() {
     </div>
   );
 }
+
