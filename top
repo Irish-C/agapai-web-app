@@ -1,0 +1,305 @@
+[33mcommit 69177943b2010ea1473ca09a878e3a96be2ff372[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m)[m
+Author: IrishC <maryirish.cammagay@gmail.com>
+Date:   Sun Nov 9 17:52:28 2025 +0800
+
+    Revert "Reapply "[Resolved] login function for two users""
+    
+    This reverts commit 292ad504e10ab8064262bfdf12e0f25ef93ffb33.
+
+[33mcommit 292ad504e10ab8064262bfdf12e0f25ef93ffb33[m
+Author: IrishC <maryirish.cammagay@gmail.com>
+Date:   Sun Nov 9 17:48:04 2025 +0800
+
+    Reapply "[Resolved] login function for two users"
+    
+    This reverts commit f2e8df2ed9e5b5f0311894e70ffc8f68c8533c32.
+
+[33mcommit f2e8df2ed9e5b5f0311894e70ffc8f68c8533c32[m
+Author: IrishC <maryirish.cammagay@gmail.com>
+Date:   Sun Nov 9 17:47:01 2025 +0800
+
+    Revert "[Resolved] login function for two users"
+    
+    This reverts commit 011606dd3adf86620ec399b2105fae8f80d151c5.
+
+[33mcommit 011606dd3adf86620ec399b2105fae8f80d151c5[m[33m ([m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m)[m
+Author: IrishC <maryirish.cammagay@gmail.com>
+Date:   Sun Nov 9 17:45:26 2025 +0800
+
+    [Resolved] login function for two users
+
+[33mcommit 84d8f3bde628935c98cff5e51538503965ee4c45[m
+Author: IrishC <maryirish.cammagay@gmail.com>
+Date:   Sun Nov 9 17:21:06 2025 +0800
+
+    Created hash_passwords.py
+
+[33mcommit b0c89899fb54a8b0670d0dac51ab19c6020324f4[m
+Author: IrishC <maryirish.cammagay@gmail.com>
+Date:   Sun Nov 9 16:41:38 2025 +0800
+
+    [Unresolved] Login mock to real user and jwt token
+
+[33mcommit 5c581abee9ff7fe1ff4745e0389b07d6acc3438f[m
+Author: IrishC <maryirish.cammagay@gmail.com>
+Date:   Sun Nov 9 14:42:29 2025 +0800
+
+    Created Database based on current ER diagram
+
+[33mcommit 8416e15ebc52b13aa5f02fef338e34e0b9b3a8d5[m
+Author: IrishC <maryirish.cammagay@gmail.com>
+Date:   Sun Nov 9 09:50:47 2025 +0800
+
+    Remove header/footer imports from pages/
+
+[33mcommit 2495203551ca2d4e80fecb7f60c329be818c5807[m
+Author: IrishC <maryirish.cammagay@gmail.com>
+Date:   Wed Nov 5 21:48:44 2025 +0800
+
+    Add Active notice when a Tab is active
+
+[33mcommit 66778cc5c7998af98b2e362cfae507978be20b26[m
+Author: IrishC <maryirish.cammagay@gmail.com>
+Date:   Wed Nov 5 21:30:49 2025 +0800
+
+    Remove duplicated header and footer in Settings and Reports page
+
+[33mcommit 5cbf5068bae9d0d829768387fd50b48b293bd2da[m
+Author: IrishC <maryirish.cammagay@gmail.com>
+Date:   Wed Nov 5 21:20:28 2025 +0800
+
+    Change test to main
+
+[33mcommit e77ad81e224130b8182b373fcb846c247acd77ed[m[33m ([m[1;31morigin/test[m[33m, [m[1;32mtest[m[33m)[m
+Author: IrishC <maryirish.cammagay@gmail.com>
+Date:   Wed Nov 5 19:49:05 2025 +0800
+
+    [Resolved] Redirection of Login to Dashboard [Issue] Empty dashboard
+
+[33mcommit 59670ab9c3c57b32fda27949a0949baa431da124[m
+Author: IrishC <maryirish.cammagay@gmail.com>
+Date:   Wed Nov 5 19:21:12 2025 +0800
+
+    Resolve Eventlet but [Issue] Blank page appears after
+
+[33mcommit bd864d490923d3e8569ff4ae831a87e4fcd64687[m
+Author: IrishC <maryirish.cammagay@gmail.com>
+Date:   Wed Nov 5 18:50:02 2025 +0800
+
+    [Temp Resolve] Success login [Issue] Main Page is missing
+
+[33mcommit 715e89bba4fc611f09c2024b9a7421d0f489f3b3[m
+Author: IrishC <maryirish.cammagay@gmail.com>
+Date:   Wed Nov 5 17:38:33 2025 +0800
+
+    [Resolve] HTTP Request Error
+
+[33mcommit fcfd3cfb376697517f8e15f8eb6d2de0ca499ae9[m
+Author: IrishC <maryirish.cammagay@gmail.com>
+Date:   Wed Nov 5 15:56:26 2025 +0800
+
+    Move bg/ and logo/ folder to assets/images
+
+[33mcommit 43aedf7c4f6bf62245b4d271ed6382580ebe8930[m
+Author: IrishC <maryirish.cammagay@gmail.com>
+Date:   Wed Nov 5 15:50:53 2025 +0800
+
+    Fixed Landing Page to show before Login Page
+
+[33mcommit c832b24decb702ec1272f426e051eb456af854a8[m
+Author: IrishC <maryirish.cammagay@gmail.com>
+Date:   Wed Nov 5 15:35:25 2025 +0800
+
+    [Resolved] Blank npm run start-all working
+
+[33mcommit d9c3cec61061c8f8315be44b3ea5444a92e4e2ae[m
+Author: IrishC <maryirish.cammagay@gmail.com>
+Date:   Wed Nov 5 13:43:56 2025 +0800
+
+    Change code line to suit tailwind v3 to tailwind v4
+
+[33mcommit d0b4f515f4bfeee9fbf4dabc418010fce72389de[m
+Author: IrishC <maryirish.cammagay@gmail.com>
+Date:   Wed Nov 5 13:43:06 2025 +0800
+
+    Change alias settingspage to Settings
+
+[33mcommit 938a1db3efa6e3853e3586c4caa3e5069beea76a[m
+Author: IrishC <maryirish.cammagay@gmail.com>
+Date:   Wed Nov 5 12:51:57 2025 +0800
+
+    Change to concurrent
+
+[33mcommit b6a9b50453adfa71a7cc1d426ebed92e4a55f162[m
+Author: IrishC <maryirish.cammagay@gmail.com>
+Date:   Wed Nov 5 12:51:08 2025 +0800
+
+    Move assets/images/ folder from public to src --updated
+
+[33mcommit ba151858934085a7eff740a1d2ddd5d43494dcb7[m
+Author: IrishC <maryirish.cammagay@gmail.com>
+Date:   Wed Nov 5 12:49:56 2025 +0800
+
+    Move assets/images/ folder from public to src
+
+[33mcommit 0cafc42ff3b546693f4ae7ef725cdcf9aa6d803c[m
+Author: IrishC <maryirish.cammagay@gmail.com>
+Date:   Wed Nov 5 12:48:27 2025 +0800
+
+    Add concurrently line to reduce combine terminal of BE and FE
+
+[33mcommit b231148e271c16f15f66a7c1f7aecbefeaed6bc1[m
+Author: IrishC <maryirish.cammagay@gmail.com>
+Date:   Sun Nov 2 21:26:54 2025 +0800
+
+    Add content to README.md file such as AGAPAI description, features, technologies used, and installation.
+
+[33mcommit 82bb5671487eda8bc4cc34bca2472dbc4875b6bf[m
+Author: IrishC <maryirish.cammagay@gmail.com>
+Date:   Sun Nov 2 21:21:15 2025 +0800
+
+    Delete App.js into App.jsx
+
+[33mcommit bbf046693f0844d38408a64e40a38e395e213d9e[m
+Author: IrishC <maryirish.cammagay@gmail.com>
+Date:   Sun Nov 2 21:17:28 2025 +0800
+
+    Create js and jsx files: scoket.js, useCamera.js, apiService.js, and ConnectionStatus.jsx.
+
+[33mcommit 9af3f6212855de64f59dd2cb9144e081119c7eab[m
+Author: IrishC <maryirish.cammagay@gmail.com>
+Date:   Sun Nov 2 21:16:24 2025 +0800
+
+    Modify files
+
+[33mcommit 0e4874b222a72775220e196eb5326b18cbd80bba[m
+Author: IrishC <maryirish.cammagay@gmail.com>
+Date:   Sun Nov 2 21:15:17 2025 +0800
+
+    Update outdated content
+
+[33mcommit c6c95edb85fa520fba9b4f92a76fe93df179e0fa[m
+Author: IrishC <maryirish.cammagay@gmail.com>
+Date:   Sun Nov 2 21:14:39 2025 +0800
+
+    Change App.jsx and main.jsx to relate to each other
+
+[33mcommit 30ba0c1566762e4780d3253adf670c1a9e5c0ca4[m
+Author: IrishC <maryirish.cammagay@gmail.com>
+Date:   Sun Nov 2 20:26:21 2025 +0800
+
+    Modify components relative to each other
+
+[33mcommit 2f44885cd6e75a4a31df96bccff2ab1640e06cba[m
+Author: IrishC <maryirish.cammagay@gmail.com>
+Date:   Sun Nov 2 20:25:41 2025 +0800
+
+    [src/pages] Add and modified pages
+
+[33mcommit 96c912f68dadddfe7a9b65ca4455343a1961078a[m
+Author: IrishC <maryirish.cammagay@gmail.com>
+Date:   Sun Nov 2 20:24:49 2025 +0800
+
+    [Backend] Add requirements.txt and user_routes.cpython-311.pyc
+
+[33mcommit cc3c0762ea009e09ba4ea1035de977bc6b79cc6c[m
+Author: IrishC <maryirish.cammagay@gmail.com>
+Date:   Sun Nov 2 19:56:57 2025 +0800
+
+    Create Header.jsx and Footer.jsx file in src/components/common/
+
+[33mcommit 300f3e7db4d2e5ce73fef160eaec1a70b16d2cc1[m
+Author: IrishC <maryirish.cammagay@gmail.com>
+Date:   Sun Nov 2 19:54:10 2025 +0800
+
+    Change images destination from src to public/assets/images
+
+[33mcommit 64bb2c4873c6e1797ee4a7d641a8386ae8d3c760[m
+Author: IrishC <maryirish.cammagay@gmail.com>
+Date:   Sun Nov 2 19:52:10 2025 +0800
+
+    [Backend] Create user_route.py
+
+[33mcommit 99d9506dacf67951e1cef0ff0cb4263820b7c5de[m
+Author: IrishC <maryirish.cammagay@gmail.com>
+Date:   Sun Nov 2 19:51:16 2025 +0800
+
+    Delete duplicate and/or redundant files and images
+
+[33mcommit 1f768454deb8c3b4154795a36bb0c03590bbf3f9[m
+Author: IrishC <maryirish.cammagay@gmail.com>
+Date:   Sun Nov 2 19:49:47 2025 +0800
+
+    Change .env content to Secret Key
+
+[33mcommit 8ffc9d36bb90d3225cc3a6d7ccf628041a2728d5[m
+Author: IrishC <maryirish.cammagay@gmail.com>
+Date:   Sun Nov 2 19:48:44 2025 +0800
+
+    Create ProjectRoot.text file
+
+[33mcommit 022518c7e2de92bafa150ad6bf1e08731eb77457[m
+Author: IrishC <maryirish.cammagay@gmail.com>
+Date:   Sun Nov 2 19:47:47 2025 +0800
+
+    [Error] MOCK_STREAM_RUNNING is assigned before global declaration
+
+[33mcommit b04c3c7a4b7198b3cfc8c022f2ff1d57374371c1[m
+Author: IrishC <maryirish.cammagay@gmail.com>
+Date:   Sun Nov 2 18:09:26 2025 +0800
+
+    [Unresolved] Frontend Hosting Error
+
+[33mcommit 9785328fbcf9335d0a24ec0e08b28f55ee92f78c[m
+Author: IrishC <maryirish.cammagay@gmail.com>
+Date:   Sun Nov 2 17:22:53 2025 +0800
+
+    Vite Changes
+
+[33mcommit dbf21149b861a066b6672d2bb2a54f01f98a3ae3[m
+Author: IrishC <maryirish.cammagay@gmail.com>
+Date:   Sun Nov 2 16:00:34 2025 +0800
+
+    Create TodayReport.jsx file
+
+[33mcommit ec93c56cfeb21cd0401ee965598074f789be0233[m
+Author: IrishC <maryirish.cammagay@gmail.com>
+Date:   Sun Nov 2 15:53:27 2025 +0800
+
+    Initial Commmit
+
+[33mcommit 8b9f29f2df52146e66b2341e0105aec3918867c5[m
+Author: Irish-C <126903401+Irish-C@users.noreply.github.com>
+Date:   Fri Oct 17 15:05:19 2025 +0800
+
+    Delete images/logo/file1
+
+[33mcommit 2564f319f33f016f981424b7261f4ecd27162275[m
+Author: Irish-C <126903401+Irish-C@users.noreply.github.com>
+Date:   Fri Oct 17 15:04:58 2025 +0800
+
+    Delete images/file1
+
+[33mcommit 37b3f234c9ba5c291b05d62268c2af980ada0087[m
+Author: Irish-C <126903401+Irish-C@users.noreply.github.com>
+Date:   Fri Oct 17 15:04:34 2025 +0800
+
+    Add files via upload
+
+[33mcommit 2fc3d2ec409617179f11121f7aff4e7ac488384c[m
+Author: Irish-C <126903401+Irish-C@users.noreply.github.com>
+Date:   Fri Oct 17 15:04:06 2025 +0800
+
+    Create file1
+
+[33mcommit c2ebe2abf78fbcdc89706ae6e414b226d889f788[m
+Author: Irish-C <126903401+Irish-C@users.noreply.github.com>
+Date:   Fri Oct 17 15:03:34 2025 +0800
+
+    Create file1
+
+[33mcommit 57df4d476f42da4223d11afbe82f4c53e639b8a6[m
+Author: Irish-C <126903401+Irish-C@users.noreply.github.com>
+Date:   Fri Oct 17 09:42:42 2025 +0800
+
+    Initial commit
