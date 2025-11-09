@@ -1,12 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { FaUserCircle, FaSignOutAlt, FaTachometerAlt, FaChartBar, FaCog, FaBars, FaTimes } from 'react-icons/fa';
-
-const logoPath = '/assets/images/logos/agapai-logo.png';
+import agapaiLogo from '../../assets/images/logos/agapai-logo.png';
 
 export default function Header({ user, logout }) {
     const [isMenuOpen, setIsMenuOpen] = useState(false);
-    const location = useLocation(); // current URL path
+    const [hidden, setHidden] = useState(false); // track header visibility
+    const [lastScrollY, setLastScrollY] = useState(0);
+    const location = useLocation();
 
     const navItems = [
         { name: 'Dashboard', path: '/dashboard', icon: FaTachometerAlt },
@@ -15,22 +16,42 @@ export default function Header({ user, logout }) {
     ];
 
     const toggleMenu = () => setIsMenuOpen(!isMenuOpen);
-
     const isActive = (path) => location.pathname === path;
 
-    return (
-        <header className="bg-gray-800 text-white shadow-lg sticky top-0 z-20">
-            <div className="container mx-auto px-4 sm:px-6 lg:px-8 flex justify-between items-center h-16">
+    // Scroll effect to hide/show header
+    useEffect(() => {
+        const handleScroll = () => {
+            const currentScrollY = window.scrollY;
+            if (currentScrollY > lastScrollY && currentScrollY > 50) {
+                // scrolling down
+                setHidden(true);
+            } else {
+                // scrolling up
+                setHidden(false);
+            }
+            setLastScrollY(currentScrollY);
+        };
 
+        window.addEventListener('scroll', handleScroll);
+        return () => window.removeEventListener('scroll', handleScroll);
+    }, [lastScrollY]);
+
+    return (
+        <header
+            className={`bg-[#2d3092] text-white shadow-lg sticky top-0 z-20 transition-transform duration-300 ${
+                hidden ? '-translate-y-full' : 'translate-y-0'
+            }`}
+        >
+            <div className="container mx-auto px-4 sm:px-6 lg:px-8 flex justify-between items-center h-16">
                 {/* Logo and App Title */}
                 <Link to="/dashboard" className="flex items-center space-x-3 transition duration-300 hover:opacity-90">
                     <img
-                        src={logoPath}
+                        src={agapaiLogo}
                         alt="AGAPAI Logo"
-                        className="h-8 w-auto rounded-full"
+                        className="h-12 w-auto rounded-full"
                         onError={(e) => { e.target.onerror = null; e.target.src = "https://placehold.co/32x32/14b8a6/ffffff?text=A" }}
                     />
-                    <span className="text-xl font-bold tracking-wider">AGAPAI</span>
+                    <span className="text-4xl font-bold text-[#c4fcff] tracking-wider">AGAPAI</span>
                 </Link>
 
                 {/* Desktop Navigation Links */}

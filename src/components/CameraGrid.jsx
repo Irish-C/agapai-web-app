@@ -6,6 +6,7 @@ import { useCameraSocket } from '../hooks/useCamera.js';
 import { fetchCameraList } from '../services/apiService.js'; 
 import { FaCameraRetro, FaPlug, FaSpinner } from 'react-icons/fa';
 
+
 export default function CameraGrid() {
     const { cameraData, incidents, isConnected } = useCameraSocket();
     const [cameraList, setCameraList] = useState([]);
@@ -53,9 +54,9 @@ export default function CameraGrid() {
     );
 
     const header = (
-        <div className="flex items-center text-2xl font-bold text-gray-800 mb-4 border-b pb-2">
+        <div className="flex items-center text-2xl font-bold text-teal-900 mb-4 border-b pb-2">
             <FaCameraRetro className="mr-3 text-teal-600" />
-            Real-Time Video Feeds 
+            Live View
             <span className={`ml-4 px-3 py-1 text-sm rounded-full font-semibold ${isConnected ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
                 <FaPlug className='inline-block mr-1' /> {isConnected ? 'WebSocket Live' : 'WebSocket Disconnected'}
             </span>
