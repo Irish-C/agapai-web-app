@@ -36,10 +36,10 @@ def login():
         return jsonify({
             "status": "success",
             "message": "Login successful",
-            "user_id": user.id,  # Galing na sa DB
-            "username": user.username, # Galing na sa DB
+            "user_id": user.id,  # From DB
+            "username": user.username,  # From DB
             "role": role_name,
-            "access_token": "mock_jwt_token_12345" # Mock JWT token pa rin
+            "access_token": access_token
         }), 200
     else:
         # Failed login

@@ -3,13 +3,13 @@
  * Centralized service for REST API calls to the Flask backend.
  */
 
-// Base URL is intentionally relative because Vite proxies /api to http://localhost:5000
+// Base URL is intentionally relative, Vite proxies /api to http://localhost:5000
 const BASE_API_URL = '/api';
 
 /**
  * Handles all network requests, including error handling.
- * @param {string} endpoint - The API endpoint (e.g., '/login').
- * @param {string} method - The HTTP method (e.g., 'GET').
+ * @param {string} endpoint - The API endpoint ('/login').
+ * @param {string} method - The HTTP method ('GET').
  * @param {object} [data=null] - JSON data to send in the body.
  * @returns {Promise<object>} The JSON response data.
  */
@@ -21,6 +21,12 @@ const fetchApi = async (endpoint, method = 'GET', data = null) => {
             'Content-Type': 'application/json',
         },
     };
+
+    // Get the token from storage
+    const token = localStorage.getItem('token'); 
+    if (token && endpoint !== '/login') {
+        options.headers['Authorization'] = `Bearer ${token}`;
+    }
 
     if (data) {
         options.body = JSON.stringify(data);
