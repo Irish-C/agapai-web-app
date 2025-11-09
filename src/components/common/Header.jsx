@@ -1,4 +1,3 @@
-/* src/components/common/Header.jsx */
 import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { FaUserCircle, FaSignOutAlt, FaTachometerAlt, FaChartBar, FaCog, FaBars, FaTimes } from 'react-icons/fa';
