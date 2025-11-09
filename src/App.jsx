@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 // Import the real login function
 import { loginUser } from './services/apiService.js'; 
-import gray_Bg from './assets/images/bg/gray-bg.png';
+import agapai_Bg from './assets/images/bg/gray-bg.png';
 
 // Common components
 import Header from './components/common/Header.jsx';
@@ -84,7 +84,7 @@ export default function App() {
       {/* This <main> tag wraps all pages and makes them grow to fill space */}
       <main
       className="flex-grow min-h-screen bg-cover bg-center bg-no-repeat bg-fixed"
-      style={{ backgroundImage: `url(${gray_Bg})` }}
+      style={{ backgroundImage: `url(${agapai_Bg})` }}
     >
         <Routes>
           {/* Public Routes */}

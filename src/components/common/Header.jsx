@@ -38,7 +38,7 @@ export default function Header({ user, logout }) {
 
     return (
         <header
-            className={`bg-[#2d3092] text-white shadow-lg sticky top-0 z-20 transition-transform duration-300 ${
+            className={`bg-gradient-to-b from-[#2d3092] to-[#015954] text-white shadow-lg sticky top-0 z-20 transition-transform duration-300 ${
                 hidden ? '-translate-y-full' : 'translate-y-0'
             }`}
         >
@@ -51,8 +51,13 @@ export default function Header({ user, logout }) {
                         className="h-12 w-auto rounded-full"
                         onError={(e) => { e.target.onerror = null; e.target.src = "https://placehold.co/32x32/14b8a6/ffffff?text=A" }}
                     />
-                    <span className="text-4xl font-bold text-[#c4fcff] tracking-wider">AGAPAI</span>
+                    <span className="text-4xl font-bold text-[#c4fcff] tracking-wider">AGAPAI:</span>
+                    <span className="text-sm italic text-gray-300 tracking-wider">
+                    <div>A Vision-Based Monitoring and Alert System</div>
+                    <div>for Fall and Inactivity in Elderly Care Facility</div>
+                    </span>
                 </Link>
+
 
                 {/* Desktop Navigation Links */}
                 <nav className="hidden md:flex space-x-6">

@@ -17,7 +17,7 @@ export default function LandingPage() {
     >
         
         <div className="relative text-center text-white z-8 p-4 md:p-6 bg-opacity-100 rounded-2xl max-w-4xl mx-auto">
-            <img src={agapaiLogo} alt="AGAPAI Logo" className="w-40 h-40 mx-auto mb-2 rounded-full border-4 border-teal-400 shadow-lg" 
+            <img src={agapaiLogo} alt="AGAPAI Logo" className="w-40 h-40 mx-auto mb-2 rounded-full border-4 border-[#1b6e86] shadow-lg" 
                  onError={(e) => { e.target.onerror = null; e.target.src="/placeholder-logo.png" }}/>
             
             <h1 className="text-8xl font-extrabold tracking-tight text-center">
