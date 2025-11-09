@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { fetchReportsData } from '../services/apiService';
 import { FaChartLine, FaSpinner, FaTable, FaExclamationTriangle, FaThermometerHalf, FaRunning, FaClock } from 'react-icons/fa';
+import agapai_Bg from './../assets/images/bg/gray-bg.png';
 
 /**
  * Renders the Reports Page with simulated QuestDB data.
@@ -36,12 +37,18 @@ export default function ReportsPage({ user, logout }) {
     };
 
     return (
-        <div className="flex flex-col min-h-screen bg-gray-100">
+        <div className="flex flex-col min-h-screen"
+            style={{
+                backgroundImage: `url(${agapai_Bg})`,
+                backgroundSize: 'cover',
+                backgroundPosition: 'center',
+                backgroundAttachment: 'fixed',
+            }}
+        >
             
             <main className="flex-grow container mx-auto p-6">
-                <h1 className="text-3xl font-extrabold text-gray-900 flex items-center mb-6">
-                    <FaChartLine className="mr-3 text-teal-600" />
-                    Historical Reports
+                <h1 className="text-2xl font-extrabold text-gray-900 flex items-center mb-6">
+                    <FaChartLine className="mr-3 text-gray-900" />
                 </h1>
 
                 {isLoading && (
