@@ -1,3 +1,4 @@
+# backend/routes/user_routes.py
 from flask import Blueprint, request, jsonify
 import bcrypt
 from database import db
@@ -35,13 +36,10 @@ def login():
         return jsonify({
             "status": "success",
             "message": "Login successful",
-            "user_id": user.id,
-            "username": user.username,
+            "user_id": user.id,  # From DB
+            "username": user.username,  # From DB
             "role": role_name,
-            "access_token": access_token,
-        
-            "firstname": user.firstname 
-
+            "access_token": access_token
         }), 200
     else:
         # Failed login

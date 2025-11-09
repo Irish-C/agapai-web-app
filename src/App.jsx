@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
-// Import login function
+// Import the real login function
 import { loginUser } from './services/apiService.js'; 
 
 // Common components
