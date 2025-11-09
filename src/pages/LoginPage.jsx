@@ -1,6 +1,9 @@
+/* src/pages/LoginPage.jsx */
+
 import React, { useState } from 'react';
-import { FaLock, FaSignInAlt, FaUser, FaKey, FaSpinner } from 'react-icons/fa';
+import { loginUser } from '../services/apiService';
 import { useNavigate } from 'react-router-dom';
+import { FaLock, FaSignInAlt, FaUser, FaKey, FaSpinner } from 'react-icons/fa';
 
 // Assets path updated based on the new hierarchy
 const bgImagePath = '/assets/images/bg/filter-bg.jpg';
@@ -8,7 +11,7 @@ const logoPath = '/assets/images/logos/agapai-logo.png';
 const dswdLogoPath = '/assets/images/logos/dswd-logo.png'; 
 const pupLogoPath = '/assets/images/logos/pup-logo.png'; 
 
-// LoginPage now receives the asynchronous 'login' function from App.jsx
+// LoginPage receives the asynchronous 'login' function from App.jsx
 export default function LoginPage({ login }) {
     const [username, setUsername] = useState('admin');
     const [password, setPassword] = useState('password');
