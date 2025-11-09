@@ -1,6 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import Header from '../components/common/Header.jsx';
-import Footer from '../components/common/Footer.jsx';
 import { fetchReportsData } from '../services/apiService';
 import { FaChartLine, FaSpinner, FaTable, FaExclamationTriangle, FaThermometerHalf, FaRunning, FaClock } from 'react-icons/fa';
 
