@@ -3,10 +3,10 @@ import { FaLock, FaSignInAlt, FaUser, FaKey, FaSpinner } from 'react-icons/fa';
 import { useNavigate } from 'react-router-dom';
 
 // Assets path updated based on the new hierarchy
-const bgImagePath = '/assets/images/bg/filter-bg.jpg';
-const logoPath = '/assets/images/logos/agapai-logo.png'; 
-const dswdLogoPath = '/assets/images/logos/dswd-logo.png'; 
-const pupLogoPath = '/assets/images/logos/pup-logo.png'; 
+import og_bg from './../assets/images/bg/filter-bg.png';
+import agapaiLogo from './../assets/images/logos/agapai-logo.png';
+import dswdLogo from './../assets/images/logos/dswd-logo.png'; 
+import pupLogo from './../assets/images/logos/pup-logo.png'; 
 
 // LoginPage now receives the asynchronous 'login' function from App.jsx
 export default function LoginPage({ login }) {
@@ -43,22 +43,24 @@ export default function LoginPage({ login }) {
         <div 
             className="min-h-screen flex items-center justify-center p-4 sm:p-6"
             style={{
-                backgroundImage: `url(${bgImagePath})`,
+                backgroundImage: `url(${og_bg})`,
                 backgroundSize: 'cover',
                 backgroundPosition: 'center',
                 backgroundAttachment: 'fixed',
             }}
         >
-            <div className="absolute inset-0 bg-gray-900 opacity-70"></div>
+            <div className="absolute inset-0 bg-black opacity-20"></div>
             
-            <div className="relative w-full max-w-md bg-white p-8 rounded-2xl shadow-2xl backdrop-blur-sm">
+            <div className="relative w-full max-w-md p-8 shadow-2xl backdrop-blur-sm 
+                bg-gradient-to-b from-[#2d3092] to-[#015954]
+                rounded-none text-white text-left">
                 
                 {/* Logo and Title */}
                 <div className="text-center mb-8">
-                    <img src={logoPath} alt="AGAPAI Logo" className="w-20 h-20 mx-auto mb-4 rounded-full border-2 border-teal-500 shadow-md" 
+                    <img src={agapaiLogo} alt="AGAPAI Logo" className="w-20 h-20 mx-auto mb-4 rounded-full border-2 border-teal-500 shadow-md" 
                          onError={(e) => { e.target.onerror = null; e.target.src="/placeholder-logo.png" }}/>
-                    <h2 className="text-3xl font-bold text-gray-800">System Login</h2>
-                    <p className="text-sm text-gray-500">Access the Elderly Care Dashboard</p>
+                    <h2 className="text-3xl font-bold white">Login</h2>
+                    <p className="text-sm text-white mt-2">Access the Elderly Care Dashboard</p>
                 </div>
 
                 {/* Login Form */}
@@ -73,7 +75,7 @@ export default function LoginPage({ login }) {
 
                     {/* Username Input */}
                     <div className="mb-4">
-                        <label className="block text-gray-700 text-sm font-semibold mb-2" htmlFor="username">
+                        <label className="block text-gray-100 text-sm font-semibold mb-2" htmlFor="username">
                             <FaUser className="inline-block mr-2 text-teal-600" />
                             Username
                         </label>
@@ -82,7 +84,7 @@ export default function LoginPage({ login }) {
                             id="username"
                             value={username}
                             onChange={(e) => setUsername(e.target.value)}
-                            className="shadow appearance-none border rounded-xl w-full py-3 px-4 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-teal-500 transition duration-150"
+                            className="shadow appearance-none border rounded-xl w-full py-3 px-4 text-gray-100 leading-tight focus:outline-none focus:ring-2 focus:ring-teal-500 transition duration-150"
                             placeholder="Enter your username"
                             required
                         />
@@ -90,7 +92,7 @@ export default function LoginPage({ login }) {
 
                     {/* Password Input */}
                     <div className="mb-6">
-                        <label className="block text-gray-700 text-sm font-semibold mb-2" htmlFor="password">
+                        <label className="block text-gray-100 text-sm font-semibold mb-2" htmlFor="password">
                             <FaKey className="inline-block mr-2 text-teal-600" />
                             Password
                         </label>
@@ -99,7 +101,7 @@ export default function LoginPage({ login }) {
                             id="password"
                             value={password}
                             onChange={(e) => setPassword(e.target.value)}
-                            className="shadow appearance-none border rounded-xl w-full py-3 px-4 text-gray-700 mb-3 leading-tight focus:outline-none focus:ring-2 focus:ring-teal-500 transition duration-150"
+                            className="shadow appearance-none border rounded-xl w-full py-3 px-4 text-gray-100 mb-3 leading-tight focus:outline-none focus:ring-2 focus:ring-teal-500 transition duration-150"
                             placeholder="********"
                             required
                         />
@@ -131,9 +133,9 @@ export default function LoginPage({ login }) {
 
                 {/* Affiliation Logos */}
                 <div className="mt-8 pt-6 border-t border-gray-200 flex justify-around items-center space-x-4">
-                    <img src={dswdLogoPath} alt="DSWD Logo" className="h-10 w-auto opacity-70"
+                    <img src={dswdLogo} alt="DSWD Logo" className="h-10 w-auto opacity-70"
                             onError={(e) => { e.target.onerror = null; e.target.src="/placeholder-logo.png" }}/>
-                    <img src={pupLogoPath} alt="PUP Logo" className="h-10 w-auto opacity-70" 
+                    <img src={pupLogo} alt="PUP Logo" className="h-10 w-auto opacity-70" 
                             onError={(e) => { e.target.onerror = null; e.target.src="/placeholder-logo.png" }}/>
                 </div>
             </div>
