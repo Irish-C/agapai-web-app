@@ -1,33 +1,45 @@
+# backend/routes/user_routes.py
 from flask import Blueprint, request, jsonify
+import bcrypt
+from database import db
+from models import User, Role
+from flask_jwt_extended import create_access_token
 
 # Define a Flask Blueprint for user-related routes
 user_routes = Blueprint('user_routes', __name__)
 
-# --- Mock User Database ---
-MOCK_USER_DB = {
-    "admin": {"password": "password", "user_id": "u4567", "username": "Administrator"},
-    "nurse": {"password": "secure", "user_id": "u1234", "username": "Nurse A"},
-}
-
 @user_routes.route('/login', methods=['POST'])
 def login():
     """
-    Handles user login via REST API (simulated authentication).
+    Handles user login via REST API (tunay na authentication).
     """
     data = request.get_json()
     username = data.get('username')
     password = data.get('password')
 
-    user = MOCK_USER_DB.get(username)
+    if not username or not password:
+        return jsonify({"status": "error", "message": "Missing username or password"}), 400
 
-    if user and user['password'] == password:
+    # 1. Find user by username
+    user = User.query.filter_by(username=username).first()
+
+    # 2. Verify password using bcrypt
+    if user and bcrypt.checkpw(password.encode('utf-8'), user.password.encode('utf-8')):
+        access_token = create_access_token(identity=user.id)
         # Successful login
+        
+        # Get role name
+        role_name = "User" # Default
+        if user.role:
+            role_name = user.role.role_name
+        
         return jsonify({
             "status": "success",
             "message": "Login successful",
-            "user_id": user['user_id'],
-            "username": user['username'],
-            "access_token": "mock_jwt_token_12345" # Mock JWT token
+            "user_id": user.id,  # Galing na sa DB
+            "username": user.username, # Galing na sa DB
+            "role": role_name,
+            "access_token": "mock_jwt_token_12345" # Mock JWT token pa rin
         }), 200
     else:
         # Failed login

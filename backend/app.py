@@ -11,9 +11,11 @@ import base64
 from io import BytesIO
 from PIL import Image, ImageDraw
 import threading    
+from flask_jwt_extended import JWTManager
 
-# Import mock models and routes modules (assuming they will be placed in models/ and routes/)
+from database import db
 from routes.user_routes import user_routes
+
 # from services.data_service import data_service # Not yet created
 # from models.fall_detection import FallDetectionModel # Not yet created
 
@@ -24,7 +26,15 @@ load_dotenv()
 
 # Initialize Flask App
 app = Flask(__name__, static_folder='../dist', static_url_path='/')
+
 app.config['SECRET_KEY'] = os.getenv('FLASK_SECRET_KEY', 'default_secret_key')
+app.config['JWT_SECRET_KEY'] = os.getenv('FLASK_SECRET_KEY')
+
+app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL')
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False # Disable to avoid overhead
+db.init_app(app)
+
+jwt = JWTManager(app)
 
 # Set up CORS policies to allow connections from the Vite development server (port 5173)
 socketio = SocketIO(
