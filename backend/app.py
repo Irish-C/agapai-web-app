@@ -1,5 +1,5 @@
 import eventlet
-eventlet.monkey_patch()
+eventlet.monkey_patch(thread=False) # Keep thread=False to avoid context errors
 
 from flask import Flask, request, jsonify, send_from_directory
 from flask_socketio import SocketIO, emit
@@ -9,15 +9,14 @@ import time
 import json
 import base64
 from io import BytesIO
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageFont
 import threading    
 from flask_jwt_extended import JWTManager
 
 from database import db
 from routes.user_routes import user_routes
-
-# from services.data_service import data_service # Not yet created
-# from models.fall_detection import FallDetectionModel # Not yet created
+from routes.camera_routes import camera_routes
+from models import Camera
 
 # --- Configuration & Initialization ---
 
@@ -36,7 +35,7 @@ db.init_app(app)
 
 jwt = JWTManager(app)
 
-# Set up CORS policies to allow connections from the Vite development server (port 5173)
+# Set up CORS policies
 socketio = SocketIO(
     app,
     cors_allowed_origins=["http://localhost:5173", "http://127.0.0.1:5173", "*"],
@@ -45,6 +44,7 @@ socketio = SocketIO(
 
 # Register Blueprints
 app.register_blueprint(user_routes, url_prefix='/api')
+app.register_blueprint(camera_routes, url_prefix='/api')
 
 # --- MOCK Stream Functions (Simulate OpenVINO/Fuzzy Logic) ---
 
@@ -53,27 +53,27 @@ MOCK_STREAM_RUNNING = True
 
 # This dict will hold the last frame data for each camera
 MOCK_FRAME_DATA = {}
-MOCK_CAMERAS = ['cam1', 'cam2', 'cam3', 'cam4']
 
 # Event to control the mock stream loop
 mock_stream_event = threading.Event()
 
 # Lock for thread-safe access to MOCK_FRAME_DATA
 frame_lock = threading.Lock()
+MOCK_STREAM_THREAD = None # Global thread object
 
-def generate_mock_frame(cam_id):
+def generate_mock_frame(cam_id, cam_name):
     """Generates a simple red JPEG frame with text overlay (Base64 encoded)."""
     try:
         from PIL import Image, ImageDraw, ImageFont 
     except ImportError:
         return base64.b64encode(b"MOCK STREAM ERROR: No Image Lib").decode('utf-8')
 
-    # Create a simple red image (320x240)
-    img = Image.new('RGB', (320, 240), color='red')
+    # Create a simple dark red image (320x240)
+    img = Image.new('RGB', (320, 240), color='darkred')
     d = ImageDraw.Draw(img)
 
     # Add text overlay
-    text = f"AGAPAI MOCK STREAM\n{cam_id.upper()} LIVE\nTime: {time.strftime('%H:%M:%S')}"
+    text = f"AGAPAI MOCK STREAM\n{cam_name.upper()} (ID: {cam_id})\nTime: {time.strftime('%H:%M:%S')}"
 
     # Simple font setup
     try:
@@ -95,25 +95,41 @@ def mock_stream_loop():
     INCIDENT_INTERVAL = 30  # seconds
 
     while MOCK_STREAM_RUNNING and not mock_stream_event.is_set():
-        current_time = time.time()
-
+        
         # 1. Generate and emit frames (for M-JPEG stream)
-        for cam_id in MOCK_CAMERAS:
-            frame_base64 = generate_mock_frame(cam_id)
+        # Use app_context to allow database queries in this thread
+        with app.app_context():
+            try:
+                # Get all cameras from the database
+                cameras_from_db = Camera.query.all()
+                
+                if not cameras_from_db:
+                    # If no cameras in DB, print a waiting message
+                    print("Mock Stream: No cameras in database. Waiting...")
+                    socketio.sleep(5) # Wait 5 seconds before checking again
+                    continue
 
-            with frame_lock:
-                MOCK_FRAME_DATA[cam_id] = frame_base64
+                for cam in cameras_from_db:
+                    # Use cam.id as the cam_id
+                    frame_base64 = generate_mock_frame(cam.id, cam.cam_name)
 
-            socketio.emit('camera_frame', {
-                'cam_id': cam_id,
-                'frame': frame_base64
-            })
+                    with frame_lock:
+                        MOCK_FRAME_DATA[cam.id] = frame_base64
+
+                    socketio.emit('camera_frame', {
+                        'cam_id': cam.id,  # <-- SEND THE DATABASE ID
+                        'frame': frame_base64
+                    })
+
+            except Exception as e:
+                print(f"Error in mock stream loop: {e}")
 
         # 2. Simulate Periodic Incident Alert
+        current_time = time.time()
         if current_time - incident_timer > INCIDENT_INTERVAL:
             mock_incident = {
                 'type': 'Fall Detected',
-                'location': 'Living Room',
+                'location': 'Living Room', # You could update this to use a real location
                 'timestamp': int(current_time)
             }
             socketio.emit('incident_alert', mock_incident)
@@ -128,14 +144,14 @@ def mock_stream_loop():
 # --- SocketIO Event Handlers ---
 
 @socketio.on('connect')
-def handle_connect():
-    """Handles new client connections."""
-    print(f'Client connected: {request.sid}')
-
-    global MOCK_STREAM_THREAD
-    if MOCK_STREAM_THREAD and MOCK_STREAM_THREAD.is_alive():
-        MOCK_STREAM_THREAD.join()
-
+def handle_connect(auth=None):
+    # ...
+    global MOCK_STREAM_THREAD # Ensure you're modifying the global variable
+    with frame_lock:
+        # Start the background thread only if it hasn't been started yet
+        if MOCK_STREAM_THREAD is None:
+            print("Starting mock stream thread...")
+            MOCK_STREAM_THREAD = socketio.start_background_task(mock_stream_loop)
 
 @socketio.on('disconnect')
 def handle_disconnect():
@@ -143,6 +159,14 @@ def handle_disconnect():
     print(f'Client disconnected: {request.sid}')
 
 # --- Flask Routes (REST API & Main Entry Point) ---
+
+@app.route('/create_db')
+def create_db():
+    # Import all models here so flask shell isn't required
+    from models import Role, User, Location, EventType, EventClass, Camera, EventLog
+    with app.app_context():
+        db.create_all()
+    return "Database tables created!"
 
 @app.route('/', defaults={'path': ''})
 @app.route('/<path:path>')
@@ -152,16 +176,24 @@ def serve_index(path):
 
 @app.route('/api/camera_status', methods=['GET'])
 def get_camera_status():
-    """Returns a mock camera connection status list."""
-    status = [
-        {'id': cam, 'location': 'Location Placeholder', 'status': 'Connected' if cam in MOCK_FRAME_DATA else 'Disconnected'}
-        for cam in MOCK_CAMERAS
-    ]
-    return jsonify({'status': 'success', 'cameras': status}), 200
+    """
+    Returns camera status from the DATABASE now.
+    This replaces the old mock route.
+    """
+    try:
+        cameras = Camera.query.all()
+        status_list = []
+        for cam in cameras:
+            status_list.append({
+                'id': cam.id,
+                'location': cam.location.loc_name if cam.location else 'Unknown',
+                'status': 'Connected' if cam.cam_status else 'Disconnected'
+            })
+        return jsonify({'status': 'success', 'cameras': status_list}), 200
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
 
 # --- Start Server ---
-
-MOCK_STREAM_THREAD = None
 
 if __name__ == '__main__':
     print("Starting Flask server with SocketIO on port 5000...")
@@ -175,6 +207,6 @@ if __name__ == '__main__':
     finally:
         MOCK_STREAM_RUNNING = False
         mock_stream_event.set()
-        if MOCK_STREAM_THREAD and MOCK_STREAM_THREAD.is_alive():
+        if MOCK_STREAM_THREAD and MOCK_STREAM_THREAD.join():
             MOCK_STREAM_THREAD.join()
         print("Server shutdown complete.")
