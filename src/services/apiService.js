@@ -3,16 +3,15 @@
  * Centralized service for REST API calls to the Flask backend.
  *
  * --- UPDATED ---
- * - 'fetchApi' 401 handler now ignores '/login' to prevent loops.
- * - 'loginUser' now has a robust try/catch block.
- * - Added console.log debugging to 'fetchApi' to check token status.
+ * - 'loginUser' now saves the auth token to localStorage.
+ * - 'fetchApi' is now EXPORTED and adds the token to the Authorization header.
+ * - 'fetchApi' will auto-redirect to '/login' if a 401 is received.
+ * - Added 'logoutUser' helper function.
  */
 
 // Base URL is intentionally relative because Vite proxies /api to http://localhost:5000
 const BASE_API_URL = '/api';
-
-// Define the key for storing the token
-const AUTH_TOKEN_KEY = 'authToken';
+const AUTH_TOKEN_KEY = 'authToken'; // Key for localStorage
 
 /**
  * Handles all network requests, including error handling.
@@ -21,33 +20,33 @@ const AUTH_TOKEN_KEY = 'authToken';
  * @param {object} [data=null] - JSON data to send in the body.
  * @returns {Promise<object>} The JSON response data.
  */
-const fetchApi = async (endpoint, method = 'GET', data = null) => {
+// --- THIS IS THE FIX ---
+// We add the 'export' keyword here so other files can import this function.
+export const fetchApi = async (endpoint, method = 'GET', data = null) => {
+// --- END FIX ---
     const url = `${BASE_API_URL}${endpoint}`;
-
-    const headers = {
-        'Content-Type': 'application/json',
-    };
-
-    const token = localStorage.getItem(AUTH_TOKEN_KEY);
-
-    // --- NEW: Debugging Logs ---
+    
+    // --- DEBUG LOG ---
     console.log(`fetchApi: Requesting ${endpoint}...`);
-    if (token) {
-        console.log("fetchApi: Token found, attaching to Authorization header.");
-        // --- THIS LINE IS NEW (UNCOMMENTED) ---
-        // This will show us the exact token value in the console.
-        console.log("fetchApi: Token value:", token); 
-        // --- END NEW ---
-        headers['Authorization'] = `Bearer ${token}`;
-    } else {
-        console.warn(`fetchApi: No token found in localStorage for ${endpoint}.`);
-    }
-    // --- END NEW ---
-
+    
     const options = {
         method,
-        headers,
+        headers: {
+            'Content-Type': 'application/json',
+        },
     };
+
+    // 1. Get token from localStorage
+    const token = localStorage.getItem(AUTH_TOKEN_KEY);
+
+    if (token) {
+        // --- DEBUG LOG ---
+        // Uncomment this line if you ever have token issues again
+        // console.log(`fetchApi: Token value: ${token.substring(0, 10)}...`);
+        options.headers['Authorization'] = `Bearer ${token}`;
+    } else {
+        console.log(`fetchApi: No token found in localStorage for ${endpoint}.`);
+    }
 
     if (data) {
         options.body = JSON.stringify(data);
@@ -56,38 +55,40 @@ const fetchApi = async (endpoint, method = 'GET', data = null) => {
     try {
         const response = await fetch(url, options);
 
+        // 2. Check for 401 Unauthorized
         if (response.status === 401) {
-            // --- NEW: Prevent redirect loop ---
-            // Don't redirect if the 401 error came from the login page itself.
-            if (endpoint !== '/login') {
-                console.error("fetchApi: 401 Unauthorized. Token is invalid or expired. Logging out.");
-                localStorage.removeItem(AUTH_TOKEN_KEY);
-                window.location.href = '/login';
-                throw new Error("Authentication failed or expired. Please log in again.");
+            // Don't redirect if we are *on* the login page and the login *fails*
+            if (!endpoint.includes('/login')) {
+                console.error('fetchApi: 401 Unauthorized. Token is invalid or expired. Redirecting to login.');
+                // Use a custom event or state manager in a real app
+                // For now, simple redirect
+                logoutUser(); // Clear bad token
+                window.location.href = '/login'; // Redirect
             }
-            // --- END NEW ---
+            // Throw an error to stop the promise chain
+            throw new Error("Authentication failed or expired.");
         }
 
         if (!response.ok) {
+            // Try to parse error message from backend
             const errorData = await response.json().catch(() => ({}));
-            const message = errorData.message || `HTTP error! status: ${response.status} for ${url}`;
+            const message = errorData.message || errorData.msg || `HTTP error! status: ${response.status} for ${url}`;
             console.error('API Error Response:', errorData);
             throw new Error(message);
         }
 
+        // 3. Handle successful response
         const contentType = response.headers.get("content-type");
         if (contentType && contentType.includes("application/json")) {
-            return await response.json();
+            return await response.json(); // This is the expected good path
         } else {
-            return {};
+            // Handle 204 No Content or non-JSON responses
+            return { status: 'success', message: 'Operation successful' };
         }
 
     } catch (error) {
-        // Don't re-log the error if it's the one we just threw
-        if (error.message.includes("Authentication failed")) {
-            throw error;
-        }
         console.error('Fetch API Error:', error);
+        // Re-throw the error so the calling component's .catch() block can handle it
         throw error;
     }
 };
@@ -100,53 +101,42 @@ const fetchApi = async (endpoint, method = 'GET', data = null) => {
  * @returns {Promise<object>} User data or error.
  */
 export const loginUser = async (username, password) => {
-    // --- NEW: Robust try/catch for login ---
+    // --- NEW: Added try...catch for robust login ---
     try {
-        // fetchApi will now throw an error if login fails (e.g., 401)
         const response = await fetchApi('/login', 'POST', { username, password });
 
-        if (response && response.access_token) {
+        // Check for backend's logical success *and* an access token
+        if (response && (response.token || response.access_token)) {
+            const token = response.token || response.access_token;
             console.log("loginUser: Login successful, saving token.");
-            localStorage.setItem(AUTH_TOKEN_KEY, response.access_token);
-            return response;
+            localStorage.setItem(AUTH_TOKEN_KEY, token);
+            return response; // Return the full response data (user, role, etc.)
         } else {
-            // This happens if the server gives a 200 OK but no token
-            console.warn("loginUser: Login response OK, but no 'access_token' found in response.", response);
-            throw new Error("Login failed: Server did not return an access token.");
+            // This handles cases where login is 200 OK but "status: error"
+            throw new Error(response.message || 'Login failed: No token received.');
         }
     } catch (error) {
-        // This will catch 401s (invalid credentials) or other fetch errors
-        console.error("loginUser: Login failed.", error.message);
-        // Clear any old, invalid tokens just in case
-        localStorage.removeItem(AUTH_TOKEN_KEY);
-        // Re-throw the error so the LoginPage UI can display it
-        throw error;
+        console.error("loginUser Error:", error);
+        localStorage.removeItem(AUTH_TOKEN_KEY); // Ensure no bad token is left
+        throw error; // Re-throw for the LoginPage to catch
     }
-    // --- END NEW ---
 };
 
 /**
- * --- NEW: Logout function ---
- * Clears the token and redirects to the login page.
+ * Logout function.
  */
 export const logoutUser = () => {
-    console.log("logoutUser: Clearing token and redirecting to /login.");
     localStorage.removeItem(AUTH_TOKEN_KEY);
-    window.location.href = '/login';
+    // We don't redirect here, just clear the token.
+    // The component calling this can decide where to redirect.
+    console.log("logoutUser: Token removed.");
 };
-// --- END NEW ---
-
 
 /**
  * Fetches historical event log data for the ReportsPage.
  * @returns {Promise<object>} Time-series data.
  */
 export const fetchReportsData = () => {
-    // If your backend *requires* parameters, add them like this:
-    // EXAMPLE:
-    // return fetchApi('/event_logs?page=1&limit=50', 'GET');
-    
-    // Your original code (which is probably fine if you do Option 1):
     return fetchApi('/event_logs', 'GET');
 };
 
@@ -156,6 +146,7 @@ export const fetchReportsData = () => {
  * @returns {Promise<object>} API response with camera list.
  */
 export const fetchCameraList = () => {
+    // This now calls your real backend endpoint from app.py
     return fetchApi('/camera_status', 'GET');
 }
 
@@ -163,6 +154,6 @@ export const fetchCameraList = () => {
  * Fetches event logs for today from the backend database.
  * @returns {Promise<object>} API response with today's logs.
  */
-export const fetchTodayEventLogs = () => { // --- FIX: Removed the underscore ---
+export const fetchTodayEventLogs = () => {
     return fetchApi('/event_logs/today', 'GET');
 };
