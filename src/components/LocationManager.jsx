@@ -66,14 +66,20 @@ export default function LocationManager({ onLocationsUpdated }) {
     const handleUpdateLocation = async (e) => {
         e.preventDefault();
         setLocMessage({ text: '', type: '' });
-        if (!editingLoc.loc_name.trim()) {
+        // --- FIX 1 ---
+        // We check editingLoc.name, not editingLoc.loc_name
+        if (!editingLoc.name.trim()) {
             setLocMessage({ text: 'Location name cannot be empty.', type: 'error' });
             return;
         }
         try {
+            // --- FIX 2 ---
+            // We must send 'loc_name' in the body, but its value
+            // comes from 'editingLoc.name' in our state.
             const data = await fetchApi(`/locations/${editingLoc.id}`, 'PATCH', { 
-                loc_name: editingLoc.loc_name 
+                loc_name: editingLoc.name // <-- This was editingLoc.loc_name
             });
+            // --- END FIX ---
             if (data.status === 'success') {
                 setLocMessage({ text: 'Location updated successfully!', type: 'success' });
                 setEditingLoc(null); // Exit edit mode
