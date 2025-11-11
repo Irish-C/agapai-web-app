@@ -1,4 +1,3 @@
-# backend/routes/user_routes.py
 from flask import Blueprint, request, jsonify
 import bcrypt
 from database import db
@@ -25,7 +24,11 @@ def login():
 
     # 2. Verify password using bcrypt
     if user and bcrypt.checkpw(password.encode('utf-8'), user.password.encode('utf-8')):
-        access_token = create_access_token(identity=user.id)
+        # --- THIS IS THE FIX ---
+        # The identity must be a string, not an integer.
+        access_token = create_access_token(identity=str(user.id))
+        # --- END FIX ---
+        
         # Successful login
         
         # Get role name

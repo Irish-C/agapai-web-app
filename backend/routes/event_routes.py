@@ -4,7 +4,7 @@ from models import EventLog, EventType, Camera, Location
 from database import db
 import traceback
 
-# 1. Create the Blueprint. App will import this.
+# 1. Create the Blueprint. App.py will import this.
 event_routes = Blueprint('event_routes', __name__)
 
 
@@ -21,7 +21,7 @@ def get_event_logs():
         per_page = request.args.get('per_page', 20, type=int)
 
         # Query the database
-        # This joins the related tables to get names instead of just IDs
+        # Joins the related tables to get names instead of just IDs
         log_query = db.session.query(
             EventLog,
             EventType.type_name,
