@@ -8,9 +8,9 @@ import {
     FaSpinner,
     FaTrash,
     FaPlus,
-    FaMapMarkerAlt, // <-- Added for Location Management
-    FaPencilAlt,    // <-- Added for Edit button
-    FaTimes         // <-- Added for Cancel button
+    FaMapMarkerAlt,
+    FaPencilAlt,
+    FaTimes
 } from 'react-icons/fa';
 
 /**
@@ -95,22 +95,87 @@ export default function Settings({ user, logout }) {
         }
     };
 
-    const handleSave = (e) => {
+    // --- THIS IS THE UPDATED FUNCTION ---
+    const handleSave = async (e) => {
         e.preventDefault();
         setMessage({ text: '', type: '' });
         setIsSaving(true);
-        
-        setTimeout(() => {
+
+        // 1. Password Validation
+        if (settings.password && settings.password !== settings.confirmPassword) {
+            setMessage({ text: 'Error: New password and confirmation do not match.', type: 'error' });
             setIsSaving(false);
-            if (settings.password && settings.password !== settings.confirmPassword) {
-                setMessage({ text: 'Error: New password and confirmation do not match.', type: 'error' });
-                return;
+            return;
+        }
+
+        try {
+            const apiCalls = [];
+
+            // 2. Password Change API Call
+            // Note: Your backend will need to be @jwt_required() to know *which* user
+            if (settings.password) {
+                apiCalls.push(
+                    fetch('/api/users/change-password', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ 
+                            new_password: settings.password 
+                        })
+                    }).then(res => res.json().then(data => ({ ...data, ok: res.ok })))
+                );
             }
-            console.log("Saving settings...", settings); 
+
+            // 3. Notification Settings API Call
+            // Note: You'll need to create a '/api/settings/notifications' route
+            apiCalls.push(
+                fetch('/api/settings/notifications', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        alert_threshold: settings.alertThreshold,
+                        email_notifications: settings.emailNotifications
+                    })
+                }).then(res => res.json().then(data => ({ ...data, ok: res.ok })))
+            );
+
+            // 4. Camera Activation API Call
+            // Note: You'll need to create a '/api/cameras/bulk-status' route
+            apiCalls.push(
+                fetch('/api/cameras/bulk-status', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        statuses: settings.cameraActive // Sends { "1": true, "2": false }
+                    })
+                }).then(res => res.json().then(data => ({ ...data, ok: res.ok })))
+            );
+
+            // Run all API calls in parallel
+            const results = await Promise.all(apiCalls);
+
+            // Check if any call failed
+            const failedCalls = results.filter(res => !res.ok);
+
+            if (failedCalls.length > 0) {
+                const errorMessages = failedCalls.map(res => res.message || 'Unknown error').join(', ');
+                throw new Error(`Failed to save some settings: ${errorMessages}`);
+            }
+
+            // All successful
             setMessage({ text: 'Settings saved successfully!', type: 'success' });
             setSettings(prev => ({ ...prev, password: '', confirmPassword: '' }));
-        }, 1500);
+
+            // Refresh camera data, as their statuses may have changed
+            fetchCameras(); 
+
+        } catch (error) {
+            console.error("Error saving settings:", error);
+            setMessage({ text: error.message, type: 'error' });
+        } finally {
+            setIsSaving(false);
+        }
     };
+    // --- END OF UPDATED FUNCTION ---
 
     // --- Handlers for Camera Management ---
     
@@ -245,7 +310,7 @@ export default function Settings({ user, logout }) {
     // --- Render ---
     const messageClass = (msg) => msg.type === 'success'
         ? 'bg-green-100 border-green-400 text-green-700'
-        : 'bg-red-1Red-400 text-red-700'; // Corrected typo here
+        : 'bg-red-100 border-red-400 text-red-700'; // <-- Corrected typo here
 
     return (
         <div className="flex flex-col min-h-screen bg-gray-100">
