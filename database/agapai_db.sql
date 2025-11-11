@@ -1,6 +1,6 @@
+-- agapai_db.sql
 CREATE DATABASE agapai_db;
 USE agapai_db;
-
 
 
 -- LOOKUP TABLE (parent)
@@ -63,7 +63,7 @@ CREATE TABLE event_logs (
     -- FK
     cam_id BIGINT,
     event_class_id BIGINT,
-    ack_by_user_id BIGINT NULL, -- Tama ito, 'bigint' at 'NULL'
+    ack_by_user_id BIGINT NULL,
     
     -- FK ref
     FOREIGN KEY (cam_id) REFERENCES camera(id),
