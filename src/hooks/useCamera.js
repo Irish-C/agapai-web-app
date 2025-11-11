@@ -14,11 +14,13 @@ export const useCameraSocket = () => {
 
     // This useEffect now only handles the socket connection.
     useEffect(() => {
-        // The URL is relative because Vite is configured to proxy '/socket.io' requests to the Flask backend.
-        const socket = io({ 
+        // --- FIX FOR LOCAL DEV ENVIRONMENT ---
+        // We will connect *directly* to the Flask server on port 5000.
+        const socket = io('http://localhost:5000', { 
             path: '/socket.io', 
             transports: ['websocket', 'polling'] 
         });
+        // --- END FIX ---
 
         socket.on('connect', () => {
             console.log('SocketIO: Connected to Flask server');
