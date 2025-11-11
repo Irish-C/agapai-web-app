@@ -18,8 +18,9 @@ from models import Location, EventType, EventClass, Camera, Role
 from database import db
 from routes.user_routes import user_routes
 from routes.camera_routes import camera_routes
-from routes.event_routes import event_routes  # <-- ADDED THIS IMPORT
-from models import Camera
+from routes.event_routes import event_routes
+from routes.settings_routes import settings_routes
+
 
 # --- Configuration & Initialization ---
 
@@ -48,7 +49,8 @@ socketio = SocketIO(
 # Register Blueprints
 app.register_blueprint(user_routes, url_prefix='/api')
 app.register_blueprint(camera_routes, url_prefix='/api')
-app.register_blueprint(event_routes, url_prefix='/api') # <-- ADDED THIS REGISTRATION
+app.register_blueprint(event_routes, url_prefix='/api')
+app.register_blueprint(settings_routes, url_prefix='/api')
 
 # --- MOCK Stream Functions (Simulate OpenVINO/Fuzzy Logic) ---
 
