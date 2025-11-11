@@ -261,7 +261,7 @@ if __name__ == '__main__':
     print(f"Async mode: {socketio.async_mode}")
 
     try:
-        socketio.run(app, host='0.0.0.0', port=5000, debug=True, use_reloader=False)
+        socketio.run(app, host='0.0.0.0', port=5000, debug=False, use_reloader=False)
     except KeyboardInterrupt:
         print("Server shutting down...")
     finally:
