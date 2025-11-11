@@ -36,7 +36,7 @@ def get_all_cameras():
         return jsonify({"status": "error", "message": str(e)}), 500
 
 @camera_routes.route('/cameras', methods=['POST'])
-@jwt_required() # <-- Added protection
+@jwt_required()
 def create_camera():
     """
     POST a new camera to the database.
@@ -77,14 +77,55 @@ def create_camera():
                 "location_id": new_camera.loc_id,
                 "location_name": location.loc_name
             }
-        }), 201 # 201 means "Created"
+        }), 201
         
     except Exception as e:
-        db.session.rollback() # Roll back changes if an error occurs
+        db.session.rollback()
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+@camera_routes.route('/cameras/<int:cam_id>', methods=['PATCH'])
+@jwt_required()
+def update_camera(cam_id):
+    """
+    PATCH an existing camera's details (name, location).
+    """
+    try:
+        # 1. Find the camera
+        camera = Camera.query.get(cam_id)
+        if not camera:
+            return jsonify({"status": "error", "message": "Camera not found"}), 404
+
+        # 2. Get data from request
+        data = request.get_json()
+        new_name = data.get('cam_name')
+        new_loc_id = data.get('loc_id')
+
+        if not new_name or not new_loc_id:
+            return jsonify({"status": "error", "message": "Missing 'cam_name' or 'loc_id'"}), 400
+
+        # 3. Check if new location exists
+        location = Location.query.get(new_loc_id)
+        if not location:
+            return jsonify({"status": "error", "message": "New location not found"}), 404
+
+        # 4. Update the camera object
+        camera.cam_name = new_name
+        camera.loc_id = new_loc_id
+        # You could also update stream_url here if passed
+
+        db.session.commit()
+        
+        return jsonify({
+            "status": "success",
+            "message": "Camera updated"
+        }), 200
+
+    except Exception as e:
+        db.session.rollback()
         return jsonify({"status": "error", "message": str(e)}), 500
 
 @camera_routes.route('/cameras/<int:cam_id>', methods=['DELETE'])
-@jwt_required() # <-- Added protection
+@jwt_required()
 def delete_camera(cam_id):
     """
     DELETE a specific camera by its ID.
@@ -106,7 +147,6 @@ def delete_camera(cam_id):
         db.session.rollback()
         return jsonify({"status": "error", "message": str(e)}), 500
 
-# --- NEW ROUTE FOR SAVE SETTINGS ---
 @camera_routes.route('/cameras/bulk-status', methods=['POST'])
 @jwt_required()
 def bulk_update_camera_status():
@@ -148,8 +188,6 @@ def bulk_update_camera_status():
         print(f"Error bulk updating cameras: {e}")
         print(traceback.format_exc())
         return jsonify({"status": "error", "message": "Internal server error"}), 500
-# --- END NEW ROUTE ---
-
 
 # --- Location Routes ---
 
@@ -166,7 +204,7 @@ def get_all_locations():
         return jsonify({"status": "error", "message": str(e)}), 500
 
 @camera_routes.route('/locations', methods=['POST'])
-@jwt_required() # <-- Added protection
+@jwt_required()
 def create_location():
     """
     POST a new location to the database.
@@ -197,7 +235,6 @@ def create_location():
         db.session.rollback()
         return jsonify({"status": "error", "message": str(e)}), 500
 
-# --- NEW ROUTE FOR EDITING LOCATION ---
 @camera_routes.route('/locations/<int:loc_id>', methods=['PATCH'])
 @jwt_required()
 def update_location(loc_id):
@@ -230,9 +267,7 @@ def update_location(loc_id):
     except Exception as e:
         db.session.rollback()
         return jsonify({"status": "error", "message": str(e)}), 500
-# --- END NEW ROUTE ---
 
-# --- NEW ROUTE FOR DELETING LOCATION ---
 @camera_routes.route('/locations/<int:loc_id>', methods=['DELETE'])
 @jwt_required()
 def delete_location(loc_id):
@@ -246,7 +281,6 @@ def delete_location(loc_id):
             return jsonify({"status": "error", "message": "Location not found"}), 404
 
         # 2. Check if any cameras are still assigned to this location
-        # This enforces the 'ON DELETE RESTRICT' rule
         camera_exists = Camera.query.filter_by(loc_id=loc_id).first()
         if camera_exists:
             return jsonify({
@@ -263,4 +297,3 @@ def delete_location(loc_id):
     except Exception as e:
         db.session.rollback()
         return jsonify({"status": "error", "message": str(e)}), 500
-# --- END NEW ROUTE ---
