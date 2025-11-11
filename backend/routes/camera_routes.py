@@ -57,7 +57,7 @@ def create_camera():
         cam_name=cam_name,
         stream_url=stream_url,
         loc_id=loc_id
-        # cam_status defaults to True per your model
+        # cam_status defaults to True per model
     )
 
     try:
