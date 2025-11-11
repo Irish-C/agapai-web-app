@@ -1,3 +1,9 @@
+/*
+ * === FILENAME: src/services/apiService.js ===
+ *
+ * I've updated 'fetchReportsData' to call the real database 
+ * endpoint instead of returning mock data.
+ */
 /**
  * src/services/apiService.js
  * Centralized service for REST API calls to the Flask backend.
@@ -65,20 +71,12 @@ export const loginUser = (username, password) => {
 };
 
 /**
- * Fetches historical sensor data for the ReportsPage.
+ * Fetches historical event log data for the ReportsPage.
  * @returns {Promise<object>} Time-series data.
  */
 export const fetchReportsData = () => {
-    // Mocking a successful data fetch for ReportsPage
-    const mockData = {
-        status: 'success',
-        report: [
-            { timestamp: 1715000000, temperature: 25.5, activity: 60 },
-            { timestamp: 1715000060, temperature: 25.8, activity: 75 },
-            { timestamp: 1715000120, temperature: 26.0, activity: 45 },
-        ]
-    };
-    return Promise.resolve(mockData);
+    // This now calls the real backend endpoint for all event logs
+    return fetchApi('/event_logs', 'GET');
 };
 
 
@@ -90,3 +88,11 @@ export const fetchCameraList = () => {
     // This now calls your real backend endpoint from app.py
     return fetchApi('/camera_status', 'GET');
 }
+
+/**
+ * Fetches event logs for today from the backend database.
+ * @returns {Promise<object>} API response with today's logs.
+ */
+export const fetchTodayEventLogs = () => {
+    return fetchApi('/event_logs/today', 'GET');
+};

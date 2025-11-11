@@ -1,120 +1,138 @@
+/*
+ * === FILENAME: src/pages/ReportsPage.jsx ===
+ *
+ * This component now fetches real event logs from the apiService
+ * and displays them in a table instead of a mock chart.
+ */
 import React, { useState, useEffect } from 'react';
 import { fetchReportsData } from '../services/apiService';
-import { FaChartLine, FaSpinner, FaTable, FaExclamationTriangle, FaThermometerHalf, FaRunning, FaClock } from 'react-icons/fa';
-import agapai_Bg from './../assets/images/bg/gray-bg.png';
+import { FaFileAlt, FaSpinner, FaExclamationTriangle } from 'react-icons/fa';
 
-/**
- * Renders the Reports Page with simulated QuestDB data.
- * This component demonstrates fetching REST API data.
- */
-export default function ReportsPage({ user, logout }) {
-    const [reportData, setReportData] = useState(null);
-    const [isLoading, setIsLoading] = useState(true);
-    const [error, setError] = useState(null);
+export default function ReportsPage() {
+  const [logs, setLogs] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-    useEffect(() => {
-        const loadReports = async () => {
-            setIsLoading(true);
-            setError(null);
-            try {
-                // Fetch data using the updated API service
-                const response = await fetchReportsData();
-                setReportData(response.report || []);
-            } catch (err) {
-                console.error("Error loading report data:", err);
-                setError(err.message || "Failed to load report data.");
-            } finally {
-                setIsLoading(false);
-            }
-        };
-
-        loadReports();
-    }, []);
-
-    const convertUnixToTime = (timestamp) => {
-        if (!timestamp) return 'N/A';
-        return new Date(timestamp * 1000).toLocaleString();
+  useEffect(() => {
+    const loadReportData = async () => {
+      try {
+        setIsLoading(true);
+        setError(null);
+        const data = await fetchReportsData();
+        
+        if (data.status === 'success' && Array.isArray(data.report)) {
+          setLogs(data.report);
+        } else {
+          throw new Error(data.message || 'Failed to fetch report data');
+        }
+      } catch (err) {
+        console.error("Error fetching report data:", err);
+        setError(err.message);
+      } finally {
+        setIsLoading(false);
+      }
     };
 
-    return (
-        <div className="flex flex-col min-h-screen"
-            style={{
-                backgroundImage: `url(${agapai_Bg})`,
-                backgroundSize: 'cover',
-                backgroundPosition: 'center',
-                backgroundAttachment: 'fixed',
-            }}
-        >
-            
-            <main className="flex-grow container mx-auto p-6">
-                <h1 className="text-2xl font-extrabold text-gray-900 flex items-center mb-6">
-                    <FaChartLine className="mr-3 text-gray-900" />
-                </h1>
+    loadReportData();
+  }, []);
 
-                {isLoading && (
-                    <div className='flex items-center justify-center p-12 text-xl text-gray-700'>
-                        <FaSpinner className='animate-spin mr-2' /> Fetching data from QuestDB simulation...
-                    </div>
-                )}
-
-                {error && (
-                    <div className="p-4 bg-red-100 border border-red-400 text-red-700 rounded-xl flex items-center">
-                        <FaExclamationTriangle className="mr-3" /> {error}
-                    </div>
-                )}
-
-                {reportData && reportData.length > 0 && (
-                    <div className="bg-white rounded-xl shadow-lg overflow-hidden border border-gray-200">
-                        <div className="p-4 bg-teal-600 text-white flex items-center">
-                            <FaTable className="mr-2" />
-                            <h2 className="text-xl font-semibold">Sensor Data Log</h2>
-                        </div>
-                        <div className="overflow-x-auto">
-                            <table className="min-w-full divide-y divide-gray-200">
-                                <thead className="bg-gray-50">
-                                    <tr>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                            <FaClock className="inline mr-1" /> Timestamp
-                                        </th>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                            <FaThermometerHalf className="inline mr-1" /> Temperature (°C)
-                                        </th>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                            <FaRunning className="inline mr-1" /> Activity Level (Score)
-                                        </th>
-                                    </tr>
-                                </thead>
-                                <tbody className="bg-white divide-y divide-gray-200">
-                                    {reportData.map((data, index) => (
-                                        <tr key={index} className="hover:bg-gray-50">
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                                                {convertUnixToTime(data.timestamp)}
-                                            </td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                                {data.temperature.toFixed(1)}°C
-                                            </td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold">
-                                                <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                                                    data.activity > 60 ? 'bg-teal-100 text-teal-800' : 
-                                                    data.activity > 30 ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800'
-                                                }`}>
-                                                    {data.activity}
-                                                </span>
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                )}
-                {reportData && reportData.length === 0 && !isLoading && (
-                    <div className="p-4 bg-yellow-100 border border-yellow-400 text-yellow-700 rounded-xl">
-                        No historical data found for the requested period.
-                    </div>
-                )}
-
-            </main>
+  const renderContent = () => {
+    if (isLoading) {
+      return (
+        <div className="flex justify-center items-center p-10 text-gray-500">
+          <FaSpinner className="animate-spin mr-3 text-2xl" />
+          <span className="text-lg">Loading report data...</span>
         </div>
+      );
+    }
+
+    if (error) {
+      return (
+        <div className="flex justify-center items-center p-10 text-red-600 bg-red-50 border border-red-300 rounded-lg">
+          <FaExclamationTriangle className="mr-3 text-2xl" />
+          <span className="text-lg">Error: {error}</span>
+        </div>
+      );
+    }
+
+    if (logs.length === 0) {
+      return (
+        <div className="flex justify-center items-center p-10 text-gray-500">
+          <span className="text-lg">No event logs found in the database.</span>
+        </div>
+      );
+    }
+
+    // Render the table with logs
+    return (
+      <div className="overflow-x-auto shadow-md rounded-lg border border-gray-200">
+        <table className="min-w-full divide-y divide-gray-200 bg-white">
+          <thead className="bg-gray-50">
+            <tr>
+              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Timestamp
+              </th>
+              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Event Type
+              </th>
+              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Location
+              </th>
+              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Camera
+              </th>
+              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Status
+              </th>
+            </tr>
+          </thead>
+          <tbody className="bg-white divide-y divide-gray-200">
+            {logs.map((log) => (
+              <tr key={log.id} className="hover:bg-gray-50">
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                  {new Date(log.timestamp).toLocaleString()}
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-red-700">
+                  {log.type}
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                  {log.location}
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                  {log.camera_name}
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm">
+                  <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                    log.status === 'unacknowledged' 
+                      ? 'bg-red-100 text-red-800' 
+                      : 'bg-green-100 text-green-800'
+                  }`}>
+                    {log.status}
+                  </span>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     );
+  };
+
+  return (
+    <div className="container mx-auto p-6 space-y-6">
+      <div className="flex items-center space-x-3">
+        <FaFileAlt className="text-3xl text-teal-600" />
+        <h1 className="text-3xl font-bold text-gray-800">
+          Event Log History
+        </h1>
+      </div>
+      <p className="text-gray-600">
+        This page shows a complete history of all events recorded by the system, retrieved from the main database.
+      </p>
+      
+      <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-200">
+        {renderContent()}
+      </div>
+    </div>
+  );
 }
