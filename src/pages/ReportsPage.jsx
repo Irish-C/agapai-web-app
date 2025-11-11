@@ -125,8 +125,10 @@ export default function ReportsPage() {
           Event Log History
         </h1>
       </div>
-      <p className="text-gray-600">
-        This page shows a complete history of all events recorded by the system, retrieved from the main database.
+      <p className="text-gray-600 mx-4 sm:mx-8 lg:mx-16">
+        These are the complete audit logs of all vision-based events detected by the system. 
+        Review historical fall and inactivity alerts from all locations to ensure comprehensive 
+        resident monitoring and facility oversight.
       </p>
       
       <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-200">
