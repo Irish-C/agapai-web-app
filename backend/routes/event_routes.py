@@ -4,8 +4,7 @@ from models import EventLog, EventType, Camera, Location
 from database import db
 import traceback
 
-# 1. Create the Blueprint
-# This is what app.py will import
+# 1. Create the Blueprint. App will import this.
 event_routes = Blueprint('event_routes', __name__)
 
 
