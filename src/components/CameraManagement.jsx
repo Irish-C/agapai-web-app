@@ -72,7 +72,7 @@ function CameraManagement() {
         // Refresh the camera list to show the new one
         fetchCameras();
       } else {
-        alert('Error: 'D + data.message);
+        alert('Error: ' + data.message); // Note: There seems to be a typo here in your original code ('Error: 'D + data.message)
       }
     })
     .catch(err => console.error("Error adding camera:", err));
