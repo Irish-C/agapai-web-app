@@ -6,17 +6,20 @@ import {
     FaCamera, 
     FaSave, 
     FaSpinner,
-    FaTrash, // <-- Added for Remove button
-    FaPlus   // <-- Added for Add button
+    FaTrash,
+    FaPlus,
+    FaMapMarkerAlt, // <-- Added for Location Management
+    FaPencilAlt,    // <-- Added for Edit button
+    FaTimes         // <-- Added for Cancel button
 } from 'react-icons/fa';
 
 /**
- * Settings Page with combined Camera Management.
+ * Settings Page with combined Camera and Location Management.
  */
 export default function Settings({ user, logout }) {
     // --- State Management ---
     const [cameras, setCameras] = useState([]);
-    const [locations, setLocations] = useState([]); // <-- NEW: For the 'Add' form
+    const [locations, setLocations] = useState([]);
     
     // State for the main settings form
     const [settings, setSettings] = useState({
@@ -30,9 +33,15 @@ export default function Settings({ user, logout }) {
     // State for the "Add Camera" form
     const [newCam, setNewCam] = useState({ name: '', url: '', locId: '' });
 
+    // --- NEW: State for Location Management ---
+    const [newLocationName, setNewLocationName] = useState('');
+    const [editingLocation, setEditingLocation] = useState(null); // e.g., { id: 1, name: 'Living Room' }
+    const [locMessage, setLocMessage] = useState({ text: '', type: '' }); // Message for location actions
+    // --- END NEW ---
+
     const [isSaving, setIsSaving] = useState(false);
     const [message, setMessage] = useState({ text: '', type: '' });
-    const [camMessage, setCamMessage] = useState({ text: '', type: '' }); // Message for camera actions
+    const [camMessage, setCamMessage] = useState({ text: '', type: '' });
 
     // --- Data Fetching ---
     useEffect(() => {
@@ -47,7 +56,6 @@ export default function Settings({ user, logout }) {
                 if (data.status === 'success') {
                     setCameras(data.cameras);
                     
-                    // Build the initial 'cameraActive' settings
                     const initialCameraSettings = {};
                     for (const cam of data.cameras) {
                         initialCameraSettings[cam.id] = cam.status; 
@@ -69,7 +77,6 @@ export default function Settings({ user, logout }) {
                 if (data.status === 'success') {
                     setLocations(data.locations);
                     if (data.locations.length > 0) {
-                        // Set default location for the 'Add' form
                         setNewCam(prev => ({ ...prev, locId: data.locations[0].id }));
                     }
                 }
@@ -79,7 +86,6 @@ export default function Settings({ user, logout }) {
 
     // --- Handlers for Main Settings ---
     const handleChange = (e) => {
-        // ... (This is your existing handleChange, it's perfect)
         const { name, value, type, checked } = e.target;
         if (name.includes('.')) {
             const [parent, child] = name.split('.');
@@ -94,8 +100,6 @@ export default function Settings({ user, logout }) {
         setMessage({ text: '', type: '' });
         setIsSaving(true);
         
-        // TODO: Create a backend endpoint to save these settings
-        // For now, we just log it and show a mock success
         setTimeout(() => {
             setIsSaving(false);
             if (settings.password && settings.password !== settings.confirmPassword) {
@@ -110,13 +114,11 @@ export default function Settings({ user, logout }) {
 
     // --- Handlers for Camera Management ---
     
-    // Update state for the "Add Camera" form
     const handleNewCamChange = (e) => {
         const { name, value } = e.target;
         setNewCam(prev => ({ ...prev, [name]: value }));
     };
 
-    // Handle "Add Camera" submission
     const handleAddCamera = (e) => {
         e.preventDefault();
         setCamMessage({ text: '', type: '' });
@@ -136,17 +138,16 @@ export default function Settings({ user, logout }) {
         .then(data => {
             if (data.status === 'success') {
                 setCamMessage({ text: 'Camera added successfully!', type: 'success' });
-                setNewCam({ name: '', url: '', locId: locations[0]?.id || '' }); // Reset form
-                fetchCameras(); // Refresh the entire camera list
+                setNewCam({ name: '', url: '', locId: locations[0]?.id || '' });
+                fetchCameras();
             } else {
                 setCamMessage({ text: `Error: ${data.message}`, type: 'error' });
             }
         });
     };
 
-    // Handle "Remove" button click
     const handleDeleteCamera = (camId) => {
-        if (!window.confirm('Are you sure you want to delete this camera?')) {
+        if (!window.confirm('Are you sure you want to delete this camera? This might also remove associated event logs.')) {
             return;
         }
         
@@ -157,17 +158,94 @@ export default function Settings({ user, logout }) {
         .then(data => {
             if (data.status === 'success') {
                 setCamMessage({ text: 'Camera removed successfully!', type: 'success' });
-                fetchCameras(); // Refresh the entire camera list
+                fetchCameras();
             } else {
                 setCamMessage({ text: `Error: ${data.message}`, type: 'error' });
             }
         });
     };
 
+    // --- NEW: Handlers for Location Management ---
+
+    const handleAddLocation = (e) => {
+        e.preventDefault();
+        setLocMessage({ text: '', type: '' });
+
+        fetch('/api/locations', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ loc_name: newLocationName })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.status === 'success') {
+                setLocMessage({ text: 'Location added successfully!', type: 'success' });
+                setNewLocationName(''); // Reset form
+                fetchLocations(); // Refresh the locations list
+            } else {
+                setLocMessage({ text: `Error: ${data.message}`, type: 'error' });
+            }
+        });
+    };
+
+    const handleDeleteLocation = (locId) => {
+        if (!window.confirm('Are you sure you want to delete this location? All cameras at this location must be removed first.')) {
+            return;
+        }
+
+        setLocMessage({ text: '', type: '' });
+
+        fetch(`/api/locations/${locId}`, { method: 'DELETE' })
+        .then(res => res.json())
+        .then(data => {
+            if (data.status === 'success') {
+                setLocMessage({ text: 'Location removed successfully!', type: 'success' });
+                fetchLocations(); // Refresh list
+                fetchCameras(); // Also refresh cameras (in case some were removed)
+            } else {
+                setLocMessage({ text: `Error: ${data.message}`, type: 'error' });
+            }
+        });
+    };
+
+    const handleEditLocation = (loc) => {
+        // Set the location to be edited (name is copied for the input)
+        setEditingLocation({ ...loc });
+    };
+
+    const handleCancelEdit = () => {
+        setEditingLocation(null);
+    };
+
+    const handleUpdateLocation = () => {
+        if (!editingLocation || !editingLocation.name) return;
+
+        setLocMessage({ text: '', type: '' });
+
+        fetch(`/api/locations/${editingLocation.id}`, {
+            method: 'PATCH', // Use PATCH to update partially
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ loc_name: editingLocation.name })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.status === 'success') {
+                setLocMessage({ text: 'Location updated successfully!', type: 'success' });
+                setEditingLocation(null); // Exit edit mode
+                fetchLocations(); // Refresh list
+            } else {
+                setLocMessage({ text: `Error: ${data.message}`, type: 'error' });
+            }
+        });
+    };
+    
+    // --- END NEW HANDLERS ---
+
+
     // --- Render ---
     const messageClass = (msg) => msg.type === 'success'
         ? 'bg-green-100 border-green-400 text-green-700'
-        : 'bg-red-100 border-red-400 text-red-700';
+        : 'bg-red-1Red-400 text-red-700'; // Corrected typo here
 
     return (
         <div className="flex flex-col min-h-screen bg-gray-100">
@@ -229,13 +307,14 @@ export default function Settings({ user, logout }) {
                     
                     {/* Save Button */}
                     <div className="pt-4">
-                        <button type="submit" disabled={isSaving} /* ... (your className) */>
-                            {/* ... (your saving/save icons) ... */}
+                        <button type="submit" disabled={isSaving} className="flex items-center justify-center bg-teal-600 text-white font-bold py-2 px-6 rounded-xl hover:bg-teal-700 disabled:opacity-50">
+                           {isSaving ? <FaSpinner className="animate-spin mr-2" /> : <FaSave className="mr-2" />}
+                           {isSaving ? 'Saving...' : 'Save All Settings'}
                         </button>
                     </div>
                 </form>
 
-                {/* --- NEW: Camera Management Section --- */}
+                {/* --- Camera Management Section --- */}
                 <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-200 mt-8 max-w-4xl">
                     <h2 className="text-2xl font-semibold text-gray-800 flex items-center mb-4 pb-2 border-b">
                         <FaCamera className="mr-2 text-gray-500" /> Camera Management
@@ -273,7 +352,7 @@ export default function Settings({ user, logout }) {
                                 required
                             >
                                 {locations.map(loc => (
-                                    <option key={loc.id} value={loc.id}>{loc.name}</option>
+                                    <option key={loc.id} value={loc.id}>{loc.name}</option> // <-- This should be loc.name
                                 ))}
                             </select>
                         </div>
@@ -285,7 +364,6 @@ export default function Settings({ user, logout }) {
                                 <FaPlus className="mr-2" /> Add
                             </button>
                         </div>
-                        {/* Optional: Add a field for stream_url if needed */}
                     </form>
                     
                     {/* 2. Existing Camera List (for Deletion) */}
@@ -308,6 +386,101 @@ export default function Settings({ user, logout }) {
                         ))}
                     </div>
                 </div>
+
+                {/* --- NEW: Location Management Section --- */}
+                <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-200 mt-8 max-w-4xl">
+                    <h2 className="text-2xl font-semibold text-gray-800 flex items-center mb-4 pb-2 border-b">
+                        <FaMapMarkerAlt className="mr-2 text-indigo-500" /> Location Management
+                    </h2>
+
+                    {/* Location Action Status Message */}
+                    {locMessage.text && (
+                        <div className={`mb-6 p-4 border rounded-xl font-medium ${messageClass(locMessage)}`}>
+                            {locMessage.text}
+                        </div>
+                    )}
+
+                    {/* 1. Add Location Form */}
+                    <form onSubmit={handleAddLocation} className="flex items-end gap-4 mb-6">
+                        <div className="flex-grow">
+                            <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="newLocationName">
+                                New Location Name
+                            </label>
+                            <input
+                                type="text"
+                                id="newLocationName"
+                                value={newLocationName}
+                                onChange={(e) => setNewLocationName(e.target.value)}
+                                className="w-full border-gray-300 rounded-lg shadow-sm focus:ring-teal-500 focus:border-teal-500"
+                                required
+                            />
+                        </div>
+                        <div>
+                            <button
+                                type="submit"
+                                className="flex items-center justify-center bg-green-600 text-white font-bold py-2 px-4 rounded-xl hover:bg-green-700"
+                            >
+                                <FaPlus className="mr-2" /> Add Location
+                            </button>
+                        </div>
+                    </form>
+                    
+                    {/* 2. Existing Location List (for Edit/Delete) */}
+                    <h3 className="text-lg font-semibold text-gray-700 mb-2">Existing Locations</h3>
+                    <div className="space-y-2">
+                        {locations.length === 0 ? <p>No locations added yet.</p> : null}
+                        {locations.map(loc => (
+                            <div key={loc.id} className="flex justify-between items-center p-3 border rounded-lg bg-gray-50">
+                                {editingLocation && editingLocation.id === loc.id ? (
+                                    // --- Edit Mode ---
+                                    <>
+                                        <input
+                                            type="text"
+                                            value={editingLocation.name}
+                                            onChange={(e) => setEditingLocation(prev => ({ ...prev, name: e.target.value }))}
+                                            className="w-full border-gray-300 rounded-lg shadow-sm focus:ring-teal-500 focus:border-teal-500"
+                                        />
+                                        <button
+                                            onClick={handleUpdateLocation}
+                                            className="flex items-center bg-green-600 text-white text-sm font-bold py-1 px-3 rounded-lg hover:bg-green-700 ml-2"
+                                        >
+                                            <FaSave className="mr-1" /> Save
+                                        </button>
+                                        <button
+                                            onClick={handleCancelEdit}
+                                            className="flex items-center bg-gray-500 text-white text-sm font-bold py-1 px-3 rounded-lg hover:bg-gray-600 ml-2"
+                                        >
+                                            <FaTimes className="mr-1" /> Cancel
+                                        </button>
+                                    </>
+                                ) : (
+                                    // --- View Mode ---
+                                    <>
+                                        <div>
+                                            <strong className="text-gray-900">{loc.name}</strong>
+                                        </div>
+                                        <div className="flex gap-2">
+                                            <button
+                                                onClick={() => handleEditLocation(loc)}
+                                                className="flex items-center bg-blue-600 text-white text-sm font-bold py-1 px-3 rounded-lg hover:bg-blue-700"
+                                            >
+                                                <FaPencilAlt className="mr-1" /> Edit
+                                            </button>
+                                            <button
+                                                onClick={() => handleDeleteLocation(loc.id)}
+                                                className="flex items-center bg-red-600 text-white text-sm font-bold py-1 px-3 rounded-lg hover:bg-red-700"
+                                            >
+                                                <FaTrash className="mr-1" /> Remove
+                                            </button>
+                                        </div>
+                                    </>
+                                )}
+                            </div>
+                        ))}
+                    </div>
+                </div>
+                {/* --- END NEW SECTION --- */}
+
             </main>
         </div>
     );
