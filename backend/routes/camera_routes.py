@@ -1,10 +1,8 @@
 from flask import Blueprint, request, jsonify
 from database import db
 from models import Camera, Location
-# --- ADDED IMPORTS ---
 from flask_jwt_extended import jwt_required
 import traceback
-# --- END ADDED IMPORTS ---
 
 # Define a Flask Blueprint
 camera_routes = Blueprint('camera_routes', __name__)

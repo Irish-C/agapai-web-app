@@ -38,25 +38,35 @@ export default function Header({ user, logout }) {
 
     return (
         <header
-            className={`bg-gradient-to-b from-[#2d3092] to-[#015954] text-white shadow-lg sticky top-0 z-20 transition-transform duration-300 ${
-                hidden ? '-translate-y-full' : 'translate-y-0'
-            }`}
+        className={`bg-gradient-to-b from-[#2d3092] to-[#015954] text-white shadow-lg sticky top-0 z-20 transition-transform duration-300 ${
+            hidden ? '-translate-y-full' : 'translate-y-0'
+        }`}
         >
-            <div className="container mx-auto px-4 sm:px-6 lg:px-8 flex justify-between items-center h-16">
-                {/* Logo and App Title */}
-                <Link to="/dashboard" className="flex items-center space-x-3 transition duration-300 hover:opacity-90">
-                    <img
-                        src={agapaiLogo}
-                        alt="AGAPAI Logo"
-                        className="h-12 w-auto rounded-full"
-                        onError={(e) => { e.target.onerror = null; e.target.src = "https://placehold.co/32x32/14b8a6/ffffff?text=A" }}
-                    />
-                    <span className="text-4xl font-bold text-[#c4fcff] tracking-wider">AGAPAI:</span>
-                    <span className="text-sm italic text-gray-300 tracking-wider">
-                    <div>A Vision-Based Monitoring and Alert System</div>
-                    <div>for Fall and Inactivity in Elderly Care Facility</div>
-                    </span>
-                </Link>
+        <div className="container mx-auto px-4 sm:px-6 lg:px-8 flex justify-between items-center h-16">
+            {/* Logo and App Title */}
+            <Link
+            to="/dashboard"
+            className="flex items-center space-x-3 transition duration-300 hover:opacity-90"
+            >
+            <img
+                src={agapaiLogo}
+                alt="AGAPAI Logo"
+                className="h-12 w-auto rounded-full"
+                onError={(e) => {
+                e.target.onerror = null;
+                e.target.src = 'https://placehold.co/32x32/14b8a6/ffffff?text=A';
+                }}
+            />
+            <div className="flex flex-col leading-tight">
+                <span className="text-4xl font-bold text-[#c4fcff] tracking-wider">
+                AGAPAI
+                </span>
+                <span className="text-[0.75rem] italic text-gray-300 tracking-wide">
+                A Vision-Based Monitoring and Alert System for Fall and Inactivity in
+                Elderly Care Facility
+                </span>
+            </div>
+            </Link>
 
 
                 {/* Desktop Navigation Links */}
