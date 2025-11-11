@@ -1,3 +1,4 @@
+// src/pages/LoginPage.jsx
 import React, { useState } from 'react';
 import { FaLock, FaSignInAlt, FaUser, FaKey, FaSpinner } from 'react-icons/fa';
 import { useNavigate } from 'react-router-dom';

@@ -34,8 +34,10 @@ const fetchApi = async (endpoint, method = 'GET', data = null) => {
     console.log(`fetchApi: Requesting ${endpoint}...`);
     if (token) {
         console.log("fetchApi: Token found, attaching to Authorization header.");
-        // Uncomment the line below if you need to see the token value (be careful with this in production!)
-        // console.log("fetchApi: Token value:", token); 
+        // --- THIS LINE IS NEW (UNCOMMENTED) ---
+        // This will show us the exact token value in the console.
+        console.log("fetchApi: Token value:", token); 
+        // --- END NEW ---
         headers['Authorization'] = `Bearer ${token}`;
     } else {
         console.warn(`fetchApi: No token found in localStorage for ${endpoint}.`);
@@ -140,6 +142,11 @@ export const logoutUser = () => {
  * @returns {Promise<object>} Time-series data.
  */
 export const fetchReportsData = () => {
+    // If your backend *requires* parameters, add them like this:
+    // EXAMPLE:
+    // return fetchApi('/event_logs?page=1&limit=50', 'GET');
+    
+    // Your original code (which is probably fine if you do Option 1):
     return fetchApi('/event_logs', 'GET');
 };
 
