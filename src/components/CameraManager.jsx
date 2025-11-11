@@ -90,15 +90,15 @@ export default function CameraManager({ locations, onCameraUpdated }) {
         }
     };
 
-    // --- NEW: Handlers for editing a camera ---
+    // --- Handlers for editing a camera ---
     
     // 1. When "Edit" is clicked, set the camera to editing state
     const handleEditCamera = (cam) => {
-        // We must map the backend 'location_id' to 'locId' for our form state
+        // Map the data correctly for the form state
         setEditingCam({ 
             ...cam, 
-            cam_name: cam.name, // Use 'name' from the fetched list
-            loc_id: cam.location_id // Use 'location_id' from the fetched list
+            cam_name: cam.name, // The camera's name for the input field
+            loc_id: cam.location_id // The camera's location ID for the select field
         });
     };
 
@@ -126,7 +126,7 @@ export default function CameraManager({ locations, onCameraUpdated }) {
         const cameraData = {
             cam_name: editingCam.cam_name,
             loc_id: parseInt(editingCam.loc_id)
-            // You could add stream_url here too if you add it to the edit form
+            // stream_url could be added here if needed
         };
 
         try {
@@ -134,7 +134,7 @@ export default function CameraManager({ locations, onCameraUpdated }) {
             if (data.status === 'success') {
                 setCamMessage({ text: 'Camera updated successfully!', type: 'success' });
                 setEditingCam(null); // Exit edit mode
-                await fetchCameras(); // Await to refresh the list
+                await fetchCameras(); // Refresh the list
             } else {
                 setCamMessage({ text: `Error: ${data.message}`, type: 'error' });
             }
@@ -207,7 +207,7 @@ export default function CameraManager({ locations, onCameraUpdated }) {
                 {cameras.map(cam => (
                     <div key={cam.id} className="p-3 border rounded-lg bg-gray-50">
                         {editingCam && editingCam.id === cam.id ? (
-                            // --- NEW: Edit Mode ---
+                            // --- Edit Mode ---
                             <form onSubmit={handleUpdateCamera} className="space-y-4">
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <div>
