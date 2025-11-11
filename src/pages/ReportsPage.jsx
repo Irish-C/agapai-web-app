@@ -1,8 +1,7 @@
-/*
- * === FILENAME: src/pages/ReportsPage.jsx ===
- *
- * This component now fetches real event logs from the apiService
- * and displays them in a table instead of a mock chart.
+/* src/pages/ReportsPage.jsx
+
+ * This component fetches real event logs from the apiService
+ * and displays them in a table format.
  */
 import React, { useState, useEffect } from 'react';
 import { fetchReportsData } from '../services/apiService';
