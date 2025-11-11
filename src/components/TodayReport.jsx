@@ -20,7 +20,7 @@ export default function TodayReport({ incidents }) {
   ];
   
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 sticky top-14 h-fit">
 
       {/* 1. REAL-TIME INCIDENT LOG (WebSocket Data) */}
       <div className="bg-white p-4 rounded-xl shadow-lg border border-gray-200">
