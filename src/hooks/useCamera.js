@@ -7,20 +7,17 @@ import io from 'socket.io-client';
  * and managing camera and incident data streams.
  */
 export const useCameraSocket = () => {
-    // We remove cameraList from here. The component will fetch it.
     const [cameraData, setCameraData] = useState({});
     const [incidents, setIncidents] = useState([]);
     const [isConnected, setIsConnected] = useState(false);
 
-    // This useEffect now only handles the socket connection.
+    // This useEffect only handles the socket connection.
     useEffect(() => {
-        // --- FIX FOR LOCAL DEV ENVIRONMENT ---
-        // We will connect *directly* to the Flask server on port 5000.
+        // Connect directly to the Flask server on port 5000.
         const socket = io('http://localhost:5000', { 
             path: '/socket.io', 
             transports: ['websocket', 'polling'] 
         });
-        // --- END FIX ---
 
         socket.on('connect', () => {
             console.log('SocketIO: Connected to Flask server');

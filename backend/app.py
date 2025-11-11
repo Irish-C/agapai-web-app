@@ -1,6 +1,7 @@
 import eventlet
 eventlet.monkey_patch(thread=False) # Keep thread=False to avoid context errors
 
+
 from flask import Flask, request, jsonify, send_from_directory
 from flask_socketio import SocketIO, emit
 from dotenv import load_dotenv
@@ -13,6 +14,7 @@ from PIL import Image, ImageDraw, ImageFont
 import threading    
 from flask_jwt_extended import JWTManager
 
+from models import Location, EventType, EventClass, Camera, Role
 from database import db
 from routes.user_routes import user_routes
 from routes.camera_routes import camera_routes
@@ -170,6 +172,60 @@ def create_db():
         db.create_all()
     return "Database tables created!"
 
+@app.route('/seed_db')
+def seed_db():
+    """
+    Seeds the database with one of each required item
+    so the mock log generator can work.
+    """
+    with app.app_context():
+        try:
+            # Check if data already exists to avoid duplicates
+            if Location.query.first() or Camera.query.first() or EventType.query.first():
+                return "Database already has data. Seed skipped."
+
+            print("Seeding database...")
+
+            # 1. Create a Location
+            new_loc = Location(loc_name="Sebastian")
+            db.session.add(new_loc)
+
+            # 2. Create EventType
+            new_event_type = EventType(event_type_name="Fall")
+            db.session.add(new_event_type)
+            
+            # Commit so we can get IDs for the next step
+            db.session.commit()
+
+            # 3. Create EventClass 
+            new_event_class = EventClass(
+                class_name="Backward Fall",
+                event_type_id=new_event_type.id
+            )
+            db.session.add(new_event_class)
+
+            # 4. Create a Camera
+            new_cam = Camera(
+                cam_name="Cam 1",
+                loc_id=new_loc.id
+            )
+            db.session.add(new_cam)
+            
+            # 5. Create a default Role
+            if not Role.query.first():
+                new_role = Role(role_name="Admin")
+                db.session.add(new_role)
+
+            db.session.commit()
+            
+            print("Database seeding successful!")
+            return "Database seeded with 1 Location, 1 Camera, 1 EventType, and 1 EventClass."
+
+        except Exception as e:
+            db.session.rollback()
+            print(f"Error seeding database: {e}")
+            return f"Error seeding database: {e}", 500
+        
 @app.route('/', defaults={'path': ''})
 @app.route('/<path:path>')
 def serve_index(path):
