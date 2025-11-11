@@ -139,17 +139,27 @@ export default function CameraGrid() {
 
                         {/* Show grid only when not loading */}
                         {!isLoading && cameraList.length > 0 && (
+                            // This grid container stays the same: 1 col on mobile, 2 on desktop
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 {cameraList.map(camera => (
-                                    <VideoFeed
-                                        key={camera.id}
-                                        camId={camera.id}
-                                        location={camera.location || camera.location_name} // Handle both formats
-                                        frameData={cameraData[camera.id]}
-                                        isConnected={isConnected}
-                                        isFocused={false}
-                                        onFocusChange={setFocusedCameraId} // Pass the setter
-                                    />
+                                    // --- THIS IS THE FIX ---
+                                    // We wrap the VideoFeed in a div.
+                                    // If there is only 1 camera, we tell this div to span 2 columns
+                                    // on medium screens, making it fill the grid.
+                                    <div 
+                                        key={camera.id} 
+                                        className={cameraList.length === 1 ? 'md:col-span-2' : ''}
+                                    >
+                                        <VideoFeed
+                                            camId={camera.id}
+                                            location={camera.location || camera.location_name} // Handle both formats
+                                            frameData={cameraData[camera.id]}
+                                            isConnected={isConnected}
+                                            isFocused={false}
+                                            onFocusChange={setFocusedCameraId} // Pass the setter
+                                        />
+                                    </div>
+                                    // --- END FIX ---
                                 ))}
                             </div>
                         )}
