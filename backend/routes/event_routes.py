@@ -1,8 +1,10 @@
 from flask import Blueprint, jsonify, request
 from flask_jwt_extended import jwt_required, get_jwt_identity
-from models import EventLog, EventType, Camera, Location, EventClass # Added EventClass
+# ADDED User to imports
+from models import EventLog, EventType, Camera, Location, EventClass, User 
 from database import db
 import traceback
+from sqlalchemy.sql import func 
 
 # 1. Create the Blueprint. App will import this.
 event_routes = Blueprint('event_routes', __name__)
@@ -12,27 +14,27 @@ event_routes = Blueprint('event_routes', __name__)
 @event_routes.route('/event_logs', methods=['GET'])
 @jwt_required()  # Protect this endpoint
 def get_event_logs():
-    """
-    Fetches and serializes event logs from the database.
-    --- UPDATED: Pagination has been removed ---
-    """
     try:
-        # Joins based on  SQL schema:
-        # EventLog -> Camera -> Location
-        # EventLog -> EventClass -> EventType
+        # Joins based on SQL schema:
         log_query = db.session.query(
             EventLog,
-            EventType.event_type_name, # <-- Correct column from SQL
-            Camera.cam_name,
-            Location.loc_name
+            # 1. RESOLVE EVENT CLASS NAME (Incident Classification)
+            EventClass.class_name.label('event_class_name'), 
+            # 2. RESOLVE LOCATION/CAMERA NAMES
+            Camera.cam_name.label('camera_name'),
+            Location.loc_name.label('location_name'),
+            # 3. RESOLVE ACKNOWLEDGED BY USERNAME (User.username)
+            # Use .label() to give the result a clear name for serialization
+            User.username.label('acknowledged_by_username')
         ).join(
-            Camera, EventLog.cam_id == Camera.id # <-- Correct FK from SQL
+            Camera, EventLog.cam_id == Camera.id 
         ).join(
-            Location, Camera.loc_id == Location.id # <-- Correct join
+            Location, Camera.loc_id == Location.id 
         ).join(
-            EventClass, EventLog.event_class_id == EventClass.id # <-- Correct FK from SQL
-        ).join(
-            EventType, EventClass.event_type_id == EventType.id # <-- Correct join
+            EventClass, EventLog.event_class_id == EventClass.id 
+        # Use LEFT OUTER JOIN for the User table because ack_by_user_id can be NULL
+        ).outerjoin( 
+            User, EventLog.ack_by_user_id == User.id
         ).order_by(
             EventLog.timestamp.desc()
         )
@@ -40,16 +42,20 @@ def get_event_logs():
         # Get all logs
         logs = log_query.all()
 
-        # Serialize the data based on SQL schema
+        # Serialize the data
         results = []
-        for log, type_name, cam_name, loc_name in logs:
+        # Unpack the tuple of results using the defined labels
+        for log, event_class_name, camera_name, location_name, acknowledged_by_username in logs:
             results.append({
                 "id": log.id,
-                "type": type_name, 
-                "camera_name": cam_name,
-                "location": loc_name,
+                # Use the resolved class name (e.g., 'Backward Fall')
+                "event_class_name": event_class_name, 
+                "camera_name": camera_name,
+                "location": location_name,
                 "timestamp": log.timestamp.isoformat() if log.timestamp else None,
                 "status": log.event_status,
+                # Use the resolved username
+                "acknowledged_by_username": acknowledged_by_username,
                 "file_path": log.file_path
             })
 
