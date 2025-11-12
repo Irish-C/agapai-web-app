@@ -1,217 +1,182 @@
-import React, { useState, useEffect } from 'react';
-import { fetchApi } from '../services/apiService'; 
-import { 
-    FaLock, 
-    FaBell, 
-    FaCamera, 
-    FaSave, 
-    FaSpinner 
-} from 'react-icons/fa';
+import React, { useState } from 'react';
+import { FaLock, FaKey, FaSave, FaSpinner, FaCheckCircle, FaExclamationCircle } from 'react-icons/fa';
+import { fetchApi } from '../services/apiService';
 
-// This component handles the main settings form
+// Mock API Call to simulate password update logic
+// In a real application, this would be a dedicated function in apiService.
+const mockUpdatePasswordApi = async (oldPassword, newPassword) => {
+    // Simulate network delay
+    await new Promise(resolve => setTimeout(resolve, 1500)); 
+
+    // NOTE: In a production Flask app, the backend verifies the old password against the hash
+    // stored in the database BEFORE hashing and saving the new one.
+    
+    if (oldPassword === 'admin_test') {
+        // Successful response simulation
+        return { status: 'success', message: 'Password updated successfully. Please log in again.' };
+    } else if (oldPassword === 'error_test') {
+        // Failed response simulation (e.g., database error)
+         return { status: 'error', message: 'Database failed to save the new password.' };
+    } else {
+        // Validation failed (Old password incorrect)
+        return { status: 'error', message: 'Invalid old password provided.' };
+    }
+};
+
+
 export default function MainSettingsForm() {
-    const [settings, setSettings] = useState({
-        alertThreshold: 50,
-        emailNotifications: true,
-        cameraActive: {},
-        password: '',
-        confirmPassword: ''
-    });
-    const [cameras, setCameras] = useState([]);
-    const [isSaving, setIsSaving] = useState(false);
-    const [message, setMessage] = useState({ text: '', type: '' });
+    const [oldPassword, setOldPassword] = useState('');
+    const [newPassword, setNewPassword] = useState('');
+    const [confirmPassword, setConfirmPassword] = useState('');
+    
+    const [isLoading, setIsLoading] = useState(false);
+    const [message, setMessage] = useState(null); // { type: 'success' | 'error', text: string }
 
-    // Fetch cameras on mount to populate the activation toggles
-    useEffect(() => {
-        fetchCameras();
-    }, []);
-
-    const fetchCameras = async () => {
-        try {
-            const data = await fetchApi('/cameras', 'GET');
-            if (data.status === 'success') {
-                setCameras(data.cameras);
-                const initialCameraSettings = {};
-                for (const cam of data.cameras) {
-                    initialCameraSettings[cam.id] = cam.status; 
-                }
-                setSettings(prev => ({
-                    ...prev,
-                    cameraActive: initialCameraSettings
-                }));
-            }
-        } catch (err) {
-            console.error("Error fetching cameras:", err);
-            setMessage({ text: `Failed to load camera toggles: ${err.message}`, type: 'error' });
-        }
-    };
-
-    const handleChange = (e) => {
-        const { name, value, type, checked } = e.target;
-        if (name.includes('.')) {
-            const [parent, child] = name.split('.');
-            setSettings(prev => ({ ...prev, [parent]: { ...prev[parent], [child]: type === 'checkbox' ? checked : value }}));
-        } else {
-            setSettings(prev => ({ ...prev, [name]: type === 'checkbox' ? checked : value }));
-        }
-    };
-
-    const handleSave = async (e) => {
+    const handleSubmit = async (e) => {
         e.preventDefault();
-        setMessage({ text: '', type: '' });
-        setIsSaving(true);
+        setMessage(null);
         
-        if (settings.password && settings.password !== settings.confirmPassword) {
-            setMessage({ text: 'Error: New password and confirmation do not match.', type: 'error' });
-            setIsSaving(false);
+        // 1. Frontend validation
+        if (newPassword.length < 8) {
+            setMessage({ type: 'error', text: 'New password must be at least 8 characters long.' });
+            return;
+        }
+        if (newPassword !== confirmPassword) {
+            setMessage({ type: 'error', text: 'New password and confirmation password do not match.' });
             return;
         }
 
+        setIsLoading(true);
+
         try {
-            const apiCalls = [];
-            if (settings.password) {
-                apiCalls.push(fetchApi('/users/change-password', 'POST', { new_password: settings.password }));
+            // 2. Call the backend API (using mock for demonstration)
+            const result = await mockUpdatePasswordApi(oldPassword, newPassword);
+
+            if (result.status === 'success') {
+                setMessage({ type: 'success', text: result.message });
+                // Clear inputs on success
+                setOldPassword('');
+                setNewPassword('');
+                setConfirmPassword('');
+            } else {
+                setMessage({ type: 'error', text: result.message });
             }
-            apiCalls.push(fetchApi('/settings/notifications', 'POST', {
-                alert_threshold: settings.alertThreshold,
-                email_notifications: settings.emailNotifications
-            }));
-            apiCalls.push(fetchApi('/cameras/bulk-status', 'POST', { statuses: settings.cameraActive }));
-
-            const results = await Promise.all(apiCalls.map(p => p.catch(e => e)));
-            const failed = results.filter(res => res instanceof Error || res.status !== 'success');
-
-            if (failed.length > 0) {
-                const errorMessages = failed.map(f => f.message || 'Unknown error').join(', ');
-                throw new Error(`Failed to save some settings: ${errorMessages}`);
-            }
-
-            setMessage({ text: 'Settings saved successfully!', type: 'success' });
-            setSettings(prev => ({ ...prev, password: '', confirmPassword: '' }));
-            fetchCameras(); // Refresh camera data
 
         } catch (error) {
-            console.error("Error saving settings:", error);
-            setMessage({ text: error.message, type: 'error' });
+            console.error("Password update error:", error);
+            setMessage({ type: 'error', text: error.message || 'An unknown network error occurred.' });
         } finally {
-            setIsSaving(false);
+            setIsLoading(false);
         }
     };
 
-    const messageClass = (msg) => msg.type === 'success'
-        ? 'bg-green-100 border-green-400 text-green-700'
-        : 'bg-red-100 border-red-400 text-red-700';
+    const isFormValid = oldPassword && newPassword && confirmPassword && newPassword === confirmPassword;
 
     return (
-        <>
-            {/* Main Settings Status Message */}
-            {message.text && (
-                <div className={`mb-6 p-4 border rounded-xl font-medium ${messageClass(message)}`}>
+        <div className="bg-white p-6 rounded-xl shadow-md border border-gray-100 mb-6">
+            <h2 className="text-xl font-semibold text-gray-800 flex items-center mb-4 border-b pb-2">
+                <FaLock className="mr-2 text-red-500" />
+                Change Password
+            </h2>
+            <p className="text-sm text-gray-500 mb-6">
+                For security, you must provide your current password to set a new one.
+            </p>
+
+            {/* Status Message Display */}
+            {message && (
+                <div 
+                    className={`mb-4 p-3 rounded-lg flex items-center text-sm ${
+                        message.type === 'success' 
+                            ? 'bg-green-100 text-green-700 border border-green-300' 
+                            : 'bg-red-100 text-red-700 border border-red-300'
+                    }`}
+                >
+                    {message.type === 'success' ? <FaCheckCircle className="mr-2" /> : <FaExclamationCircle className="mr-2" />}
                     {message.text}
                 </div>
             )}
 
-            {/* --- Main Settings Form (Security, Notifications) --- */}
-            <form onSubmit={handleSave} className="space-y-8 max-w-4xl">
+            <form onSubmit={handleSubmit} className="space-y-4">
                 
-                {/* 1. Security Settings */}
-                <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-200">
-                    <h2 className="text-2xl font-semibold text-gray-800 flex items-center mb-4 pb-2 border-b">
-                        <FaLock className="mr-2 text-blue-500" /> Security
-                    </h2>
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="password">
-                                New Password
-                            </label>
-                            <input
-                                type="password"
-                                id="password"
-                                name="password"
-                                value={settings.password}
-                                onChange={handleChange}
-                                className="w-full border-gray-300 rounded-lg shadow-sm focus:ring-teal-500 focus:border-teal-500"
-                                placeholder="Enter new password"
-                            />
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="confirmPassword">
-                                Confirm New Password
-                            </label>
-                            <input
-                                type="password"
-                                id="confirmPassword"
-                                name="confirmPassword"
-                                value={settings.confirmPassword}
-                                onChange={handleChange}
-                                className="w-full border-gray-300 rounded-lg shadow-sm focus:ring-teal-500 focus:border-teal-500"
-                                placeholder="Confirm new password"
-                            />
-                        </div>
-                    </div>
-                </div>
-
-                {/* 2. Notification Settings */}
-                <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-200">
-                    <h2 className="text-2xl font-semibold text-gray-800 flex items-center mb-4 pb-2 border-b">
-                        <FaBell className="mr-2 text-yellow-500" /> Notifications
-                    </h2>
-                    <div className="flex items-center">
-                        <input
-                            id="emailNotifications"
-                            name="emailNotifications"
-                            type="checkbox"
-                            checked={settings.emailNotifications}
-                            onChange={handleChange}
-                            className="h-5 w-5 text-teal-600 border-gray-300 rounded focus:ring-teal-500"
-                        />
-                        <label htmlFor="emailNotifications" className="ml-3 text-sm font-medium text-gray-700">
-                            Receive email notifications for new incidents
-                        </label>
-                    </div>
-                </div>
-
-                {/* 3. Camera Activation */}
-                <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-200">
-                    <h2 className="text-2xl font-semibold text-gray-800 flex items-center mb-4 pb-2 border-b">
-                        <FaCamera className="mr-2 text-gray-500" /> Camera Activation
-                    </h2>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {cameras.map((cam) => (
-                            <div key={cam.id} className="flex items-center p-2 border rounded-lg hover:bg-gray-50">
-                                <input
-                                    id={`cam-active-${cam.id}`}
-                                    name={`cameraActive.${cam.id}`} 
-                                    type="checkbox"
-                                    checked={settings.cameraActive[cam.id] || false}
-                                    onChange={handleChange}
-                                    className="h-5 w-5 text-teal-600 border-gray-300 rounded focus:ring-teal-500"
-                                />
-                                <label htmlFor={`cam-active-${cam.id}`} className="ml-3 text-sm font-medium text-gray-700">
-                                    {cam.name} - {settings.cameraActive[cam.id] ? 'Active' : 'Inactive'}
-                                </label>
-                            </div>
-                        ))}
-                    </div>
+                {/* 1. OLD PASSWORD FIELD (Required for security) */}
+                <div>
+                    <label className="block text-gray-700 text-sm font-medium mb-2" htmlFor="oldPassword">
+                        <FaKey className="inline mr-1 text-teal-600" />
+                        Current Password
+                    </label>
+                    <input
+                        type="password"
+                        id="oldPassword"
+                        value={oldPassword}
+                        onChange={(e) => setOldPassword(e.target.value)}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-teal-500 focus:border-teal-500 transition duration-150"
+                        placeholder="Enter old password"
+                        required
+                        disabled={isLoading}
+                    />
                 </div>
                 
-                {/* Save Button */}
-                <div className="pt-4">
-                    <button 
-                        type="submit" 
-                        disabled={isSaving}
-                        className="flex items-center justify-center bg-teal-600 text-white font-bold py-3 px-6 rounded-xl hover:bg-teal-700 disabled:opacity-50 w-full md:w-auto"
-                    >
-                        {isSaving ? (
+                {/* 2. NEW PASSWORD FIELD */}
+                <div>
+                    <label className="block text-gray-700 text-sm font-medium mb-2" htmlFor="newPassword">
+                        <FaLock className="inline mr-1 text-teal-600" />
+                        New Password (min 8 characters)
+                    </label>
+                    <input
+                        type="password"
+                        id="newPassword"
+                        value={newPassword}
+                        onChange={(e) => setNewPassword(e.target.value)}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-teal-500 focus:border-teal-500 transition duration-150"
+                        placeholder="Enter new password"
+                        minLength={8}
+                        required
+                        disabled={isLoading}
+                    />
+                </div>
+
+                {/* 3. CONFIRM NEW PASSWORD FIELD */}
+                <div>
+                    <label className="block text-gray-700 text-sm font-medium mb-2" htmlFor="confirmPassword">
+                        <FaLock className="inline mr-1 text-teal-600" />
+                        Confirm New Password
+                    </label>
+                    <input
+                        type="password"
+                        id="confirmPassword"
+                        value={confirmPassword}
+                        onChange={(e) => setConfirmPassword(e.target.value)}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-teal-500 focus:border-teal-500 transition duration-150"
+                        placeholder="Confirm new password"
+                        minLength={8}
+                        required
+                        disabled={isLoading}
+                    />
+                </div>
+
+                {/* Submission Button */}
+                <button
+                    type="submit"
+                    disabled={isLoading || !isFormValid}
+                    className={`w-full flex items-center justify-center py-2.5 px-4 rounded-lg font-semibold text-white transition duration-300 shadow-md ${
+                        isLoading || !isFormValid 
+                            ? 'bg-gray-400 cursor-not-allowed' 
+                            : 'bg-teal-600 hover:bg-teal-700'
+                    }`}
+                >
+                    {isLoading ? (
+                        <>
                             <FaSpinner className="animate-spin mr-2" />
-                        ) : (
+                            Updating...
+                        </>
+                    ) : (
+                        <>
                             <FaSave className="mr-2" />
-                        )}
-                        {isSaving ? 'Saving...' : 'Save All Settings'}
-                    </button>
-                </div>
+                            Save New Password
+                        </>
+                    )}
+                </button>
             </form>
-        </>
+        </div>
     );
 }
