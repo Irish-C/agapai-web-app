@@ -73,11 +73,7 @@ export default function ReportsPage() {
                 Timestamp
               </th>
               <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Event Type
-              </th>
-              {/* ADDED: Event Class ID Header */}
-              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Event Class ID
+                Incident Classification
               </th>
               <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Location
@@ -100,10 +96,6 @@ export default function ReportsPage() {
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
                   {new Date(log.timestamp).toLocaleString()}
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-red-700">
-                  {log.type}
-                </td>
-
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
                   {log.event_class_id || 'N/A'}
                 </td>
