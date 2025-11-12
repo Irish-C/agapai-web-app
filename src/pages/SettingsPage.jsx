@@ -1,19 +1,21 @@
 import React, { useState } from 'react';
-import { FaUserCog, FaCogs, FaMapMarkerAlt, FaVideo, FaBell } from 'react-icons/fa';
+import { FaUserCog, FaCogs, FaMapMarkerAlt, FaVideo, FaBell } from 'react-icons/fa'; // Added FaBell icon
 
 // 1. Import the new components
 import AccountSettingsForm from '../components/AccountSettingsForm.jsx';
 import CameraManager from '../components/CameraManager.jsx';
 import LocationManager from '../components/LocationManager.jsx';
-import CameraNotificationSettings from '../components/AccountSettingsForm.jsx';
+// NEW IMPORT: Component for Activation/Notification settings
+import CameraNotificationSettings from '../components/CameraNotificationSettings.jsx';
 
 /**
  * Settings Page - REFACTORED to use Side Navigation
+ * This provides a cleaner interface for complex settings pages.
  */
 export default function Settings() {
     
     // --- State for active navigation section ---
-    const [activeSection, setActiveSection] = useState('account');
+    const [activeSection, setActiveSection] = useState('general');
 
     // --- State to share locations between components ---
     const [locations, setLocations] = useState([]);
@@ -24,7 +26,7 @@ export default function Settings() {
 
     // 2. Define the navigation structure
     const navItems = [
-        { id: 'account', name: 'Account', icon: FaCogs },
+        { id: 'general', name: 'General', icon: FaCogs },
         { id: 'locations', name: 'Locations', icon: FaMapMarkerAlt },
         { id: 'cameras', name: 'Cameras', icon: FaVideo },
         // UPDATED NAVIGATION ITEM NAME
@@ -34,7 +36,7 @@ export default function Settings() {
     // 3. Conditional rendering logic to show only the active component
     const renderActiveComponent = () => {
         switch (activeSection) {
-            case 'account':
+            case 'general':
                 return <AccountSettingsForm />;
             case 'locations':
                 return <LocationManager onLocationsUpdated={handleLocationsUpdate} />;
@@ -45,6 +47,7 @@ export default function Settings() {
                         onCameraUpdated={() => {}} 
                     />
                 );
+            // NEW CASE: Render the new component
             case 'notification':
                 return <CameraNotificationSettings />;
             default:
@@ -65,7 +68,7 @@ export default function Settings() {
             <main className="flex-grow container mx-auto p-6">
                 <h1 className="text-3xl font-extrabold text-gray-900 flex items-center mb-6">
                     <FaUserCog className="mr-3 text-teal-600" />
-                    General Settings
+                    System Settings
                 </h1>
 
                 {/* Main Content Area: Responsive Side Navigation Layout */}
