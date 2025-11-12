@@ -1,12 +1,24 @@
+// src/components/ConnectionStatus.jsx
 import React, { useEffect, useState } from "react";
 import { socket } from "../socket";
 
-export default function ConnectionStatus() {
+// Accept the onLogout prop
+export default function ConnectionStatus({ onLogout }) {
   const [connected, setConnected] = useState(socket.connected);
 
   useEffect(() => {
     const handleConnect = () => setConnected(true);
-    const handleDisconnect = () => setConnected(false);
+    
+    // Call the provided logout function on disconnect
+    const handleDisconnect = () => {
+      setConnected(false);
+      
+      // ⬅️ CRITICAL: Call the logout function passed from App.jsx
+      if (onLogout) {
+          console.log("WebSocket disconnected. Initiating forced logout.");
+          onLogout(); 
+      }
+    };
 
     socket.on("connect", handleConnect);
     socket.on("disconnect", handleDisconnect);
@@ -16,7 +28,7 @@ export default function ConnectionStatus() {
       socket.off("connect", handleConnect);
       socket.off("disconnect", handleDisconnect);
     };
-  }, []);
+  }, [onLogout]); // Include onLogout in dependency array
 
   return (
     <div className="fixed top-3 right-3 flex items-center gap-2 bg-gray-800 text-white px-3 py-2 rounded-xl shadow-md text-sm">
