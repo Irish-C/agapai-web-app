@@ -15,7 +15,7 @@ It provides a user-friendly interface to view live camera feeds, manage camera s
 - React.js for the frontend
 - Node.js and Express for the backend
 - Socket.IO for real-time communication
-- MongoDB for database management
+- MySQL for database management
 - CSS3 for styling and layout
 - Vite as the build tool
 - React Router for client-side routing
