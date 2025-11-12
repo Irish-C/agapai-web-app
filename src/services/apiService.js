@@ -151,7 +151,7 @@ export const fetchCameraList = () => {
 }
 
 /**
- * Fetches event logs for today from the backend database.
+ * Fetches event logs for today from the backend database.z
  * @returns {Promise<object>} API response with today's logs.
  */
 export const fetchTodayEventLogs = () => {
