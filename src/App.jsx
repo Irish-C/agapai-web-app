@@ -86,8 +86,8 @@ const [cameras] = useState([
   return (
     <div className="flex flex-col min-h-screen">
       {/* 🔌 Connection status indicator (always visible) */}
-      <ConnectionStatus />
-
+      <ConnectionStatus onLogout={logout} />
+      
       {/* Conditionally render Header for authenticated users */}
       {user && <Header user={user} logout={logout} />}
       
