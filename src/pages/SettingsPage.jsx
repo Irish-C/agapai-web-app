@@ -1,14 +1,14 @@
 import React, { useState } from 'react';
-import { FaUserCog, FaCogs, FaMapMarkerAlt, FaVideo } from 'react-icons/fa'; // Added new icons
+import { FaUserCog, FaCogs, FaMapMarkerAlt, FaVideo, FaBell } from 'react-icons/fa';
 
 // 1. Import the new components
 import MainSettingsForm from '../components/MainSettingsForm.jsx';
 import CameraManager from '../components/CameraManager.jsx';
 import LocationManager from '../components/LocationManager.jsx';
+import CameraNotificationSettings from '../components/CameraNotificationSettings.jsx';
 
 /**
  * Settings Page - REFACTORED to use Side Navigation
- * This provides a cleaner interface for complex settings pages.
  */
 export default function Settings() {
     
@@ -27,6 +27,8 @@ export default function Settings() {
         { id: 'general', name: 'General', icon: FaCogs },
         { id: 'locations', name: 'Locations', icon: FaMapMarkerAlt },
         { id: 'cameras', name: 'Cameras', icon: FaVideo },
+        // UPDATED NAVIGATION ITEM NAME
+        { id: 'notification', name: 'Camera Activation and Notifications', icon: FaBell },
     ];
     
     // 3. Conditional rendering logic to show only the active component
@@ -43,6 +45,9 @@ export default function Settings() {
                         onCameraUpdated={() => {}} 
                     />
                 );
+            // NEW CASE: Render the new component
+            case 'notification':
+                return <CameraNotificationSettings />;
             default:
                 return <MainSettingsForm />;
         }
