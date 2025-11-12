@@ -20,6 +20,7 @@ export default function ReportsPage() {
         const data = await fetchReportsData();
         
         if (data.status === 'success' && Array.isArray(data.report)) {
+          // Assuming the fetched log objects contain event_class_id and ack_by_user_id
           setLogs(data.report);
         } else {
           throw new Error(data.message || 'Failed to fetch report data');
@@ -74,6 +75,10 @@ export default function ReportsPage() {
               <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Event Type
               </th>
+              {/* ADDED: Event Class ID Header */}
+              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Event Class ID
+              </th>
               <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Location
               </th>
@@ -82,6 +87,10 @@ export default function ReportsPage() {
               </th>
               <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Status
+              </th>
+              {/* ADDED: Acknowledged By Header */}
+              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Ack. By User ID
               </th>
             </tr>
           </thead>
@@ -93,6 +102,10 @@ export default function ReportsPage() {
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-red-700">
                   {log.type}
+                </td>
+
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                  {log.event_class_id || 'N/A'}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
                   {log.location}
@@ -108,6 +121,10 @@ export default function ReportsPage() {
                   }`}>
                     {log.status}
                   </span>
+                </td>
+                {/* ADDED: Acknowledged By User ID Data */}
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                  {log.ack_by_user_id || 'None'}
                 </td>
               </tr>
             ))}
