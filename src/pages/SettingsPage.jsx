@@ -2,10 +2,10 @@ import React, { useState } from 'react';
 import { FaUserCog, FaCogs, FaMapMarkerAlt, FaVideo, FaBell } from 'react-icons/fa';
 
 // 1. Import the new components
-import MainSettingsForm from '../components/MainSettingsForm.jsx';
+import AccountSettingsForm from '../components/AccountSettingsForm.jsx';
 import CameraManager from '../components/CameraManager.jsx';
 import LocationManager from '../components/LocationManager.jsx';
-import CameraNotificationSettings from '../components/CameraNotificationSettings.jsx';
+import CameraNotificationSettings from '../components/AccountSettingsForm.jsx';
 
 /**
  * Settings Page - REFACTORED to use Side Navigation
@@ -13,7 +13,7 @@ import CameraNotificationSettings from '../components/CameraNotificationSettings
 export default function Settings() {
     
     // --- State for active navigation section ---
-    const [activeSection, setActiveSection] = useState('general');
+    const [activeSection, setActiveSection] = useState('account');
 
     // --- State to share locations between components ---
     const [locations, setLocations] = useState([]);
@@ -24,7 +24,7 @@ export default function Settings() {
 
     // 2. Define the navigation structure
     const navItems = [
-        { id: 'general', name: 'General', icon: FaCogs },
+        { id: 'account', name: 'Account', icon: FaCogs },
         { id: 'locations', name: 'Locations', icon: FaMapMarkerAlt },
         { id: 'cameras', name: 'Cameras', icon: FaVideo },
         // UPDATED NAVIGATION ITEM NAME
@@ -34,8 +34,8 @@ export default function Settings() {
     // 3. Conditional rendering logic to show only the active component
     const renderActiveComponent = () => {
         switch (activeSection) {
-            case 'general':
-                return <MainSettingsForm />;
+            case 'account':
+                return <AccountSettingsForm />;
             case 'locations':
                 return <LocationManager onLocationsUpdated={handleLocationsUpdate} />;
             case 'cameras':
@@ -66,7 +66,7 @@ export default function Settings() {
             <main className="flex-grow container mx-auto p-6">
                 <h1 className="text-3xl font-extrabold text-gray-900 flex items-center mb-6">
                     <FaUserCog className="mr-3 text-teal-600" />
-                    System Settings
+                    General Settings
                 </h1>
 
                 {/* Main Content Area: Responsive Side Navigation Layout */}
