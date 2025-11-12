@@ -44,7 +44,7 @@ export default function Settings() {
                 {/* We pass the locations list down to it */}
                 <CameraManager 
                     locations={locations} 
-                    onCameraUpdated={() => {}} // You could use this to notify MainSettingsForm
+                    onCameraUpdated={() => {}} // Use this to notify MainSettingsForm
                 />
 
             </main>

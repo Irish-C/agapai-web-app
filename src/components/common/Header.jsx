@@ -9,6 +9,9 @@ export default function Header({ user, logout }) {
     const [hidden, setHidden] = useState(false); // track header visibility
     const [lastScrollY, setLastScrollY] = useState(0);
     const location = useLocation();
+    if (location.pathname === '/' || location.pathname === '/landing') {
+        return null;
+    }
 
     const navItems = [
         { name: 'Dashboard', path: '/dashboard', icon: FaTachometerAlt },
