@@ -45,11 +45,10 @@ export default function Settings() {
                         onCameraUpdated={() => {}} 
                     />
                 );
-            // NEW CASE: Render the new component
             case 'notification':
                 return <CameraNotificationSettings />;
             default:
-                return <MainSettingsForm />;
+                return <AccountSettingsForm />;
         }
     };
 
