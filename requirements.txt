@@ -1,0 +1,38 @@
+# --- Model Development ---
+torch
+torchvision
+torchaudio
+opencv-python
+scikit-learn
+openvino-dev
+roboflow
+tensorflow
+tensorflow-intel
+tensorrt
+numpy
+pandas
+matplotlib
+seaborn
+fuzzywuzzy
+
+# --- System Development ---
+flask
+flask-socketio
+eventlet
+mysql-connector-python
+sqlalchemy
+requests
+aiohttp
+python-dotenv
+gunicorn
+
+# --- Alert and Notification System ---
+paho-mqtt
+
+# --- Utilities / Visualization / Testing ---
+jupyter
+notebook
+pyqt5
+
+# --- Frontend Tooling (optional if integrated through Node.js) ---
+tailwindcss
