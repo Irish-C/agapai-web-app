@@ -1,22 +1,20 @@
 import React, { useState, useEffect } from 'react';
-import { fetchApi } from '../services/apiService'; 
-import { 
-    FaCamera, 
-    FaTrash, 
-    FaPlus,
-    FaPencilAlt, 
-    FaSave,      
-    FaTimes      
-} from 'react-icons/fa';
+import { fetchApi } from '../services/apiService';
+import { FaCamera, FaTrash, FaPlus, FaPencilAlt, FaSave, FaTimes } from 'react-icons/fa';
 
 // This component manages adding, editing, and removing cameras
 export default function CameraManager({ locations, onCameraUpdated }) {
     const [cameras, setCameras] = useState([]);
     const [newCam, setNewCam] = useState({ name: '', url: '', locId: '' });
     const [camMessage, setCamMessage] = useState({ text: '', type: '' });
-    
+
     // State to track the camera being edited
-    const [editingCam, setEditingCam] = useState(null); 
+    const [editingCam, setEditingCam] = useState(null);
+
+    // --- NEW STATE FOR MODAL ---
+    const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+    const [cameraToDeleteId, setCameraToDeleteId] = useState(null);
+    // ---------------------------
 
     // Fetch cameras on mount
     useEffect(() => {
@@ -63,7 +61,7 @@ export default function CameraManager({ locations, onCameraUpdated }) {
             if (data.status === 'success') {
                 setCamMessage({ text: 'Camera added successfully!', type: 'success' });
                 setNewCam({ name: '', url: '', locId: locations[0]?.id || '' });
-                await fetchCameras(); 
+                await fetchCameras();
             } else {
                 setCamMessage({ text: `Error: ${data.message}`, type: 'error' });
             }
@@ -72,48 +70,55 @@ export default function CameraManager({ locations, onCameraUpdated }) {
         }
     };
 
-    const handleDeleteCamera = async (camId) => {
-        if (!window.confirm('Are you sure you want to delete this camera? This cannot be undone.')) {
+    // --- UPDATED HANDLER TO OPEN MODAL ---
+    const handleDeleteCamera = (camId) => {
+        setCameraToDeleteId(camId);
+        setIsDeleteModalOpen(true);
+    };
+
+    // --- NEW FUNCTION TO CONFIRM DELETION ---
+    const confirmDelete = async () => {
+        if (!cameraToDeleteId) {
             return;
         }
-        setCamMessage({ text: '', type: '' });
+
+        setIsDeleteModalOpen(false); // Close the modal first
+        setCamMessage({ text: '', type: '' }); // Clear message
+
         try {
-            const data = await fetchApi(`/cameras/${camId}`, 'DELETE');
+            const data = await fetchApi(`/cameras/${cameraToDeleteId}`, 'DELETE');
             if (data.status === 'success') {
                 setCamMessage({ text: 'Camera removed successfully!', type: 'success' });
-                await fetchCameras(); 
+                await fetchCameras();
             } else {
                 setCamMessage({ text: `Error: ${data.message}`, type: 'error' });
             }
         } catch (error) {
             setCamMessage({ text: `Error: ${error.message}`, type: 'error' });
+        } finally {
+            setCameraToDeleteId(null); // Clear the ID regardless of success/fail
         }
     };
+    // ------------------------------------------
 
-    // --- Handlers for editing a camera ---
-    
-    // 1. When "Edit" is clicked, set the camera to editing state
+    // --- Handlers for editing a camera (unchanged) ---
     const handleEditCamera = (cam) => {
-        // Map the data correctly for the form state
-        setEditingCam({ 
-            ...cam, 
-            cam_name: cam.name, // The camera's name for the input field
-            loc_id: cam.location_id // The camera's location ID for the select field
+        setEditingCam({
+            ...cam,
+            cam_name: cam.name,
+            loc_id: cam.location_id
         });
     };
 
-    // 2. When an edit form field changes, update state
     const handleEditChange = (e) => {
         const { name, value } = e.target;
         setEditingCam(prev => ({ ...prev, [name]: value }));
     };
 
-    // 3. When "Cancel" is clicked, clear editing state
     const handleCancelEdit = () => {
         setEditingCam(null);
     };
 
-    // 4. When "Save" is clicked, send a PATCH request
     const handleUpdateCamera = async (e) => {
         e.preventDefault();
         setCamMessage({ text: '', type: '' });
@@ -126,15 +131,14 @@ export default function CameraManager({ locations, onCameraUpdated }) {
         const cameraData = {
             cam_name: editingCam.cam_name,
             loc_id: parseInt(editingCam.loc_id)
-            // stream_url could be added here if needed
         };
 
         try {
             const data = await fetchApi(`/cameras/${editingCam.id}`, 'PATCH', cameraData);
             if (data.status === 'success') {
                 setCamMessage({ text: 'Camera updated successfully!', type: 'success' });
-                setEditingCam(null); // Exit edit mode
-                await fetchCameras(); // Refresh the list
+                setEditingCam(null);
+                await fetchCameras();
             } else {
                 setCamMessage({ text: `Error: ${data.message}`, type: 'error' });
             }
@@ -142,11 +146,13 @@ export default function CameraManager({ locations, onCameraUpdated }) {
             setCamMessage({ text: `Error: ${error.message}`, type: 'error' });
         }
     };
-    // --- END NEW HANDLERS ---
+    // --------------------------------------------------
 
     const messageClass = (msg) => msg.type === 'success'
         ? 'bg-green-100 border-green-400 text-green-700'
         : 'bg-red-100 border-red-400 text-red-700';
+
+    const cameraName = cameras.find(c => c.id === cameraToDeleteId)?.name || 'this camera';
 
     return (
         <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-200 mt-12 max-w-4xl">
@@ -160,7 +166,7 @@ export default function CameraManager({ locations, onCameraUpdated }) {
                 </div>
             )}
 
-            {/* --- Add Camera Form --- */}
+            {/* --- Add Camera Form (unchanged) --- */}
             <h3 className="text-lg font-semibold text-gray-700 mb-2">Add New Camera</h3>
             <form onSubmit={handleAddCamera} className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end mb-6">
                 <div className="md:col-span-2">
@@ -196,18 +202,18 @@ export default function CameraManager({ locations, onCameraUpdated }) {
                         type="submit"
                         className="w-full flex items-center justify-center bg-green-600 text-white font-bold py-2 px-4 rounded-xl hover:bg-green-700 h-10"
                     >
-                        <FaPlus className="mr-2" /> Add
+                        Add
                     </button>
                 </div>
             </form>
-            
+
             <h3 className="text-lg font-semibold text-gray-700 mb-2">Existing Cameras</h3>
             <div className="space-y-2">
                 {cameras.length === 0 ? <p className="text-gray-500">No cameras added yet.</p> : null}
                 {cameras.map(cam => (
                     <div key={cam.id} className="p-3 border rounded-lg bg-gray-50">
                         {editingCam && editingCam.id === cam.id ? (
-                            // --- Edit Mode ---
+                            /* --- Edit Mode (unchanged) --- */
                             <form onSubmit={handleUpdateCamera} className="space-y-4">
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <div>
@@ -215,7 +221,7 @@ export default function CameraManager({ locations, onCameraUpdated }) {
                                         <input
                                             type="text"
                                             id={`edit-cam-name-${cam.id}`}
-                                            name="cam_name" // Corresponds to editingCam state
+                                            name="cam_name"
                                             value={editingCam.cam_name}
                                             onChange={handleEditChange}
                                             className="w-full border-gray-300 rounded-lg shadow-sm focus:ring-teal-500 focus:border-teal-500"
@@ -226,7 +232,7 @@ export default function CameraManager({ locations, onCameraUpdated }) {
                                         <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor={`edit-loc-id-${cam.id}`}>Location</label>
                                         <select
                                             id={`edit-loc-id-${cam.id}`}
-                                            name="loc_id" // Corresponds to editingCam state
+                                            name="loc_id"
                                             value={editingCam.loc_id}
                                             onChange={handleEditChange}
                                             className="w-full border-gray-300 rounded-lg shadow-sm focus:ring-teal-500 focus:border-teal-500"
@@ -244,18 +250,18 @@ export default function CameraManager({ locations, onCameraUpdated }) {
                                         onClick={handleCancelEdit}
                                         className="flex items-center bg-gray-500 text-white text-sm font-bold py-1 px-3 rounded-lg hover:bg-gray-600"
                                     >
-                                        <FaTimes className="mr-1" /> Cancel
+                                        Cancel
                                     </button>
                                     <button
                                         type="submit"
                                         className="flex items-center bg-green-600 text-white text-sm font-bold py-1 px-3 rounded-lg hover:bg-green-700"
                                     >
-                                        <FaSave className="mr-1" /> Save
+                                        Save
                                     </button>
                                 </div>
                             </form>
                         ) : (
-                            // --- View Mode ---
+                            /* --- View Mode (updated onClick) --- */
                             <div className="flex justify-between items-center">
                                 <div>
                                     <strong className="text-gray-900">{cam.name}</strong>
@@ -263,16 +269,17 @@ export default function CameraManager({ locations, onCameraUpdated }) {
                                 </div>
                                 <div className="flex gap-2">
                                     <button
-                                        onClick={() => handleEditCamera(cam)} // <-- NEW Edit button
+                                        onClick={() => handleEditCamera(cam)}
                                         className="flex items-center bg-blue-600 text-white text-sm font-bold py-1 px-3 rounded-lg hover:bg-blue-700"
                                     >
-                                        <FaPencilAlt className="mr-1" /> Edit
+                                        Edit
                                     </button>
                                     <button
+                                        // Change: Call the new handler to open the modal
                                         onClick={() => handleDeleteCamera(cam.id)}
                                         className="flex items-center bg-red-600 text-white text-sm font-bold py-1 px-3 rounded-lg hover:bg-red-700"
                                     >
-                                        <FaTrash className="mr-1" /> Remove
+                                        Remove
                                     </button>
                                 </div>
                             </div>
@@ -280,6 +287,41 @@ export default function CameraManager({ locations, onCameraUpdated }) {
                     </div>
                 ))}
             </div>
+
+            {/* --------------------------- DELETE CONFIRMATION MODAL --------------------------- */}
+            {isDeleteModalOpen && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+                    <div className="bg-white rounded-xl shadow-2xl w-full max-w-md">
+                        <div className="p-6 border-b border-gray-200">
+                            <h4 className="text-xl font-bold text-red-600 flex items-center">
+                                Confirm Deletion
+                            </h4>
+                        </div>
+                        <div className="p-6">
+                            <p className="text-gray-700 mb-6">
+                                Are you sure you want to delete <strong className="font-semibold">{cameraName}</strong>?
+                                <br/>
+                                <strong className="text-red-700">This action cannot be undone.</strong>
+                            </p>
+                            <div className="flex justify-end space-x-3">
+                                <button
+                                    onClick={() => setIsDeleteModalOpen(false)}
+                                    className="px-4 py-2 text-sm font-medium rounded-lg border border-gray-300 text-gray-700 bg-white hover:bg-gray-50"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={confirmDelete}
+                                    className="px-4 py-2 text-sm font-medium rounded-lg text-white bg-red-600 hover:bg-red-700"
+                                >
+                                    Delete Camera
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+            {/* --------------------------------------------------------------------------------- */}
         </div>
     );
 }

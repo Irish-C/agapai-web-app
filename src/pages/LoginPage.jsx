@@ -125,7 +125,7 @@ export default function LoginPage({ login }) {
                             ) : (
                                 <>
                                     <FaSignInAlt className="mr-2" />
-                                    Sign In
+                                    Login
                                 </>
                             )}
                         </button>
