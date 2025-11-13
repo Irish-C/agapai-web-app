@@ -1,17 +1,12 @@
 import React, { useState } from 'react';
-import { FaUserCog, FaCogs, FaMapMarkerAlt, FaVideo, FaBell } from 'react-icons/fa'; // Added FaBell icon
+import { FaUserCog, FaCogs, FaMapMarkerAlt, FaVideo, FaBell } from 'react-icons/fa';
 
 // 1. Import the new components
 import AccountSettingsForm from '../components/AccountSettingsForm.jsx';
 import CameraManager from '../components/CameraManager.jsx';
 import LocationManager from '../components/LocationManager.jsx';
-// NEW IMPORT: Component for Activation/Notification settings
 import CameraNotificationSettings from '../components/CameraNotificationSettings.jsx';
 
-/**
- * Settings Page - REFACTORED to use Side Navigation
- * This provides a cleaner interface for complex settings pages.
- */
 export default function Settings() {
     
     // --- State for active navigation section ---
@@ -29,7 +24,6 @@ export default function Settings() {
         { id: 'general', name: 'General', icon: FaCogs },
         { id: 'locations', name: 'Locations', icon: FaMapMarkerAlt },
         { id: 'cameras', name: 'Cameras', icon: FaVideo },
-        // UPDATED NAVIGATION ITEM NAME
         { id: 'notification', name: 'Camera Activation and Notifications', icon: FaBell },
     ];
     
@@ -92,7 +86,7 @@ export default function Settings() {
                         })}
                     </nav>
 
-                    {/* RIGHT: Active Content Area (3/4 width on desktop, full width on mobile) */}
+                    {/* Active Content Area (3/4 width on desktop, full width on mobile) */}
                     <div className="w-full lg:w-3/4">
                         <h2 className="text-2xl font-bold text-gray-900 mb-6">
                             {/* Display the title of the active section */}

@@ -16,6 +16,11 @@ export default function LocationManager({ onLocationsUpdated }) {
     const [editingLoc, setEditingLoc] = useState(null);
     const [locMessage, setLocMessage] = useState({ text: '', type: '' });
 
+    // --- NEW STATE FOR MODAL ---
+    const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+    const [locationToDeleteId, setLocationToDeleteId] = useState(null);
+    // ---------------------------
+
     useEffect(() => {
         fetchLocations();
     }, []);
@@ -26,7 +31,6 @@ export default function LocationManager({ onLocationsUpdated }) {
             if (data.status === 'success') {
                 setLocations(data.locations);
                 // Notify parent component that locations have updated
-                // This is so CameraManager can refresh its dropdown
                 if(onLocationsUpdated) {
                     onLocationsUpdated(data.locations);
                 }
@@ -49,7 +53,7 @@ export default function LocationManager({ onLocationsUpdated }) {
             if (data.status === 'success') {
                 setLocMessage({ text: 'Location added successfully!', type: 'success' });
                 setNewLocName('');
-                await fetchLocations(); // Await this to ensure parent is updated
+                await fetchLocations(); 
             } else {
                 setLocMessage({ text: `Error: ${data.message}`, type: 'error' });
             }
@@ -66,24 +70,19 @@ export default function LocationManager({ onLocationsUpdated }) {
     const handleUpdateLocation = async (e) => {
         e.preventDefault();
         setLocMessage({ text: '', type: '' });
-        // --- FIX 1 ---
-        // We check editingLoc.name, not editingLoc.loc_name
+
         if (!editingLoc.name.trim()) {
             setLocMessage({ text: 'Location name cannot be empty.', type: 'error' });
             return;
         }
         try {
-            // --- FIX 2 ---
-            // We must send 'loc_name' in the body, but its value
-            // comes from 'editingLoc.name' in our state.
             const data = await fetchApi(`/locations/${editingLoc.id}`, 'PATCH', { 
-                loc_name: editingLoc.name // <-- This was editingLoc.loc_name
+                loc_name: editingLoc.name 
             });
-            // --- END FIX ---
             if (data.status === 'success') {
                 setLocMessage({ text: 'Location updated successfully!', type: 'success' });
                 setEditingLoc(null); // Exit edit mode
-                await fetchLocations(); // Await this to ensure parent is updated
+                await fetchLocations(); 
             } else {
                 setLocMessage({ text: `Error: ${data.message}`, type: 'error' });
             }
@@ -92,27 +91,43 @@ export default function LocationManager({ onLocationsUpdated }) {
         }
     };
 
-    const handleDeleteLocation = async (locId) => {
-        if (!window.confirm('Are you sure you want to delete this location? You must re-assign or remove cameras using this location first.')) {
+    // --- UPDATED HANDLER TO OPEN MODAL ---
+    const handleDeleteLocation = (locId) => {
+        setLocationToDeleteId(locId);
+        setIsDeleteModalOpen(true);
+    };
+
+    // --- NEW FUNCTION TO CONFIRM DELETION ---
+    const confirmDelete = async () => {
+        if (!locationToDeleteId) {
             return;
         }
-        setLocMessage({ text: '', type: '' });
+
+        setIsDeleteModalOpen(false); // Close the modal
+        setLocMessage({ text: '', type: '' }); // Clear message
+
         try {
-            const data = await fetchApi(`/locations/${locId}`, 'DELETE');
+            const data = await fetchApi(`/locations/${locationToDeleteId}`, 'DELETE');
             if (data.status === 'success') {
                 setLocMessage({ text: 'Location removed successfully!', type: 'success' });
-                await fetchLocations(); // Await this to ensure parent is updated
+                await fetchLocations(); 
             } else {
                 setLocMessage({ text: `Error: ${data.message}`, type: 'error' });
             }
         } catch (error) {
             setLocMessage({ text: `Error: ${error.message}`, type: 'error' });
+        } finally {
+            setLocationToDeleteId(null);
         }
     };
+    // ------------------------------------------
 
     const messageClass = (msg) => msg.type === 'success'
         ? 'bg-green-100 border-green-400 text-green-700'
         : 'bg-red-100 border-red-400 text-red-700';
+
+    // Get the name for display in the modal
+    const locationName = locations.find(loc => loc.id === locationToDeleteId)?.name || 'this location';
 
     return (
         <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-200 mt-12 max-w-4xl">
@@ -156,12 +171,12 @@ export default function LocationManager({ onLocationsUpdated }) {
                     <div key={loc.id} className="flex justify-between items-center p-3 border rounded-lg bg-gray-50">
                         
                         {editingLoc && editingLoc.id === loc.id ? (
-                            // --- Edit Mode ---
+                            // --- Edit Mode (unchanged) ---
                             <form onSubmit={handleUpdateLocation} className="flex-grow flex items-center gap-4">
                                 <input
                                     type="text"
-                                    value={editingLoc.name} // <-- FIX: Was editingLoc.loc_name
-                                    onChange={(e) => setEditingLoc(prev => ({ ...prev, name: e.target.value }))} // <-- FIX: Was loc_name
+                                    value={editingLoc.name} 
+                                    onChange={(e) => setEditingLoc(prev => ({ ...prev, name: e.target.value }))} 
                                     className="w-full border-gray-300 rounded-lg shadow-sm focus:ring-teal-500 focus:border-teal-500"
                                     required
                                 />
@@ -169,18 +184,18 @@ export default function LocationManager({ onLocationsUpdated }) {
                                     type="submit"
                                     className="flex items-center bg-green-600 text-white text-sm font-bold py-1 px-3 rounded-lg hover:bg-green-700"
                                 >
-                                    <FaSave className="mr-1" /> Save
+                                    Save
                                 </button>
                                 <button
                                     type="button"
                                     onClick={() => setEditingLoc(null)}
                                     className="flex items-center bg-gray-500 text-white text-sm font-bold py-1 px-3 rounded-lg hover:bg-gray-600"
                                 >
-                                    <FaTimes className="mr-1" /> Cancel
+                                    Cancel
                                 </button>
                             </form>
                         ) : (
-                            // --- View Mode ---
+                            // --- View Mode (updated onClick) ---
                             <>
                                 <strong className="text-gray-900">{loc.name}</strong>
                                 <div className="flex gap-2">
@@ -188,13 +203,14 @@ export default function LocationManager({ onLocationsUpdated }) {
                                         onClick={() => handleEditLocation(loc)}
                                         className="flex items-center bg-blue-600 text-white text-sm font-bold py-1 px-3 rounded-lg hover:bg-blue-700"
                                     >
-                                        <FaPencilAlt className="mr-1" /> Edit
+                                        Edit
                                     </button>
                                     <button
+                                        // Change: Call the new handler to open the modal
                                         onClick={() => handleDeleteLocation(loc.id)}
                                         className="flex items-center bg-red-600 text-white text-sm font-bold py-1 px-3 rounded-lg hover:bg-red-700"
                                     >
-                                        <FaTrash className="mr-1" /> Remove
+                                        Remove
                                     </button>
                                 </div>
                             </>
@@ -202,6 +218,46 @@ export default function LocationManager({ onLocationsUpdated }) {
                     </div>
                 ))}
             </div>
+
+            {/* --------------------------- DELETE CONFIRMATION MODAL --------------------------- */}
+            {isDeleteModalOpen && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+                    <div className="bg-white rounded-xl shadow-2xl w-full max-w-md">
+                        <div className="p-6 border-b border-gray-200">
+                            <h4 className="text-xl font-bold text-red-600 flex items-center">
+                                <FaTrash className="mr-2" /> Confirm Deletion
+                            </h4>
+                        </div>
+                        <div className="p-6">
+                            <p className="text-gray-700 mb-4">
+                                Are you sure you want to delete <strong className="font-semibold">{locationName}</strong>?
+                            </p>
+                            <p className="text-red-700 mb-6 font-medium">
+                                WARNING: You must re-assign or remove all cameras using this location before deletion.
+                                This action cannot be undone.
+                            </p>
+                            <div className="flex justify-end space-x-3">
+                                <button
+                                    onClick={() => {
+                                        setIsDeleteModalOpen(false);
+                                        setLocationToDeleteId(null);
+                                    }}
+                                    className="px-4 py-2 text-sm font-medium rounded-lg border border-gray-300 text-gray-700 bg-white hover:bg-gray-50"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={confirmDelete}
+                                    className="px-4 py-2 text-sm font-medium rounded-lg text-white bg-red-600 hover:bg-red-700"
+                                >
+                                    Delete Location
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+            {/* --------------------------------------------------------------------------------- */}
         </div>
     );
 }
