@@ -1,3 +1,4 @@
+# backend/routes/camera_routes.py
 from flask import Blueprint, request, jsonify
 from database import db
 from models import Camera, Location

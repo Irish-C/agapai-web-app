@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+// src/App.jsx
+import React, { useState, useEffect } from 'react'; // <-- Added useEffect
 import { Routes, Route, Navigate } from 'react-router-dom';
-// Import the real login function
-import { loginUser } from './services/apiService.js'; 
+import { loginUser, fetchCameraList, logoutUser } from './services/apiService.js'; // <-- Updated imports
 import agapai_Bg from './assets/images/bg/gray-bg.png';
 
 // Common components
@@ -20,112 +20,125 @@ import Settings from './pages/SettingsPage.jsx';
  * Main application component responsible for state management and routing.
  */
 export default function App() {
-  // Authentication state: user is null if logged out, or contains user data if logged in
-const [user, setUser] = useState(() => {
-    const storedUser = localStorage.getItem('user');
-    // ...
-    return storedUser ? JSON.parse(storedUser) : null;
-});
+    // Authentication state
+    const [user, setUser] = useState(() => {
+        const storedUser = localStorage.getItem('user');
+        return storedUser ? JSON.parse(storedUser) : null;
+    });
 
-// Mock cameras data (can be replaced with an API call later)
-const [cameras] = useState([
-    { id: 'cam1', name: 'House Sebastian', location: 'House Sebastian' },
-    { id: 'cam2', name: 'House Charbel', location: 'House Charbel' },
-    { id: 'cam3', name: 'House Emmanuel', location: 'House Emmanuel' },
-    { id: 'cam4', name: 'House Gabriel', location: 'House Gabriel' },
-]);
+    // State for camera data, initialized to an empty array
+    const [cameras, setCameras] = useState([]); // <-- Mutable state for API data
 
-  /**
-   * Real login function that calls the API.
-   * This function is passed to LoginPage.
-   * @param {string} username 
-   * @param {string} password 
-   * @returns {Promise<object>} An object { success: boolean, message?: string }
-   */
-  const login = async (username, password) => {
+    /**
+     * Real login function that calls the API.
+     */
+    const login = async (username, password) => {
+        try {
+            const data = await loginUser(username, password);
+
+            if (data.status === 'success' || data.token || data.access_token) {
+                const userData = { 
+                    username: data.username, 
+                    role: 'admin', 
+                    userId: data.user_id,
+                    token: data.access_token || data.token // Use the token from the response
+                };
+
+                // Set the user state and store in localStorage
+                setUser(userData);
+                localStorage.setItem('user', JSON.stringify(userData));
+                
+                return { success: true };
+            } else {
+                return { success: false, message: data.message || 'Login failed.' };
+            }
+
+        } catch (error) {
+            console.error('Login API error:', error); 
+            return { success: false, message: error.message || 'Invalid credentials or server error.' };
+        }
+    };
+
+    /**
+     * Logout function
+     */
+    const logout = () => {
+        logoutUser(); // Clear token from localStorage
+        setUser(null); // Clear user state
+        localStorage.removeItem('user'); // Clear user data
+    };
+
+    /**
+     * Fetches the list of cameras from the API.
+     */
+    const loadCameras = async () => {
+      if (!user) {
+        setCameras([]);
+        return; 
+      }
+
       try {
-          // Call the API service
-          const data = await loginUser(username, password);
-
-          if (data.status === 'success') {
-              // userData is defined (scoped) ONLY within this block
-              const userData = { 
-                  username: data.username, 
-                  role: 'admin', 
-                  userId: data.user_id,
-                  token: data.access_token 
-              };
-
-              // Set the user state and store in localStorage
-              setUser(userData);
-              localStorage.setItem('user', JSON.stringify(userData));
-              
-              return { success: true };
-          } else {
-              // API call succeeded but returned a logical failure (e.g., wrong password)
-              return { success: false, message: data.message || 'Login failed.' };
-          }
+        const cameraList = await fetchCameraList(); 
+        setCameras(cameraList);
 
       } catch (error) {
-          // Execution jumps here if there is a network error or fetch failure.
-          // DO NOT use 'userData' here, use the 'error' object.
-          console.error('Login API error:', error); 
-          return { success: false, message: error.message || 'Invalid credentials or server error.' };
+        console.error('Failed to fetch cameras:', error);
+        setCameras([]); 
       }
-  };
-  /**
-   * Logout function
-   */
-  const logout = () => {
-    setUser(null);
-    localStorage.removeItem('user');
-  };
+    };
 
-  const authProps = { user, logout, cameras };
+    /**
+     * Effect to fetch cameras once the user state is set.
+     */
+    useEffect(() => {
+        if (user) { 
+            loadCameras();
+        } else {
+            setCameras([]);
+        }
+    }, [user]); 
 
-  return (
-    <div className="flex flex-col min-h-screen">
-      {/* 🔌 Connection status indicator (always visible) */}
-      <ConnectionStatus onLogout={logout} />
-      
-      {/* Conditionally render Header for authenticated users */}
-      {user && <Header user={user} logout={logout} />}
-      
-      {/* This <main> tag wraps all pages and makes them grow to fill space */}
-      <main
-      className="flex-grow min-h-screen bg-cover bg-center bg-no-repeat bg-fixed"
-      style={{ backgroundImage: `url(${agapai_Bg})` }}
-    >
-        <Routes>
-          {/* Public Routes */}
-          <Route path="/" element={<LandingPage />} />
-          <Route 
-            path="/login" 
-            element={!user ? <LoginPage login={login} /> : <Navigate to="/dashboard" replace />} 
-          />
+    const authProps = { user, logout, cameras };
 
-          {/* Protected Routes */}
-          <Route 
-            path="/dashboard" 
-            element={user ? <MainPage {...authProps} /> : <Navigate to="/login" replace />} 
-          />
-          <Route 
-            path="/reports" 
-            element={user ? <ReportsPage {...authProps} /> : <Navigate to="/login" replace />} 
-          />
-          <Route 
-            path="/settings" 
-            element={user ? <Settings {...authProps} /> : <Navigate to="/login" replace />} 
-          />
+    return (
+        <div className="flex flex-col min-h-screen">
+            <ConnectionStatus onLogout={logout} />
+            
+            {user && <Header user={user} logout={logout} />}
+            
+            <main
+                className="flex-grow min-h-screen bg-cover bg-center bg-no-repeat bg-fixed"
+                style={{ backgroundImage: `url(${agapai_Bg})` }}
+            >
+                <Routes>
+                    {/* Public Routes */}
+                    <Route path="/" element={<LandingPage />} />
+                    <Route 
+                        path="/login" 
+                        element={!user ? <LoginPage login={login} /> : <Navigate to="/dashboard" replace />} 
+                    />
 
-          {/* Fallbacks */}
-          {!user && <Route path="*" element={<Navigate to="/" replace />} />} 
-          {user && <Route path="*" element={<Navigate to="/dashboard" replace />} />}
-        </Routes>
-      </main>
+                    {/* Protected Routes */}
+                    <Route 
+                        path="/dashboard" 
+                        element={user ? <MainPage {...authProps} /> : <Navigate to="/login" replace />} 
+                    />
+                    <Route 
+                        path="/reports" 
+                        element={user ? <ReportsPage {...authProps} /> : <Navigate to="/login" replace />} 
+                    />
+                    <Route 
+                        path="/settings" 
+                        element={user ? <Settings {...authProps} /> : <Navigate to="/login" replace />} 
+                    />
 
-      {/* Conditionally render Footer for authenticated users */}
-      {user && <Footer />}
-    </div>
-  );
+                    {/* Fallbacks */}
+                    {!user && <Route path="*" element={<Navigate to="/" replace />} />} 
+                    {user && <Route path="*" element={<Navigate to="/dashboard" replace />} />}
+                </Routes>
+            </main>
+
+            {user && <Footer />}
+        </div>
+    );
 }
