@@ -1,16 +1,23 @@
+// src/pages/Settings.jsx
 import React, { useState } from 'react';
-import { FaUserCog, FaCogs, FaMapMarkerAlt, FaVideo, FaBell } from 'react-icons/fa';
+// Import the icon for User Management
+import { FaUserCog, FaCogs, FaMapMarkerAlt, FaVideo, FaBell, FaUsers } from 'react-icons/fa'; 
 
-// 1. Import the new components
+// Import the new components
 import AccountSettingsForm from '../components/AccountSettingsForm.jsx';
 import CameraManager from '../components/CameraManager.jsx';
 import LocationManager from '../components/LocationManager.jsx';
 import CameraNotificationSettings from '../components/CameraNotificationSettings.jsx';
+import UserManager from '../components/UserManager.jsx'; 
 
-export default function Settings() {
+// Settings component now accepts 'user' object from App.jsx via props
+export default function Settings({ user }) {
+    
+    // Check if the current user is an admin
+    const isAdmin = user && user.role === 'admin'; 
     
     // --- State for active navigation section ---
-    const [activeSection, setActiveSection] = useState('general');
+    const [activeSection, setActiveSection] = useState('my_account'); 
 
     // --- State to share locations between components ---
     const [locations, setLocations] = useState([]);
@@ -19,15 +26,21 @@ export default function Settings() {
         setLocations(newLocations);
     };
 
-    // 2. Define the navigation structure
-    const navItems = [
-        { id: 'my_account', name: 'My Account', icon: FaUserCog },
-        { id: 'locations', name: 'Locations', icon: FaMapMarkerAlt },
-        { id: 'cameras', name: 'Cameras', icon: FaVideo },
-        { id: 'notification', name: 'Camera Activation and Notifications', icon: FaBell },
+    // 1. Define the full navigation structure with User Management at the end
+    const fullNavItems = [
+        { id: 'my_account', name: 'My Account', icon: FaUserCog, role: 'all' },
+        { id: 'locations', name: 'Locations', icon: FaMapMarkerAlt, role: 'admin' },
+        { id: 'cameras', name: 'Cameras', icon: FaVideo, role: 'admin' },
+        { id: 'notification', name: 'Notifications', icon: FaBell, role: 'all' },
+        { id: 'user_management', name: 'User Management', icon: FaUsers, role: 'admin' }, // <-- MOVED TO THE END
     ];
     
-    // 3. Conditional rendering logic to show only the active component
+    // 2. Filter the navigation items based on the user's role
+    const navItems = fullNavItems.filter(item => {
+        return item.role === 'all' || (item.role === 'admin' && isAdmin);
+    });
+
+    // 3. Conditional rendering logic
     const renderActiveComponent = () => {
         switch (activeSection) {
             case 'my_account':
@@ -41,11 +54,15 @@ export default function Settings() {
                         onCameraUpdated={() => {}} 
                     />
                 );
-            // NEW CASE: Render the new component
             case 'notification':
                 return <CameraNotificationSettings />;
+            case 'user_management': // <-- NEW CASE for User Management
+                // IMPORTANT: Use the isAdmin check here as a fallback security layer
+                return isAdmin ? <UserManager user={user} /> : <p className="text-red-500">Access Denied: You must be an Administrator to manage users.</p>; 
             default:
-                return <AccountSettingsForm />;
+                // Ensure default case handles a potentially invalid activeSection after filtering
+                const firstAvailableSection = navItems[0]?.id || 'my_account';
+                return renderActiveComponent(firstAvailableSection); 
         }
     };
 
@@ -65,13 +82,13 @@ export default function Settings() {
                     System Settings
                 </h1>
 
-                {/* Main Content Area: Responsive Side Navigation Layout */}
                 <div className="flex flex-col lg:flex-row gap-6 bg-white p-4 lg:p-8 rounded-xl shadow-lg border border-gray-200">
                     
-                    {/* LEFT: Side Navigation Panel (1/4 width on desktop, full width on mobile) */}
+                    {/* LEFT: Side Navigation Panel */}
                     <nav className="w-full lg:w-1/4 space-y-2 pb-4 lg:pb-0 lg:border-r lg:pr-6">
                         <h2 className="text-lg font-semibold text-gray-800 mb-3 border-b pb-2 hidden lg:block">Navigation</h2>
-                        {navItems.map((item) => {
+                        {/* Map over the filtered navItems array */}
+                        {navItems.map((item) => { 
                             const Icon = item.icon;
                             return (
                                 <div
@@ -86,13 +103,11 @@ export default function Settings() {
                         })}
                     </nav>
 
-                    {/* Active Content Area (3/4 width on desktop, full width on mobile) */}
+                    {/* Active Content Area */}
                     <div className="w-full lg:w-3/4">
                         <h2 className="text-2xl font-bold text-gray-900 mb-6">
-                            {/* Display the title of the active section */}
                             {navItems.find(item => item.id === activeSection)?.name || 'Settings'}
                         </h2>
-                        {/* Render the currently active component */}
                         {renderActiveComponent()}
                     </div>
                 </div>
