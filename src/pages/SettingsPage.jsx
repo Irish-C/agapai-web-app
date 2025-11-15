@@ -21,7 +21,7 @@ export default function Settings() {
 
     // 2. Define the navigation structure
     const navItems = [
-        { id: 'general', name: 'General', icon: FaCogs },
+        { id: 'my_account', name: 'My Account', icon: FaUserCog },
         { id: 'locations', name: 'Locations', icon: FaMapMarkerAlt },
         { id: 'cameras', name: 'Cameras', icon: FaVideo },
         { id: 'notification', name: 'Camera Activation and Notifications', icon: FaBell },
@@ -30,7 +30,7 @@ export default function Settings() {
     // 3. Conditional rendering logic to show only the active component
     const renderActiveComponent = () => {
         switch (activeSection) {
-            case 'general':
+            case 'my_account':
                 return <AccountSettingsForm />;
             case 'locations':
                 return <LocationManager onLocationsUpdated={handleLocationsUpdate} />;
@@ -61,7 +61,7 @@ export default function Settings() {
         <div className="flex flex-col min-h-screen bg-gray-50">
             <main className="flex-grow container mx-auto p-6">
                 <h1 className="text-3xl font-extrabold text-gray-900 flex items-center mb-6">
-                    <FaUserCog className="mr-3 text-teal-600" />
+                    <FaCogs className="mr-3 text-teal-600" />
                     System Settings
                 </h1>
 
