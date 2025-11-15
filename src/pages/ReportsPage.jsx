@@ -20,9 +20,6 @@ export default function ReportsPage() {
                 const data = await fetchReportsData();
                 
                 if (data.status === 'success' && Array.isArray(data.report)) {
-                    // Assuming data.report now contains resolved names:
-                    // log.event_class_name (instead of log.type)
-                    // log.acknowledged_by_username (instead of log.ack_by_user_id)
                     setLogs(data.report);
                 } else {
                     throw new Error(data.message || 'Failed to fetch report data');

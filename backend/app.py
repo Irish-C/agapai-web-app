@@ -1,5 +1,6 @@
+# backend/app.py
 import eventlet
-eventlet.monkey_patch(thread=False) # Keep thread=False to avoid context errors
+eventlet.monkey_patch(thread=False) # Thread=False avoids context errors
 
 
 from flask import Flask, request, jsonify, send_from_directory
