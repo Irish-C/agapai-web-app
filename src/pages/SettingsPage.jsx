@@ -1,68 +1,59 @@
 // src/pages/Settings.jsx
 import React, { useState } from 'react';
-// Import the icon for User Management
-import { FaUserCog, FaCogs, FaMapMarkerAlt, FaVideo, FaBell, FaUsers } from 'react-icons/fa'; 
+import { FaUserCog, FaCogs, FaBell, FaUsers, FaDharmachakra } from 'react-icons/fa'; 
 
-// Import the new components
 import AccountSettingsForm from '../components/AccountSettingsForm.jsx';
-import CameraManager from '../components/CameraManager.jsx';
-import LocationManager from '../components/LocationManager.jsx';
 import CameraNotificationSettings from '../components/CameraNotificationSettings.jsx';
 import UserManager from '../components/UserManager.jsx'; 
+import ManagementDashboard from "../components/ManagementDashboard.jsx";
 
-// Settings component now accepts 'user' object from App.jsx via props
 export default function Settings({ user }) {
+    const isAdmin = user && user.role === 'Admin'; 
     
-    // Check if the current user is an admin
-    const isAdmin = user && user.role === 'admin'; 
-    
-    // --- State for active navigation section ---
     const [activeSection, setActiveSection] = useState('my_account'); 
-
-    // --- State to share locations between components ---
     const [locations, setLocations] = useState([]);
 
     const handleLocationsUpdate = (newLocations) => {
         setLocations(newLocations);
     };
 
-    // 1. Define the full navigation structure with User Management at the end
+    // 2. Define the navigation structure with roles
     const fullNavItems = [
         { id: 'my_account', name: 'My Account', icon: FaUserCog, role: 'all' },
-        { id: 'locations', name: 'Locations', icon: FaMapMarkerAlt, role: 'admin' },
-        { id: 'cameras', name: 'Cameras', icon: FaVideo, role: 'admin' },
+        // Combined Tab
+        { id: 'management', name: 'Device & Location Management', icon: FaDharmachakra, role: 'Admin' }, 
         { id: 'notification', name: 'Notifications', icon: FaBell, role: 'all' },
-        { id: 'user_management', name: 'User Management', icon: FaUsers, role: 'admin' }, // <-- MOVED TO THE END
+        // User Management Tab (at the end)
+        { id: 'user_management', name: 'User Management', icon: FaUsers, role: 'Admin' }, 
     ];
     
-    // 2. Filter the navigation items based on the user's role
+    // 3. Filter the navigation items based on the user's role
     const navItems = fullNavItems.filter(item => {
-        return item.role === 'all' || (item.role === 'admin' && isAdmin);
+        return item.role === 'all' || (item.role === 'Admin' && isAdmin);
     });
 
-    // 3. Conditional rendering logic
     const renderActiveComponent = () => {
         switch (activeSection) {
             case 'my_account':
                 return <AccountSettingsForm />;
-            case 'locations':
-                return <LocationManager onLocationsUpdated={handleLocationsUpdate} />;
-            case 'cameras':
-                return (
-                    <CameraManager 
+            
+            case 'management':
+                return isAdmin ? (
+                    <ManagementDashboard 
                         locations={locations} 
-                        onCameraUpdated={() => {}} 
+                        onLocationsUpdated={handleLocationsUpdate}
                     />
+                ) : (
+                    <p className="text-red-500">Access Denied: You must be an Administrator to manage devices and locations.</p>
                 );
+
             case 'notification':
                 return <CameraNotificationSettings />;
-            case 'user_management': // <-- NEW CASE for User Management
-                // IMPORTANT: Use the isAdmin check here as a fallback security layer
+            case 'user_management': 
+                // Pass the user object to UserManager for its internal logic (e.g., cannot delete self)
                 return isAdmin ? <UserManager user={user} /> : <p className="text-red-500">Access Denied: You must be an Administrator to manage users.</p>; 
             default:
-                // Ensure default case handles a potentially invalid activeSection after filtering
-                const firstAvailableSection = navItems[0]?.id || 'my_account';
-                return renderActiveComponent(firstAvailableSection); 
+                return <div>Please select a setting category.</div>;
         }
     };
 
@@ -87,7 +78,7 @@ export default function Settings({ user }) {
                     {/* LEFT: Side Navigation Panel */}
                     <nav className="w-full lg:w-1/4 space-y-2 pb-4 lg:pb-0 lg:border-r lg:pr-6">
                         <h2 className="text-lg font-semibold text-gray-800 mb-3 border-b pb-2 hidden lg:block">Navigation</h2>
-                        {/* Map over the filtered navItems array */}
+                        {/* Now, the navItems array correctly shows 4 items for Admin */}
                         {navItems.map((item) => { 
                             const Icon = item.icon;
                             return (

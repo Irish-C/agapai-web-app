@@ -1,40 +1,48 @@
 // src/components/UserManager.jsx
 import React, { useState, useEffect } from 'react';
-import { FaUserPlus, FaUsers, FaEdit, FaTrash, FaSpinner, FaSearch } from 'react-icons/fa';
-// You would need to add fetchUsers, addUser, deleteUser, etc. to apiService.js
-// import { fetchUsers, addUser, deleteUser } from '../services/apiService'; 
+import { FaUserPlus, FaUsers, FaEdit, FaTrash, FaSpinner } from 'react-icons/fa';
+import { fetchUsers } from '../services/apiService.js'; 
 
 export default function UserManager({ user }) {
     const [users, setUsers] = useState([]);
     const [isLoading, setIsLoading] = useState(false);
-    const [isModalOpen, setIsModalOpen] = useState(false); // For Add/Edit User Modal
+    const [error, setError] = useState(null);
+    const [isModalOpen, setIsModalOpen] = useState(false);
 
-    // Dummy Data for immediate testing (Replace with real API fetch)
+    // --- EFFECT: Fetch Users from API ---
     useEffect(() => {
-        setIsLoading(true);
-        // Replace this with a real API call like: fetchUsers().then(setUsers);
-        setTimeout(() => {
-            setUsers([
-                { id: 1, username: 'admin_user', email: 'admin@system.com', role: 'admin', created: '2023-01-01' },
-                { id: 2, username: 'staff_sebastian', email: 'sebastian@site.com', role: 'staff', created: '2024-03-15' },
-                { id: 3, username: 'staff_gabriel', email: 'gabriel@site.com', role: 'staff', created: '2024-05-20' },
-            ]);
-            setIsLoading(false);
-        }, 1000);
-    }, []);
+        const loadUsers = async () => {
+            if (!user) return;
+
+            setIsLoading(true);
+            setError(null);
+
+            try {
+                const userData = await fetchUsers(); 
+                setUsers(userData);
+            } catch (err) {
+                console.error("Error loading users:", err);
+                // The error message for the user is set here
+                setError('Failed to load user list. Check server connection or permissions.'); 
+            } finally {
+                setIsLoading(false);
+            }
+        };
+
+        loadUsers();
+    }, [user]); 
+
 
     const handleDelete = (userId) => {
         if (window.confirm(`Are you sure you want to delete user ID ${userId}?`)) {
-            // Implement deleteUser(userId) API call here
+            // TODO: Implement deleteUser(userId) API call here
             setUsers(users.filter(u => u.id !== userId));
             console.log(`Deleting user ${userId}`);
         }
     };
     
-    // Function to open modal for adding a user
     const handleAddUser = () => {
         setIsModalOpen(true);
-        // In a real app, you'd pass a null user object to the modal
     };
 
 
@@ -53,6 +61,12 @@ export default function UserManager({ user }) {
                 </button>
             </div>
 
+            {error && (
+                <div className="p-3 bg-red-100 border border-red-400 text-red-700 rounded-lg">
+                    {error}
+                </div>
+            )}
+
             {isLoading ? (
                 <div className="text-center p-8 text-gray-500">
                     <FaSpinner className="animate-spin inline-block mr-2" /> Loading user data...
@@ -63,7 +77,8 @@ export default function UserManager({ user }) {
                         <thead className="bg-gray-50">
                             <tr>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Username</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">First Name</th> 
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Last Name</th> 
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Role</th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                             </tr>
@@ -72,9 +87,10 @@ export default function UserManager({ user }) {
                             {users.map((u) => (
                                 <tr key={u.id}>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{u.username}</td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{u.email}</td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{u.firstname}</td> 
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{u.lastname}</td> 
                                     <td className="px-6 py-4 whitespace-nowrap">
-                                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${u.role === 'admin' ? 'bg-indigo-100 text-indigo-800' : 'bg-green-100 text-green-800'}`}>
+                                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${u.role === 'Admin' ? 'bg-indigo-100 text-indigo-800' : 'bg-green-100 text-green-800'}`}>
                                             {u.role}
                                         </span>
                                     </td>
@@ -85,7 +101,7 @@ export default function UserManager({ user }) {
                                         >
                                             <FaEdit className="inline-block" /> Edit
                                         </button>
-                                        {/* Prevent user from deleting themselves (or the primary admin) */}
+                                        {/* Ensure the logged-in user cannot delete themselves */}
                                         {u.id !== user.userId && ( 
                                             <button 
                                                 className="text-red-600 hover:text-red-900"
@@ -102,7 +118,6 @@ export default function UserManager({ user }) {
                 </div>
             )}
             
-            {/* Modal for Add/Edit User goes here */}
             {isModalOpen && <p>User Modal would be displayed here.</p>} 
 
         </div>

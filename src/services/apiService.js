@@ -1,21 +1,19 @@
 // src/services/apiService.js
-// Centralized service for REST API calls to the Flask backend.
 
 // Base URL is intentionally relative because Vite proxies /api to http://localhost:5000
 const BASE_API_URL = '/api';
-const AUTH_TOKEN_KEY = 'authToken'; // Key for localStorage
+const AUTH_TOKEN_KEY = 'authToken'; 
 
-/**
- * Handles all network requests, including error handling and token injection.
- * @param {string} endpoint - The API endpoint (e.g., '/login').
- * @param {string} method - The HTTP method ('GET', 'POST').
- * @param {object} [data=null] - JSON data to send in the body.
- * @returns {Promise<object>} The JSON response data.
- */
+// Export the user fetching function
+export const fetchUsers = () => {
+    return fetchApi('/users', 'GET'); 
+};
+
+// --- REST OF THE FILE (Existing Functions) ---
+
 export const fetchApi = async (endpoint, method = 'GET', data = null) => {
     const url = `${BASE_API_URL}${endpoint}`;
     
-    // --- DEBUG LOG ---
     console.log(`fetchApi: Requesting ${endpoint}...`);
     
     const options = {
@@ -25,7 +23,6 @@ export const fetchApi = async (endpoint, method = 'GET', data = null) => {
         },
     };
 
-    // 1. Get token from localStorage
     const token = localStorage.getItem(AUTH_TOKEN_KEY);
 
     if (token) {
@@ -41,26 +38,22 @@ export const fetchApi = async (endpoint, method = 'GET', data = null) => {
     try {
         const response = await fetch(url, options);
 
-        // 2. Check for 401 Unauthorized
         if (response.status === 401) {
-            // Only redirect if a protected resource failed
             if (!endpoint.includes('/login')) {
-                console.error('fetchApi: 401 Unauthorized. Token is invalid or expired. Redirecting to login.');
-                logoutUser(); // Clear bad token
-                window.location.href = '/login'; // Redirect
+                console.error('fetchApi: 401 Unauthorized. Redirecting to login.');
+                logoutUser(); 
+                window.location.href = '/login'; 
             }
             throw new Error("Authentication failed or expired.");
         }
 
         if (!response.ok) {
-            // Try to parse error message from backend
             const errorData = await response.json().catch(() => ({}));
             const message = errorData.message || errorData.msg || `HTTP error! status: ${response.status} for ${url}`;
             console.error('API Error Response:', errorData);
             throw new Error(message);
         }
 
-        // 3. Handle successful response
         const contentType = response.headers.get("content-type");
         if (contentType && contentType.includes("application/json")) {
             return await response.json(); 
@@ -75,9 +68,6 @@ export const fetchApi = async (endpoint, method = 'GET', data = null) => {
 };
 
 
-/**
- * Login function.
- */
 export const loginUser = async (username, password) => {
     try {
         const response = await fetchApi('/login', 'POST', { username, password });
@@ -92,45 +82,31 @@ export const loginUser = async (username, password) => {
         }
     } catch (error) {
         console.error("loginUser Error:", error);
-        localStorage.removeItem(AUTH_TOKEN_KEY);
-        throw error;
+        localStorage.removeItem(AUTH_TOKEN_KEY); 
+        throw error; 
     }
 };
 
-/**
- * Logout function.
- */
 export const logoutUser = () => {
     localStorage.removeItem(AUTH_TOKEN_KEY);
     console.log("logoutUser: Token removed.");
 };
 
-/**
- * Fetches historical event log data for the ReportsPage.
- */
-export const fetchReportsData = () => {
-    return fetchApi('/event_logs', 'GET');
-};
-
-
-/**
- * Fetches the list of all active cameras from the backend.
- */
 export const fetchCameraList = () => {
     return fetchApi('/camera_status', 'GET');
 }
 
-/**
- * Fetches event logs for today from the backend database.
- */
-export const fetchTodayEventLogs = () => {
-    return fetchApi('/event_logs/today', 'GET');
+export const fetchDailySummary = () => {
+    return fetchApi('/summary/daily', 'GET');
 };
 
 /**
- * Fetches the 24-hour activity summary data.
- * @returns {Promise<object>} e.g., { moving_time: 400, resting_time: 600, incident_count: 5 }
+ * Fetches historical event log data for the ReportsPage.
+ * This function must exist in apiService.js.
+ * @returns {Promise<object>} Time-series data.
  */
-export const fetchDailySummary = () => {
-    return fetchApi('/summary/daily', 'GET');
+// Make sure the 'export' keyword is present here
+export const fetchReportsData = () => {
+    // Assuming your backend route for reports is '/event_logs'
+    return fetchApi('/event_logs', 'GET');
 };

@@ -1,7 +1,7 @@
 // src/App.jsx
-import React, { useState, useEffect } from 'react'; // <-- Added useEffect
+import React, { useState, useEffect } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
-import { loginUser, fetchCameraList, logoutUser } from './services/apiService.js'; // <-- Updated imports
+import { loginUser, fetchCameraList, logoutUser } from './services/apiService.js'; 
 import agapai_Bg from './assets/images/bg/gray-bg.png';
 
 // Common components
@@ -27,7 +27,7 @@ export default function App() {
     });
 
     // State for camera data, initialized to an empty array
-    const [cameras, setCameras] = useState([]); // <-- Mutable state for API data
+    const [cameras, setCameras] = useState([]);
 
     /**
      * Real login function that calls the API.
@@ -39,9 +39,10 @@ export default function App() {
             if (data.status === 'success' || data.token || data.access_token) {
                 const userData = { 
                     username: data.username, 
-                    role: 'admin', 
+                    // ✅ FIX: Use the role returned by the backend (data.role)
+                    role: data.role, 
                     userId: data.user_id,
-                    token: data.access_token || data.token // Use the token from the response
+                    token: data.access_token || data.token 
                 };
 
                 // Set the user state and store in localStorage
@@ -63,9 +64,9 @@ export default function App() {
      * Logout function
      */
     const logout = () => {
-        logoutUser(); // Clear token from localStorage
-        setUser(null); // Clear user state
-        localStorage.removeItem('user'); // Clear user data
+        logoutUser();
+        setUser(null);
+        localStorage.removeItem('user');
     };
 
     /**
