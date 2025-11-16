@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { fetchApi } from '../services/apiService';
-import { FaCamera, FaTrash, FaPlus, FaPencilAlt, FaSave, FaTimes } from 'react-icons/fa';
+import { FaCamera, FaTrash, FaPlus, FaPencilAlt, FaSave, FaTimes, FaCameraRetro } from 'react-icons/fa';
 
 // This component manages adding, editing, and removing cameras
 export default function CameraManager({ locations, onCameraUpdated }) {
@@ -160,8 +160,10 @@ export default function CameraManager({ locations, onCameraUpdated }) {
     const cameraName = cameras.find(c => c.id === cameraToDeleteId)?.name || 'this camera';
 
     return (
-        <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-200 mt-12 max-w-4xl"> 
-            
+        <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-200 mt-12 max-w-4xl">
+            <h2 className="text-2xl font-semibold text-gray-800 flex items-center mb-4 pb-2 border-b">
+                <FaCameraRetro className="mr-2 text-indigo-500" /> Camera Management
+            </h2> 
             {camMessage.text && (
                 <div className={`mb-6 p-4 border rounded-xl font-medium ${messageClass(camMessage)}`}>
                     {camMessage.text}
