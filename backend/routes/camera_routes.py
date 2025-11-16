@@ -302,9 +302,14 @@ def delete_location(loc_id):
 @jwt_required()
 def add_camera():
     data = request.get_json()
+    
+    # Server-side validation check
+    if 'stream_url' not in data or not data['stream_url']:
+        return jsonify(msg="Stream URL is required"), 400
+        
     new_cam = Camera(
         cam_name=data['cam_name'],
-        stream_url=data.get('stream_url'), # <--- Retrieve new field
+        stream_url=data['stream_url'], 
         loc_id=data['loc_id']
     )
 

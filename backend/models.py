@@ -45,7 +45,7 @@ class Camera(db.Model):
     id = db.Column(db.BigInteger, primary_key=True)
     cam_name = db.Column(db.String(100), nullable=False)
     cam_status = db.Column(db.Boolean, default=True)
-    stream_url = db.Column(db.String(255))
+    stream_url = db.Column(db.String(255), nullable=False)
     loc_id = db.Column(db.BigInteger, db.ForeignKey('location.id'))
     
     location = db.relationship('Location', backref=db.backref('cameras', lazy=True))
