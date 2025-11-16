@@ -7,6 +7,8 @@ from models import User, Role
 from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identity
 from functools import wraps
 import traceback
+from flask import jsonify
+from flask_jwt_extended import jwt_required, get_jwt_identity
 
 # Define a Flask Blueprint for user-related routes
 user_routes = Blueprint('user_routes', __name__)
@@ -120,3 +122,43 @@ def get_all_users():
     except Exception as e:
         traceback.print_exc() 
         return jsonify({'status': 'error', 'message': 'Internal server error while fetching users'}), 500
+    
+@user_routes.route('/user/profile', methods=['GET'])
+@jwt_required() # Ensures only logged-in users can access their profile
+def get_user_profile():
+    """
+    Returns detailed profile information for the currently logged-in user.
+    """
+    try:
+        # 1. Get user ID from JWT token
+        user_id_str = get_jwt_identity()
+        user_id = int(user_id_str)
+        
+        # 2. Query the user by ID
+        user = User.query.get(user_id)
+
+        if not user:
+            return jsonify(msg="User not found"), 404
+
+        # 3. Serialize and return the required data
+        profile_data = {
+            # Use the actual schema fields
+            'firstname': user.firstname,
+            'lastname': user.lastname,
+            'username': user.username,
+            # We don't need 'role' here, as it's passed via the frontend prop, 
+            # but it doesn't hurt.
+            'role': user.role.role_name if user.role else 'User' 
+        }
+
+        return jsonify(profile_data), 200
+
+    except ValueError:
+        # If get_jwt_identity() returns something that isn't a valid integer ID
+        return jsonify(msg="Invalid user ID format in token."), 400
+    except Exception as e:
+        # Catch any database or internal errors
+        print(f"Error fetching user profile: {e}")
+        return jsonify(msg="Internal server error fetching profile."), 500
+    
+# --- NEW ROUTE: Create New User (Admin Only) ---

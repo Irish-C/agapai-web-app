@@ -36,6 +36,15 @@ app.config['JWT_SECRET_KEY'] = os.getenv('FLASK_SECRET_KEY')
 
 app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False # Disable to avoid overhead
+
+# --- Connection Pooling & Timeout ---
+# Set pool recycle to less than server's wait_timeout (e.g., 2 hours = 7200 seconds)
+app.config['SQLALCHEMY_POOL_RECYCLE'] = 7200 
+
+# Force a test (pre-ping) query on the connection before use for stale connection
+app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+    "pool_pre_ping": True
+}
 db.init_app(app)
 
 jwt = JWTManager(app)
