@@ -1,6 +1,6 @@
 // src/pages/Settings.jsx
 import React, { useState } from 'react';
-import { FaUserCog, FaCogs, FaBell, FaUsers, FaDharmachakra } from 'react-icons/fa'; 
+import { FaUserCog, FaCogs, FaBell, FaUsers, FaDharmachakra, FaConnectdevelop} from 'react-icons/fa'; 
 
 import AccountSettingsForm from '../components/AccountSettingsForm.jsx';
 import CameraNotificationSettings from '../components/CameraNotificationSettings.jsx';
@@ -20,7 +20,7 @@ export default function Settings({ user }) {
     // 2. Define the navigation structure with roles
     const fullNavItems = [
         { id: 'my_account', name: 'My Account', icon: FaUserCog, role: 'all' },
-        { id: 'management', name: 'Device and Location', icon: FaDharmachakra, role: 'Admin' }, 
+        { id: 'management', name: 'Device and Location', icon: FaConnectdevelop, role: 'Admin' }, 
         { id: 'notification', name: 'Notifications', icon: FaBell, role: 'all' },
         { id: 'user_management', name: 'User Management', icon: FaUsers, role: 'Admin' }, 
     ];

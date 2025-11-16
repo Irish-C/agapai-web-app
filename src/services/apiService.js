@@ -110,3 +110,21 @@ export const fetchReportsData = () => {
     // Assuming your backend route for reports is '/event_logs'
     return fetchApi('/event_logs', 'GET');
 };
+
+/**
+ * Fetches the detailed profile for the currently logged-in user.
+ * Assumes backend uses JWT identity to find the user.
+ */
+export const fetchUserProfile = () => {
+    return fetchApi('/user/profile', 'GET');
+};
+
+/**
+ * Sends a request to change the password.
+ */
+export const changePassword = (oldPassword, newPassword) => {
+    return fetchApi('/users/change-password', 'POST', { 
+        old_password: oldPassword, 
+        new_password: newPassword 
+    });
+};
