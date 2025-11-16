@@ -192,7 +192,8 @@ export default function CameraManager({ locations, onCameraUpdated }) {
                         type="url" id="url" name="url" value={newCam.url}
                         onChange={handleNewCamChange}
                         className="w-full border-gray-300 rounded-lg shadow-sm focus:ring-teal-500 focus:border-teal-500 pl-2 py-1" 
-                        placeholder="URL"
+                        // REQUIRED ATTRIBUTE
+                        required 
                     />
                 </div>
                 
@@ -246,7 +247,8 @@ export default function CameraManager({ locations, onCameraUpdated }) {
                                             type="url" id={`edit-url-${cam.id}`} name="stream_url"
                                             value={editingCam.stream_url || ''} onChange={handleEditChange}
                                             className="w-full border-gray-300 rounded-lg shadow-sm focus:ring-teal-500 focus:border-teal-500 pl-2 py-1"
-                                            placeholder="Optional"
+                                            // 🛑 REQUIRED ATTRIBUTE
+                                            required 
                                         />
                                     </div>
                                     {/* Location */}
