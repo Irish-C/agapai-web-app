@@ -177,7 +177,7 @@ export default function CameraManager({ locations, onCameraUpdated }) {
                         name="name"
                         value={newCam.name}
                         onChange={handleNewCamChange}
-                        className="w-full border-gray-300 rounded-lg shadow-sm focus:ring-teal-500 focus:border-teal-500"
+                        className="w-full border-gray-300 rounded-lg shadow-sm focus:ring-teal-500 focus:border-teal-500 pl-2"
                         required
                     />
                 </div>
