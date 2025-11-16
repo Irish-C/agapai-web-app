@@ -151,7 +151,7 @@ export default function LocationManager({ onLocationsUpdated }) {
                         name="newLocName"
                         value={newLocName}
                         onChange={(e) => setNewLocName(e.target.value)}
-                        className="w-full border-gray-300 rounded-lg shadow-sm focus:ring-teal-500 focus:border-teal-500 pl-2"
+                        className="w-full border-gray-300 rounded-lg shadow-sm focus:ring-teal-500 focus:border-teal-500 pl-2 py-1"
                         placeholder="e.g., Main Hall"
                         required
                     />
@@ -165,21 +165,24 @@ export default function LocationManager({ onLocationsUpdated }) {
             </form>
 
             <h3 className="text-lg font-semibold text-gray-700 mb-2">Existing Locations</h3>
-            <div className="space-y-2">
+            
+            {/* 🛑 SCROLLABLE WRAPPER: Added max-h-60 and overflow-y-auto */}
+            <div className="space-y-2 max-h-72 overflow-y-auto pr-2"> 
                 {locations.length === 0 ? <p className="text-gray-500">No locations added yet.</p> : null}
                 {locations.map(loc => (
                     <div key={loc.id} className="flex justify-between items-center p-3 border rounded-lg bg-gray-50">
                         
                         {editingLoc && editingLoc.id === loc.id ? (
-                            // --- Edit Mode (unchanged) ---
+                            // --- Edit Mode (Buttons Swapped) ---
                             <form onSubmit={handleUpdateLocation} className="flex-grow flex items-center gap-4">
                                 <input
                                     type="text"
                                     value={editingLoc.name} 
                                     onChange={(e) => setEditingLoc(prev => ({ ...prev, name: e.target.value }))} 
-                                    className="w-full border-gray-300 rounded-lg shadow-sm focus:ring-teal-500 focus:border-teal-500"
+                                    className="w-full border-gray-300 rounded-lg shadow-sm focus:ring-teal-500 focus:border-teal-500 pl-2 py-1"
                                     required
                                 />
+                                {/* Swapped buttons order */}
                                 <button
                                     type="button"
                                     onClick={() => setEditingLoc(null)}
@@ -195,7 +198,7 @@ export default function LocationManager({ onLocationsUpdated }) {
                                 </button>
                             </form>
                         ) : (
-                            // --- View Mode (updated onClick) ---
+                            // --- View Mode ---
                             <>
                                 <strong className="text-gray-900">{loc.name}</strong>
                                 <div className="flex gap-2">
@@ -206,7 +209,6 @@ export default function LocationManager({ onLocationsUpdated }) {
                                         Edit
                                     </button>
                                     <button
-                                        // Change: Call the new handler to open the modal
                                         onClick={() => handleDeleteLocation(loc.id)}
                                         className="flex items-center bg-red-600 text-white text-sm font-bold py-1 px-3 rounded-lg hover:bg-red-700"
                                     >
