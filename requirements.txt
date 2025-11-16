@@ -1,38 +1,27 @@
 # --- Model Development ---
-torch
-torchvision
-torchaudio
-opencv-python
-scikit-learn
-openvino-dev
-roboflow
-tensorflow
-tensorflow-intel
-tensorrt
-numpy
-pandas
-matplotlib
-seaborn
-fuzzywuzzy
+
 
 # --- System Development ---
+bcrypt
 flask
 flask-socketio
+flask-jwt-extended
+flask-sqlalchemy
 eventlet
 mysql-connector-python
 sqlalchemy
 requests
-aiohttp
+aiohtt
+PyMySQL
+
+# --- Environment Management ---
 python-dotenv
+
+# --- Production Server ---
 gunicorn
 
 # --- Alert and Notification System ---
 paho-mqtt
-
-# --- Utilities / Visualization / Testing ---
-jupyter
-notebook
-pyqt5
 
 # --- Frontend Tooling (optional if integrated through Node.js) ---
 tailwindcss

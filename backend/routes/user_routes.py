@@ -106,3 +106,34 @@ def get_user_profile():
         import traceback
         traceback.print_exc() 
         return jsonify(msg="Internal server error fetching profile."), 500
+    
+
+@user_routes.route('/users', methods=['GET'])
+@admin_required # <-- Ensure admin_required decorator is used
+def get_all_users():
+    """
+    Returns a list of all users in the system. Requires Admin role.
+    """
+    try:
+        # NOTE: Ensure you are importing current_app and using app_context
+        from flask import current_app 
+        with current_app.app_context():
+            users = User.query.all()
+            
+            user_list = []
+            for user in users:
+                role_name = user.role.role_name if user.role else 'staff'
+                user_list.append({
+                    'id': user.id,
+                    'username': user.username,
+                    'firstname': user.firstname or 'N/A',
+                    'lastname': user.lastname or 'User', 
+                    'role': role_name,
+                    'userId': user.id 
+                })
+            return jsonify(user_list), 200
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc() 
+        return jsonify({'status': 'error', 'message': 'Internal server error while fetching users'}), 500

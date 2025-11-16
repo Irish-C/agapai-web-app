@@ -1,4 +1,3 @@
-// src/components/UserManager.jsx
 import React, { useState, useEffect } from 'react';
 import { FaUserPlus, FaUsers, FaEdit, FaTrash, FaSpinner } from 'react-icons/fa';
 import { fetchUsers } from '../services/apiService.js'; 
@@ -12,18 +11,22 @@ export default function UserManager({ user }) {
     // --- EFFECT: Fetch Users from API ---
     useEffect(() => {
         const loadUsers = async () => {
-            if (!user) return;
+            // Check if user is fully loaded before proceeding
+            if (!user || !user.userId) return;
 
             setIsLoading(true);
             setError(null);
 
             try {
+                // Assuming fetchUsers is protected by admin_required in backend
                 const userData = await fetchUsers(); 
-                setUsers(userData);
+                
+                // Ensure data is an array before setting state
+                setUsers(Array.isArray(userData) ? userData : []);
             } catch (err) {
                 console.error("Error loading users:", err);
                 // The error message for the user is set here
-                setError('Failed to load user list. Check server connection or permissions.'); 
+                setError(err.message || 'Failed to load user list. Check server connection or permissions.'); 
             } finally {
                 setIsLoading(false);
             }
@@ -34,6 +37,7 @@ export default function UserManager({ user }) {
 
 
     const handleDelete = (userId) => {
+        // NOTE: In a real app, this should be a custom modal, not window.confirm
         if (window.confirm(`Are you sure you want to delete user ID ${userId}?`)) {
             // TODO: Implement deleteUser(userId) API call here
             setUsers(users.filter(u => u.id !== userId));
@@ -61,17 +65,22 @@ export default function UserManager({ user }) {
                 </button>
             </div>
 
-            {error && (
+            {/* Display loading spinner */}
+            {isLoading && (
+                <div className="text-center p-8 text-gray-500">
+                    <FaSpinner className="animate-spin inline-block mr-2" /> Loading user data...
+                </div>
+            )}
+            
+            {/* Display error message */}
+            {error && !isLoading && (
                 <div className="p-3 bg-red-100 border border-red-400 text-red-700 rounded-lg">
                     {error}
                 </div>
             )}
 
-            {isLoading ? (
-                <div className="text-center p-8 text-gray-500">
-                    <FaSpinner className="animate-spin inline-block mr-2" /> Loading user data...
-                </div>
-            ) : (
+            {/* 🛑 Display table only if NOT loading AND NO error */}
+            {!isLoading && !error && (
                 <div className="overflow-x-auto bg-white border rounded-lg shadow-sm">
                     <table className="min-w-full divide-y divide-gray-200">
                         <thead className="bg-gray-50">
@@ -84,6 +93,13 @@ export default function UserManager({ user }) {
                             </tr>
                         </thead>
                         <tbody className="bg-white divide-y divide-gray-200">
+                            {users.length === 0 && (
+                                <tr>
+                                    <td colSpan="5" className="px-6 py-4 text-center text-sm text-gray-500">
+                                        No users found. Try adding a new user.
+                                    </td>
+                                </tr>
+                            )}
                             {users.map((u) => (
                                 <tr key={u.id}>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{u.username}</td>
