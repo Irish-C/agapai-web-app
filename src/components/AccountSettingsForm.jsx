@@ -13,12 +13,12 @@ const initialProfileState = {
 // Component now expects 'user' prop containing { username, role, userId, token }
 export default function AccountSettingsForm({ user }) {
     
-    // Initialize profile primarily using the 'user' prop (guaranteed basic info)
-    const [profile, setProfile] = useState({
+    // Initialize profile primarily using the 'user' prop
+    const [profile, setProfile] = useState(() => ({
         ...initialProfileState,
         username: user?.username || initialProfileState.username,
         role: user?.role || initialProfileState.role,
-    });
+    }));
     
     const [isProfileLoading, setIsProfileLoading] = useState(true);
 
@@ -32,9 +32,10 @@ export default function AccountSettingsForm({ user }) {
 
     // --- Effect to Fetch User Profile Details on Mount ---
     useEffect(() => {
-        // Ensure user object exists and has required IDs before trying to fetch
+        // Ensure user object exists before trying to fetch
         if (!user || !user.userId) {
-            setIsProfileLoading(false); // Stop loading if authentication is missing
+            // If user data is missing (shouldn't happen on this protected route)
+            setIsProfileLoading(false);
             return;
         }
 
@@ -46,25 +47,28 @@ export default function AccountSettingsForm({ user }) {
                 
                 const fetchedDetails = typeof data === 'object' && data !== null ? data : {};
 
-                // 🛑 MERGE: Merge fetched data (firstname/lastname) with guaranteed data from the prop
+                // SUCCESS PATH: Merge fetched names with prop basics
                 setProfile({
-                    ...user, // Basic info (username, role) from prop
-                    ...fetchedDetails, // Fetched names
+                    ...user, 
+                    ...fetchedDetails,
                     firstname: fetchedDetails.firstname || 'N/A', 
                     lastname: fetchedDetails.lastname || 'User',
-                    // The username and role are guaranteed to be correct here
+                    username: user.username, // Always use prop for guaranteed username/role
+                    role: user.role,
                 });
 
             } catch (error) {
                 console.error("Error fetching profile details:", error);
                 
-                // On API error, display error and revert to basic prop data
-                setProfile(prev => ({
-                    ...user, // Use fresh data from prop as fallback
-                    firstname: prev.firstname !== 'N/A' ? prev.firstname : 'N/A', // Keep if already partially loaded
-                    lastname: prev.lastname !== 'User' ? prev.lastname : 'User',
-                }));
-                setMessage({ type: 'error', text: 'Failed to load full profile details. Please check your backend logs.' });
+                // 🛑 RECOVERY PATH FIX: Ensure UNLOADING by setting the profile using
+                // only the guaranteed data from the 'user' prop as a fallback.
+                setProfile({
+                    firstname: 'N/A',
+                    lastname: 'User',
+                    username: user.username, 
+                    role: user.role,
+                });
+                setMessage({ type: 'error', text: 'Failed to load full profile details. Basic info displayed.' });
             } finally {
                 // Guarantee this runs to unlock the UI
                 setIsProfileLoading(false);
@@ -72,7 +76,7 @@ export default function AccountSettingsForm({ user }) {
         };
 
         loadProfile();
-    }, [user]); // Rerun when the user prop changes (e.g., after login)
+    }, [user]); 
 
 
     const handleSubmit = async (e) => {
@@ -130,7 +134,7 @@ export default function AccountSettingsForm({ user }) {
                     </div>
                 ) : (
                     <div className="space-y-2 text-sm text-gray-700">
-                        {/* Displaying First Name and Last Name from the fetched 'profile' state */}
+                        {/* Displaying Full Name */}
                         <div className="flex justify-between border-b pb-1">
                             <span className="font-medium">Full Name:</span>
                             <span>{profile.firstname} {profile.lastname}</span> 
@@ -140,7 +144,7 @@ export default function AccountSettingsForm({ user }) {
                             <span>{profile.username}</span>
                         </div>
                         <div className="flex justify-between">
-                            <span className="font-medium">Access Role:</span>
+                            <span className="font-medium">Your Role:</span>
                             <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
                                 profile.role === 'Admin' ? 'bg-indigo-100 text-indigo-800' : 'bg-green-100 text-green-800'
                             }`}>
@@ -156,7 +160,7 @@ export default function AccountSettingsForm({ user }) {
                 <h2 className="text-xl font-semibold text-gray-800 flex items-center mb-4 border-b pb-2">
                     <FaLock className="mr-2 text-red-500" />
                     Change Password
-                </h2 >
+                </h2>
                 <p className="text-sm text-gray-500 mb-6">
                     For security, you must provide your current password to set a new one.
                 </p>
