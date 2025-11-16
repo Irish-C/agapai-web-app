@@ -2,9 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { FaLock, FaKey, FaSave, FaSpinner, FaCheckCircle, FaExclamationCircle, FaUser } from 'react-icons/fa';
 import { fetchApi, fetchUserProfile, changePassword } from '../services/apiService'; 
 
+// Define default structure for loading state fallback
 const initialProfileState = { 
-    firstname: '', 
-    lastname: '', 
+    firstname: 'N/A', 
+    lastname: 'User', 
     username: 'Loading...', 
     role: 'Loading...' 
 };
@@ -12,65 +13,66 @@ const initialProfileState = {
 // Component now expects 'user' prop containing { username, role, userId, token }
 export default function AccountSettingsForm({ user }) {
     
-    // Initialize profile with basic user info from props or initial state
-    const [profile, setProfile] = useState(() => ({
+    // Initialize profile primarily using the 'user' prop (guaranteed basic info)
+    const [profile, setProfile] = useState({
         ...initialProfileState,
         username: user?.username || initialProfileState.username,
         role: user?.role || initialProfileState.role,
-    }));
+    });
     
     const [isProfileLoading, setIsProfileLoading] = useState(true);
+
     const [oldPassword, setOldPassword] = useState('');
     const [newPassword, setNewPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
     
     const [isLoading, setIsLoading] = useState(false);
-    const [message, setMessage] = useState(null); 
+    const [message, setMessage] = useState(null); // { type: 'success' | 'error', text: string }
+
 
     // --- Effect to Fetch User Profile Details on Mount ---
     useEffect(() => {
-        if (!user || !user.userId) return;
+        // Ensure user object exists and has required IDs before trying to fetch
+        if (!user || !user.userId) {
+            setIsProfileLoading(false); // Stop loading if authentication is missing
+            return;
+        }
 
         const loadProfile = async () => {
             setIsProfileLoading(true);
             
             try {
-                // Fetch extended profile data (firstname, lastname)
                 const data = await fetchUserProfile(); 
                 
-                // Ensure data is an object, defaulting to an empty object if unexpected
                 const fetchedDetails = typeof data === 'object' && data !== null ? data : {};
 
-                // Merge fetched data with basic user info from props
+                // 🛑 MERGE: Merge fetched data (firstname/lastname) with guaranteed data from the prop
                 setProfile({
-                    ...user, // Basic info from props (username, role)
+                    ...user, // Basic info (username, role) from prop
                     ...fetchedDetails, // Fetched names
-                    // Ensure the display fields are not null/undefined if API missed them
                     firstname: fetchedDetails.firstname || 'N/A', 
                     lastname: fetchedDetails.lastname || 'User',
-                    username: user.username,
-                    role: user.role,
+                    // The username and role are guaranteed to be correct here
                 });
 
             } catch (error) {
                 console.error("Error fetching profile details:", error);
-                // On API error, still set the basic profile data from the props
+                
+                // On API error, display error and revert to basic prop data
                 setProfile(prev => ({
-                    ...prev,
-                    username: user.username,
-                    role: user.role,
-                    firstname: prev.firstname === 'Loading...' ? 'N/A' : prev.firstname,
-                    lastname: prev.lastname === '...' ? 'User' : prev.lastname,
+                    ...user, // Use fresh data from prop as fallback
+                    firstname: prev.firstname !== 'N/A' ? prev.firstname : 'N/A', // Keep if already partially loaded
+                    lastname: prev.lastname !== 'User' ? prev.lastname : 'User',
                 }));
-                setMessage({ type: 'error', text: 'Failed to load full profile details. Basic info displayed.' });
+                setMessage({ type: 'error', text: 'Failed to load full profile details. Please check your backend logs.' });
             } finally {
-                // 🛑 CRITICAL: Guarantee this runs to unlock the UI
+                // Guarantee this runs to unlock the UI
                 setIsProfileLoading(false);
             }
         };
 
         loadProfile();
-    }, [user]); 
+    }, [user]); // Rerun when the user prop changes (e.g., after login)
 
 
     const handleSubmit = async (e) => {
@@ -154,7 +156,7 @@ export default function AccountSettingsForm({ user }) {
                 <h2 className="text-xl font-semibold text-gray-800 flex items-center mb-4 border-b pb-2">
                     <FaLock className="mr-2 text-red-500" />
                     Change Password
-                </h2>
+                </h2 >
                 <p className="text-sm text-gray-500 mb-6">
                     For security, you must provide your current password to set a new one.
                 </p>
