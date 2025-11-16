@@ -75,7 +75,11 @@ export const loginUser = async (username, password) => {
         if (response && (response.token || response.access_token)) {
             const token = response.token || response.access_token;
             console.log("loginUser: Login successful, saving token.");
+            
+            // Ensure any previous token is cleared before setting the new one
+            localStorage.removeItem(AUTH_TOKEN_KEY); 
             localStorage.setItem(AUTH_TOKEN_KEY, token);
+            
             return response;
         } else {
             throw new Error(response.message || 'Login failed: No token received.');
