@@ -11,8 +11,9 @@ import pupLogo from './../assets/images/logos/pup-logo.png';
 
 // LoginPage now receives the asynchronous 'login' function from App.jsx
 export default function LoginPage({ login }) {
-    const [username, setUsername] = useState('admin');
-    const [password, setPassword] = useState('password');
+    // 🛑 FIX: Removed hardcoded default credentials to force manual input
+    const [username, setUsername] = useState(''); 
+    const [password, setPassword] = useState('');
     const [error, setError] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const navigate = useNavigate();
@@ -39,7 +40,6 @@ export default function LoginPage({ login }) {
     }
     };
     
-
     return (
         <div 
             className="min-h-screen flex items-center justify-center p-4 sm:p-6"
@@ -54,12 +54,12 @@ export default function LoginPage({ login }) {
             
             <div className="relative w-full max-w-md p-8 shadow-2xl backdrop-blur-sm 
                 bg-gradient-to-b from-[#2d3092] to-[#015954]
-                rounded-none text-white text-left">
+                rounded-xl text-white text-left">
                 
                 {/* Logo and Title */}
                 <div className="text-center mb-8">
                     <img src={agapaiLogo} alt="AGAPAI Logo" className="w-20 h-20 mx-auto mb-4 rounded-full border-2 border-teal-500 shadow-md" 
-                         onError={(e) => { e.target.onerror = null; e.target.src="/placeholder-logo.png" }}/>
+                            onError={(e) => { e.target.onerror = null; e.target.src="/placeholder-logo.png" }}/>
                     <h2 className="text-3xl font-bold white">Login</h2>
                     <p className="text-sm text-white mt-2">Access the Elderly Care Dashboard</p>
                 </div>

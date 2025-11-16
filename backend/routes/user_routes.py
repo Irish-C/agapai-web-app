@@ -3,14 +3,11 @@
 from flask import Blueprint, request, jsonify
 import bcrypt
 from database import db
-from models import User, Role
+from models import User, Role # Ensure User and Role are imported
 from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identity
 from functools import wraps
-import traceback
-from flask import jsonify
-from flask_jwt_extended import jwt_required, get_jwt_identity
+import traceback # Used for debugging server crashes
 
-# Define a Flask Blueprint for user-related routes
 user_routes = Blueprint('user_routes', __name__)
 
 def admin_required(fn):
@@ -21,26 +18,18 @@ def admin_required(fn):
     @jwt_required()
     def decorator(*args, **kwargs):
         try:
-            # 1. Get the user ID from the JWT token (stored as a string)
             user_id_str = get_jwt_identity()
             user_id = int(user_id_str)
-            
-            # 2. Load the user object from the database
             user = User.query.get(user_id)
             
-            # 3. CRITICAL CHECK: Verify user exists and role_name is 'Admin'
             if user and user.role and user.role.role_name == 'Admin':
-                return fn(*args, **kwargs) # Success: Run the protected route function
+                return fn(*args, **kwargs)
             else:
-                # Failure: Return 403 Forbidden
                 return jsonify(msg="Administration rights required"), 403
         except Exception:
-            # Handle cases where the token is valid but data is corrupted (e.g., user deleted)
             return jsonify(msg="Invalid user context."), 500
     return decorator
 
-
-# --- Existing Login Route (Includes defensive check) ---
 
 @user_routes.route('/login', methods=['POST'])
 def login():
@@ -54,7 +43,6 @@ def login():
 
     user = User.query.filter_by(username=username).first()
 
-    # Defensive Password Check and Verification
     if user and user.password:
         
         is_password_valid = bcrypt.checkpw(
@@ -63,7 +51,6 @@ def login():
         )
 
         if is_password_valid:
-            # Token creation moved inside the successful block
             access_token = create_access_token(identity=str(user.id)) 
             
             role_name = user.role.role_name if user.role else 'User' 
@@ -81,84 +68,66 @@ def login():
         "message": "Invalid username or password"
     }), 401
 
-# --- Existing Logout and Change Password Routes (omitted for brevity) ---
 @user_routes.route('/logout', methods=['POST'])
 def logout():
     return jsonify({"status": "success", "message": "Logout successful"}), 200
 
-# Placeholder for change_password route
-# @user_routes.route('/users/change-password', methods=['POST'])
-# @jwt_required()
-# def change_password():
-#     # ... implementation ...
-#     pass
 
-
-# --- NEW ROUTE: Fetch All Users (Admin Only) ---
-
-@user_routes.route('/users', methods=['GET'])
-@admin_required 
-def get_all_users():
-    """
-    Returns a list of all users in the system. Requires Admin role.
-    """
-    try:
-        users = User.query.all()
-        
-        user_list = []
-        for user in users:
-            role_name = user.role.role_name if user.role else 'User'
-            user_list.append({
-                'id': user.id,
-                'username': user.username,
-                'firstname': user.firstname,
-                'lastname': user.lastname,
-                'role': role_name,
-                'userId': user.id 
-            })
-            
-        return jsonify(user_list), 200
-
-    except Exception as e:
-        traceback.print_exc() 
-        return jsonify({'status': 'error', 'message': 'Internal server error while fetching users'}), 500
-    
 @user_routes.route('/user/profile', methods=['GET'])
-@jwt_required() # Ensures only logged-in users can access their profile
+@jwt_required()
 def get_user_profile():
     """
-    Returns detailed profile information for the currently logged-in user.
+    Returns detailed profile information (firstname, lastname) for the 
+    currently authenticated user, safely handling NULL database values.
     """
     try:
-        # 1. Get user ID from JWT token
         user_id_str = get_jwt_identity()
         user_id = int(user_id_str)
         
-        # 2. Query the user by ID
+        # This is where the database access occurs
         user = User.query.get(user_id)
 
         if not user:
             return jsonify(msg="User not found"), 404
 
-        # 3. Serialize and return the required data
+        # Defensive access to relationship and attributes
+        role_name = user.role.role_name if user.role else 'User' 
+
         profile_data = {
-            # Use the actual schema fields
-            'firstname': user.firstname,
-            'lastname': user.lastname,
+            'firstname': user.firstname or 'N/A', 
+            'lastname': user.lastname or 'User',
             'username': user.username,
-            # We don't need 'role' here, as it's passed via the frontend prop, 
-            # but it doesn't hurt.
-            'role': user.role.role_name if user.role else 'User' 
+            'role': role_name
         }
 
         return jsonify(profile_data), 200
 
-    except ValueError:
-        # If get_jwt_identity() returns something that isn't a valid integer ID
-        return jsonify(msg="Invalid user ID format in token."), 400
     except Exception as e:
-        # Catch any database or internal errors
-        print(f"Error fetching user profile: {e}")
+        # If the code reaches here, it means a database or connection error occurred
+        traceback.print_exc() 
+        print(f"CRASHED PROFILE LOAD (500): {e}")
         return jsonify(msg="Internal server error fetching profile."), 500
-    
-# --- NEW ROUTE: Create New User (Admin Only) ---
+
+# Example route (used by UserManager)
+@user_routes.route('/users', methods=['GET'])
+@admin_required
+def get_all_users():
+    try:
+        users = User.query.all()
+        
+        user_list = []
+        for user in users:
+            role_name = user.role.role_name if user.role else 'staff'
+            user_list.append({
+                'id': user.id,
+                'username': user.username,
+                'firstname': user.firstname or 'N/A',
+                'lastname': user.lastname or 'User', 
+                'role': role_name,
+                'userId': user.id 
+            })
+        return jsonify(user_list), 200
+
+    except Exception as e:
+        traceback.print_exc() 
+        return jsonify({'status': 'error', 'message': 'Internal server error while fetching users'}), 500
