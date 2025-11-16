@@ -9,7 +9,7 @@ import LocationManager from './LocationManager.jsx';
 export default function ManagementDashboard({ locations, onLocationsUpdated }) {
     
     return (
-        <div className="space-y-0"> 
+        <div className="p-0"> 
 
             {/* Uses a grid layout to display both managers, stacked on small screens */}
             {/* The gap-4 provides horizontal spacing between the two columns */}

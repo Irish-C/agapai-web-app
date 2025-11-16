@@ -130,7 +130,7 @@ export default function LocationManager({ onLocationsUpdated }) {
     const locationName = locations.find(loc => loc.id === locationToDeleteId)?.name || 'this location';
 
     return (
-        <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-200 mt-12 max-w-4xl">
+        <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-200 mt-2 max-w-4xl">
             <h2 className="text-2xl font-semibold text-gray-800 flex items-center mb-4 pb-2 border-b">
                 <FaMapMarkerAlt className="mr-2 text-indigo-500" /> Location Management
             </h2>
@@ -166,7 +166,7 @@ export default function LocationManager({ onLocationsUpdated }) {
 
             <h3 className="text-lg font-semibold text-gray-700 mb-2">Existing Locations</h3>
             
-            {/* 🛑 SCROLLABLE WRAPPER: Added max-h-60 and overflow-y-auto */}
+            {/* SCROLLABLE WRAPPER: Added max-h-60 and overflow-y-auto */}
             <div className="space-y-2 max-h-72 overflow-y-auto pr-2"> 
                 {locations.length === 0 ? <p className="text-gray-500">No locations added yet.</p> : null}
                 {locations.map(loc => (
