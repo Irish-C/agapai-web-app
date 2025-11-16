@@ -8,6 +8,7 @@ from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identi
 from functools import wraps
 import traceback # Used for debugging server crashes
 from flask import current_app, jsonify
+from models import User, Role, EventLog
 
 user_routes = Blueprint('user_routes', __name__)
 
@@ -137,3 +138,90 @@ def get_all_users():
         import traceback
         traceback.print_exc() 
         return jsonify({'status': 'error', 'message': 'Internal server error while fetching users'}), 500
+    
+
+# -- Create and Delete User Endpoints ---
+# --- Create User Endpoint ---
+@user_routes.route('/users', methods=['POST'])
+@admin_required
+def create_new_user():
+    """
+    Handles adding a new user account (Admin only).
+    The frontend sends: firstname, lastname, username, role, password.
+    """
+    try:
+        # Use app context manually for stability
+        from flask import current_app
+        with current_app.app_context():
+            data = request.get_json()
+
+            # 1. Basic validation
+            required_fields = ['firstname', 'lastname', 'username', 'role', 'password']
+            if not all(field in data for field in required_fields):
+                return jsonify(msg="Missing required user fields."), 400
+
+            # 2. Check if username already exists
+            if User.query.filter_by(username=data['username']).first():
+                return jsonify(msg="Username already exists."), 409
+
+            # 3. Hash the password before saving
+            hashed_password = bcrypt.hashpw(data['password'].encode('utf-8'), bcrypt.gensalt())
+
+            # 4. Find the Role ID based on the role name (e.g., 'Admin' -> 1)
+            role = Role.query.filter_by(role_name=data['role']).first()
+            if not role:
+                return jsonify(msg=f"Role '{data['role']}' not found in database."), 404
+
+            # 5. Create and save the new User object
+            new_user = User(
+                firstname=data['firstname'],
+                lastname=data['lastname'],
+                username=data['username'],
+                password=hashed_password.decode('utf-8'), # Store as string
+                role_id=role.id
+            )
+            db.session.add(new_user)
+            db.session.commit()
+
+            return jsonify({'status': 'success', 'message': 'User created successfully!'}), 201
+
+    except Exception as e:
+        db.session.rollback()
+        import traceback
+        traceback.print_exc()
+        return jsonify({'status': 'error', 'message': 'Failed to create user due to a server error.'}), 500
+    
+# --- Delete User Endpoint ---
+
+@user_routes.route('/users/<int:user_id>', methods=['DELETE'])
+@admin_required
+def delete_user_by_id(user_id):
+    try:
+        from flask import current_app
+        from models import EventLog # <-- Ensure this import is at the top/accessible
+        
+        with current_app.app_context(): 
+            
+            current_admin_id = int(get_jwt_identity()) 
+            user_to_delete = User.query.get(user_id)
+            
+            if not user_to_delete:
+                return jsonify(msg="User not found."), 404
+            if user_id == current_admin_id:
+                return jsonify(msg="Cannot delete your own active account."), 403
+
+            # 🛑 KEEP THIS AS FAILSAFE: Manually set FK to NULL
+            EventLog.query.filter_by(ack_by_user_id=user_id).update(
+                {'ack_by_user_id': None}, synchronize_session='fetch'
+            )
+            
+            db.session.delete(user_to_delete)
+            db.session.commit()
+
+            return jsonify({'status': 'success', 'message': f'User {user_id} deleted successfully.'}), 200
+
+    except Exception as e:
+        db.session.rollback()
+        import traceback
+        traceback.print_exc()
+        return jsonify({'status': 'error', 'message': f'Failed to delete user {user_id}.'}), 500
