@@ -298,3 +298,26 @@ def delete_location(loc_id):
     except Exception as e:
         db.session.rollback()
         return jsonify({"status": "error", "message": str(e)}), 500
+    
+@jwt_required()
+def add_camera():
+    data = request.get_json()
+    new_cam = Camera(
+        cam_name=data['cam_name'],
+        stream_url=data.get('stream_url'), # <--- Retrieve new field
+        loc_id=data['loc_id']
+    )
+
+@jwt_required()
+def update_camera(id):
+    camera = Camera.query.get_or_404(id)
+    data = request.get_json()
+    
+    if 'cam_name' in data:
+        camera.cam_name = data['cam_name']
+        
+    if 'loc_id' in data:
+        camera.loc_id = data['loc_id']
+        
+    if 'stream_url' in data: # <--- Check and update new field
+        camera.stream_url = data['stream_url']
