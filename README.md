@@ -1,130 +1,76 @@
-🏡 AGAPAI: Smart Elderly Care Monitoring System
+# 🏡 **AGAPAI: Smart Elderly Care Monitoring System**
 
-AGAPAI is a specialized web application designed for the real-time monitoring and centralized management of security cameras in elderly care facilities or households. It leverages real-time technologies to provide immediate alerts and a controlled environment for managing all devices and users.
+**AGAPAI** is a specialized web application built for **real-time monitoring** and **centralized management** of security cameras in elderly care facilities or homes. It uses modern technologies to deliver instant alerts, streamlined device control, and secure user access.
 
-✨ Core Features & Value Proposition
+---
 
-AGAPAI focuses on providing secure, reliable, and organized control over monitoring infrastructure.
+## ✨ **Core Features & Value Proposition**
 
-Security & Access
+AGAPAI ensures **secure**, **reliable**, and **organized** control over your monitoring infrastructure.
 
-Role-Based Access Control (RBAC): Restricts sensitive settings (User Management, Device Management) exclusively to Admin users, ensuring data integrity.
+---
 
-Secure Authentication: Uses modern JWT tokens for authenticated API communication.
+### 🔐 **Security & Access**
 
-Device & Data Management
+- **Role-Based Access Control (RBAC):**  
+  Limits sensitive settings (User Management, Device Management) to **Admin-only** operations.
 
-Real-time Camera Feed Display: View live feeds from configured RTSP/HTTP cameras.
+- **Secure Authentication:**  
+  Implements JWT-based authentication for protected API usage.
 
-Unified Management Dashboard: Centralized screen for managing both Locations (e.g., Main Hall, Bedroom) and Cameras concurrently.
+---
 
-CRUD Operations: Full capability to Create, Read, Update, and Delete cameras and locations.
+### 📷 **Device & Data Management**
 
-Scrollable Management Lists: Efficient display of large lists of devices and locations without cluttering the interface.
+- **Real-Time Camera Feeds:**  
+  Stream live RTSP/HTTP camera feeds directly from the dashboard.
 
-Modal Confirmation: Requires explicit confirmation for critical deletion actions (e.g., removing a camera or location).
+- **Unified Management Dashboard:**  
+  Manage **Locations** and **Cameras** in a single, structured interface.
 
-Real-time Communication
+- **Full CRUD Support:**  
+  Create, read, update, and delete all cameras and locations.
 
-Real-time Alerts: Receives immediate incident alerts (simulated via WebSockets) directly from the backend inference system.
+- **Scrollable Lists:**  
+  Clean UI for handling large device/location lists without clutter.
 
-Responsive Interface: User-friendly design adaptable to desktop and mobile views.
+- **Safety Prompts:**  
+  Critical actions (like deleting devices or locations) require confirmation via modal pop-ups.
 
-💻 Technologies Used
+---
 
-This project is built using a modern, asynchronous Python backend and a single-page React application.
+### ⚡ **Real-Time Communication**
 
-Area
+- **Instant Alerts:**  
+  Receives simulated fall/inactivity alerts via WebSockets from the backend inference engine.
 
-Technology
+- **Responsive UI:**  
+  Smooth experience across desktop and mobile devices.
 
-Purpose
+---
 
-Frontend
+## 💻 **Technologies Used**
 
-React.js (Vite)
+A modern, asynchronous backend paired with a dynamic React frontend.
 
-User Interface and Client-Side Routing
+| Area | Technology | Purpose |
+|------|------------|---------|
+| **Frontend** | React.js (Vite) | UI framework & client-side routing |
+| **Styling** | Tailwind CSS | Utility-first responsive design |
+| **APIs / Icons** | React Router, React Icons | Routing & iconography |
+| **Backend** | Python / Flask | RESTful API + core logic |
+| **Authentication** | Flask-JWT-Extended, Bcrypt | Secure token auth + password hashing |
+| **Database** | SQLAlchemy | ORM & database modeling |
+| **Real-time** | Flask-SocketIO (Eventlet) | WebSocket-based live updates & alerts |
 
-Styling
+---
 
-Tailwind CSS (for single-file components)
+## 🚀 **Installation & Setup**
 
-Utility-first styling for fast, responsive design
+To run AGAPAI locally, install and configure both the backend and frontend components.
 
-APIs/Icons
+---
 
-React Router, Font Awesome (via React Icons)
+### 1. **Backend Setup (Python / Flask)**
 
-Client-side routing and rich iconography
-
-Backend
-
-Python / Flask
-
-Core RESTful API and Business Logic
-
-Authentication
-
-Flask-JWT-Extended / Bcrypt
-
-Token-based security and password hashing
-
-Database
-
-SQLAlchemy
-
-Python SQL Toolkit and ORM
-
-Real-time
-
-Flask-SocketIO (Eventlet)
-
-Bi-directional communication for live frames and alerts
-
-🚀 Installation & Setup
-
-To run AGAPAI locally, you must set up both the backend and frontend environments.
-
-1. Backend Setup (Python / Flask)
-
-Assumes Python 3.9+ and pip are installed.
-
-# Navigate to the backend directory
-cd backend
-
-# Create a virtual environment and activate it
-python -m venv venv
-source venv/bin/activate  # On Windows, use `venv\Scripts\activate`
-
-# Install dependencies
-pip install -r requirements.txt 
-
-# Set environment variables (FLASK_SECRET_KEY, DATABASE_URL, etc.)
-# You will need to create a .env file here.
-
-# Initialize the database (must be done once)
-flask --app app create_db
-
-# Seed initial data (optional, for testing)
-flask --app app seed_db
-
-# Run the Flask server with SocketIO (using eventlet)
-python app.py
-
-
-2. Frontend Setup (React / Vite)
-
-Assumes Node.js and npm/yarn are installed.
-
-# Navigate back to the root directory
-cd ..
-
-# Install Node dependencies
-npm install
-
-# Start the frontend application (which also proxies API calls to port 5000)
-npm run dev
-
-
-The application will typically be available at http://localhost:5173.
+_Requires Python 3.9+ installed on your machine._
