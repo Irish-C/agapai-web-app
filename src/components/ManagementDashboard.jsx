@@ -9,13 +9,14 @@ import LocationManager from './LocationManager.jsx';
 export default function ManagementDashboard({ locations, onLocationsUpdated }) {
     
     return (
-        <div className="space-y-2"> 
+        <div className="space-y-0"> 
 
             {/* Uses a grid layout to display both managers, stacked on small screens */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-0"> 
+            {/* The gap-4 provides horizontal spacing between the two columns */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4"> 
                 
                 {/* 1. Camera Manager (LEFT) */}
-                <div className="bg-gray-50 px-6 pb-6 rounded-xl shadow-inner border border-gray-200">
+                <div className="pl-4">
                     <CameraManager 
                         locations={locations} 
                         onCameraUpdated={() => { /* Handle camera update */ }}
@@ -23,7 +24,7 @@ export default function ManagementDashboard({ locations, onLocationsUpdated }) {
                 </div>
 
                 {/* 2. Location Manager (RIGHT) */}
-                <div className="bg-gray-50 px-6 pb-6 rounded-xl shadow-inner border border-gray-200">
+                <div className="pr-4">
                     <LocationManager onLocationsUpdated={onLocationsUpdated} />
                 </div>
             </div>

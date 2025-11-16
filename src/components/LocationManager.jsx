@@ -151,16 +151,16 @@ export default function LocationManager({ onLocationsUpdated }) {
                         name="newLocName"
                         value={newLocName}
                         onChange={(e) => setNewLocName(e.target.value)}
-                        className="w-full border-gray-300 rounded-lg shadow-sm focus:ring-teal-500 focus:border-teal-500"
+                        className="w-full border-gray-300 rounded-lg shadow-sm focus:ring-teal-500 focus:border-teal-500 pl-2"
                         placeholder="e.g., Main Hall"
                         required
                     />
                 </div>
                 <button
                     type="submit"
-                    className="flex items-center justify-center bg-green-600 text-white font-bold py-2 px-4 rounded-xl hover:bg-green-700 h-10 mt-6"
+                    className="flex items-center justify-center bg-green-600 text-white font-bold py-2 px-9 rounded-xl hover:bg-green-700 h-10 mt-6"
                 >
-                    <FaPlus className="mr-2" /> Add
+                    Add
                 </button>
             </form>
 
@@ -181,17 +181,17 @@ export default function LocationManager({ onLocationsUpdated }) {
                                     required
                                 />
                                 <button
-                                    type="submit"
-                                    className="flex items-center bg-green-600 text-white text-sm font-bold py-1 px-3 rounded-lg hover:bg-green-700"
-                                >
-                                    Save
-                                </button>
-                                <button
                                     type="button"
                                     onClick={() => setEditingLoc(null)}
                                     className="flex items-center bg-gray-500 text-white text-sm font-bold py-1 px-3 rounded-lg hover:bg-gray-600"
                                 >
                                     Cancel
+                                </button>
+                                <button
+                                    type="submit"
+                                    className="flex items-center bg-green-600 text-white text-sm font-bold py-1 px-3 rounded-lg hover:bg-green-700"
+                                >
+                                    Save
                                 </button>
                             </form>
                         ) : (
