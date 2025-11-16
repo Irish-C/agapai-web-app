@@ -7,6 +7,7 @@ from models import User, Role # Ensure User and Role are imported
 from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identity
 from functools import wraps
 import traceback # Used for debugging server crashes
+from flask import current_app, jsonify
 
 user_routes = Blueprint('user_routes', __name__)
 
@@ -76,58 +77,32 @@ def logout():
 @user_routes.route('/user/profile', methods=['GET'])
 @jwt_required()
 def get_user_profile():
-    """
-    Returns detailed profile information (firstname, lastname) for the 
-    currently authenticated user, safely handling NULL database values.
-    """
     try:
-        user_id_str = get_jwt_identity()
-        user_id = int(user_id_str)
-        
-        # This is where the database access occurs
-        user = User.query.get(user_id)
+        # 🛑 FIX: Explicitly push the application context
+        with current_app.app_context(): 
+            user_id_str = get_jwt_identity()
+            user_id = int(user_id_str)
+            
+            # Database query is executed inside this context
+            user = User.query.get(user_id) 
 
-        if not user:
-            return jsonify(msg="User not found"), 404
+            if not user:
+                return jsonify(msg="User not found"), 404
 
-        # Defensive access to relationship and attributes
-        role_name = user.role.role_name if user.role else 'User' 
+            # Defensive data retrieval
+            role_name = user.role.role_name if user.role else 'User' 
 
-        profile_data = {
-            'firstname': user.firstname or 'N/A', 
-            'lastname': user.lastname or 'User',
-            'username': user.username,
-            'role': role_name
-        }
-
-        return jsonify(profile_data), 200
-
-    except Exception as e:
-        # If the code reaches here, it means a database or connection error occurred
-        traceback.print_exc() 
-        print(f"CRASHED PROFILE LOAD (500): {e}")
-        return jsonify(msg="Internal server error fetching profile."), 500
-
-# Example route (used by UserManager)
-@user_routes.route('/users', methods=['GET'])
-@admin_required
-def get_all_users():
-    try:
-        users = User.query.all()
-        
-        user_list = []
-        for user in users:
-            role_name = user.role.role_name if user.role else 'staff'
-            user_list.append({
-                'id': user.id,
+            profile_data = {
+                'firstname': user.firstname or 'N/A', 
+                'lastname': user.lastname or 'User',
                 'username': user.username,
-                'firstname': user.firstname or 'N/A',
-                'lastname': user.lastname or 'User', 
-                'role': role_name,
-                'userId': user.id 
-            })
-        return jsonify(user_list), 200
+                'role': role_name
+            }
+
+            return jsonify(profile_data), 200
 
     except Exception as e:
+        # If the code reaches here, it means a network or configuration error occurred
+        import traceback
         traceback.print_exc() 
-        return jsonify({'status': 'error', 'message': 'Internal server error while fetching users'}), 500
+        return jsonify(msg="Internal server error fetching profile."), 500
