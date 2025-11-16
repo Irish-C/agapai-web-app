@@ -1,18 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import { FaUserPlus, FaUsers, FaEdit, FaTrash, FaSpinner, FaTimes } from 'react-icons/fa';
-// 🛑 Import UserEditModal (the modal component)
+import { FaUserPlus, FaUsers, FaEdit, FaSpinner, FaArchive } from 'react-icons/fa'; // FaArchive imported
 import UserEditModal from './UserEditModal.jsx'; 
 import { fetchUsers, fetchApi } from '../services/apiService.js'; 
 
-// --- Assumed real API function for DELETE ---
-const deleteUser = (userId) => fetchApi(`/users/${userId}`, 'DELETE');
+// --- Assumed real API function for ARCHIVE (Replaces DELETE) ---
+// We assume this function is defined in apiService.js and handles PATCH to set is_active=False
+const archiveUser = (userId) => fetchApi(`/users/${userId}/archive`, 'PATCH', { is_active: false }); 
+
 // --- Assumed real API function for SAVE (Add/Edit) ---
 const saveUserApi = (formData) => {
     if (formData.id) {
-        // If formData has an ID, it's an update (PATCH)
         return fetchApi(`/users/${formData.id}`, 'PATCH', formData);
     } else {
-        // If no ID, it's a creation (POST)
         return fetchApi('/users', 'POST', formData);
     }
 };
@@ -24,13 +23,12 @@ export default function UserManager({ user }) {
     const [error, setError] = useState(null);
     
     // States for Modals
-    const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
-    // 🛑 Removed redundant isModalOpen, using isEditModalOpen for Add/Edit
+    const [isArchiveModalOpen, setIsArchiveModalOpen] = useState(false); // Renamed state
     const [isEditModalOpen, setIsEditModalOpen] = useState(false); 
     
     // State to manage which user is being handled
-    const [userToDelete, setUserToDelete] = useState(null); 
-    const [userToEdit, setUserToEdit] = useState(null); // Holds user object if editing, null if adding
+    const [userToArchive, setUserToArchive] = useState(null); // Renamed state
+    const [userToEdit, setUserToEdit] = useState(null); 
 
     // --- Data Fetcher ---
     const loadUsers = async () => {
@@ -40,6 +38,7 @@ export default function UserManager({ user }) {
         setError(null);
 
         try {
+            // Note: Assuming fetchUsers now only returns ACTIVE users for display
             const userData = await fetchUsers(); 
             setUsers(Array.isArray(userData) ? userData : []);
         } catch (err) {
@@ -56,33 +55,35 @@ export default function UserManager({ user }) {
     }, [user]); 
 
 
-    // --- DELETE HANDLERS ---
-    const handleDeleteClick = (userItem) => {
-        setUserToDelete(userItem);
-        setIsDeleteModalOpen(true);
+    // --- ARCHIVE HANDLERS (Replaced Delete) ---
+    const handleArchiveClick = (userItem) => {
+        setUserToArchive(userItem);
+        setIsArchiveModalOpen(true);
     };
 
-    const confirmDelete = async () => {
-        if (!userToDelete) return;
+    const confirmArchive = async () => {
+        if (!userToArchive) return;
         
-        const userId = userToDelete.id;
-        setIsDeleteModalOpen(false);
+        const userId = userToArchive.id;
+        setIsArchiveModalOpen(false);
         setError(null); 
 
         try {
-            const result = await deleteUser(userId); 
+            // 🛑 Call the ARCHIVE API (PATCH to set is_active=False)
+            const result = await archiveUser(userId); 
             
             if (result.status === 'success') {
+                // Frontend update: filter the archived user out of the list
                 setUsers(currentUsers => currentUsers.filter(u => u.id !== userId));
             } else {
-                setError(`Deletion failed: ${result.message || 'Server did not confirm deletion.'}`);
+                setError(`Archive failed: ${result.message || 'Server did not confirm archive.'}`);
             }
 
         } catch (err) {
-            console.error("Deletion error:", err);
-            setError(`Deletion failed for ${userToDelete.username}: ${err.message || 'Server error.'}`);
+            console.error("Archive error:", err);
+            setError(`Archive failed for ${userToArchive.username}: ${err.message || 'Server error.'}`);
         } finally {
-            setUserToDelete(null);
+            setUserToArchive(null);
         }
     };
     
@@ -90,13 +91,13 @@ export default function UserManager({ user }) {
     
     // Handles opening the modal for Adding a new user
     const handleAddUser = () => {
-        setUserToEdit(null); // Indicates 'Add' mode
+        setUserToEdit(null);
         setIsEditModalOpen(true);
     };
 
     // Handles opening the modal for Editing an existing user (Triggered by table button)
     const handleEditUser = (userItem) => {
-        setUserToEdit(userItem); // Indicates 'Edit' mode
+        setUserToEdit(userItem);
         setIsEditModalOpen(true);
     };
 
@@ -113,7 +114,6 @@ export default function UserManager({ user }) {
                 throw new Error(result.message || "Failed to save user.");
             }
         } catch (err) {
-            // Throw error back to modal to display internally
             throw new Error(`Save Error: ${err.message || 'Network communication failed.'}`);
         }
     };
@@ -126,7 +126,6 @@ export default function UserManager({ user }) {
                     <FaUsers className="mr-2" /> Current System Users
                 </h3>
                 
-                {/* 🛑 'ADD NEW USER' button calls handleAddUser to open modal */}
                 <button 
                     onClick={handleAddUser}
                     className="flex items-center bg-teal-600 hover:bg-teal-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-150"
@@ -181,19 +180,20 @@ export default function UserManager({ user }) {
                                         </span>
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                        {/* 🛑 EDIT BUTTON: Calls handleEditUser which opens the modal with user data */}
                                         <button 
                                             className="text-indigo-600 hover:text-indigo-900 mr-3"
-                                            onClick={() => handleEditUser(u)} // 🛑 Calls Edit Handler
+                                            onClick={() => handleEditUser(u)} 
                                         >
                                             <FaEdit className="inline-block" /> Edit
                                         </button>
-                                        {/* Ensure the logged-in user cannot delete themselves (using the user prop ID) */}
+                                        {/* ARCHIVE BUTTON */}
                                         {u.id !== user.userId && ( 
                                             <button 
-                                                className="text-red-600 hover:text-red-900"
-                                                onClick={() => handleDeleteClick(u)} // 🛑 Calls Delete Handler (Opens Modal)
+                                                className="text-yellow-600 hover:text-yellow-900"
+                                                onClick={() => handleArchiveClick(u)} // Calls Archive Handler (Opens Modal)
                                             >
-                                                <FaTrash className="inline-block" /> Delete
+                                                <FaArchive className="inline-block" /> Archive
                                             </button>
                                         )}
                                     </td>
@@ -204,7 +204,7 @@ export default function UserManager({ user }) {
                 </div>
             )}
             
-            {/* 🛑 RENDER EDIT/ADD MODAL (Conditional rendering for the modal) */}
+            {/* RENDER EDIT/ADD MODAL */}
             {isEditModalOpen && (
                 <UserEditModal 
                     userToEdit={userToEdit} // Null for Add, object for Edit
@@ -213,44 +213,43 @@ export default function UserManager({ user }) {
                 />
             )} 
 
-            {/* --- Delete Confirmation Modal --- */}
-            {isDeleteModalOpen && userToDelete && (
+            {/* --- ARCHIVE Confirmation Modal --- */}
+            {isArchiveModalOpen && userToArchive && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
                     <div className="bg-white rounded-xl shadow-2xl w-full max-w-md">
                         <div className="p-6 border-b border-gray-200">
-                            <h4 className="text-xl font-bold text-red-600 flex items-center">
-                                <FaTrash className="mr-2" /> Confirm User Deletion
+                            <h4 className="text-xl font-bold text-yellow-600 flex items-center">
+                                <FaArchive className="mr-2" /> Confirm User Archiving
                             </h4>
                         </div>
                         <div className="p-6">
                             <p className="text-gray-700 mb-4">
-                                Are you sure you want to permanently delete user <strong className="font-semibold">{userToDelete.username}</strong>?
+                                Are you sure you want to **archive** user <strong className="font-semibold">{userToArchive.username}</strong>?
                             </p>
-                            <p className="text-red-700 mb-6 font-medium">
-                                This action cannot be undone.
+                            <p className="text-yellow-700 mb-6 font-medium">
+                                The user's account will be deactivated, but their historical acknowledgement records will be **preserved**.
                             </p>
                             <div className="flex justify-end space-x-3">
                                 <button
                                     onClick={() => {
-                                        setIsDeleteModalOpen(false);
-                                        setUserToDelete(null);
+                                        setIsArchiveModalOpen(false);
+                                        setUserToArchive(null);
                                     }}
                                     className="px-4 py-2 text-sm font-medium rounded-lg border border-gray-300 text-gray-700 bg-white hover:bg-gray-50"
                                 >
                                     Cancel
                                 </button>
                                 <button
-                                    onClick={confirmDelete}
-                                    className="px-4 py-2 text-sm font-medium rounded-lg text-white bg-red-600 hover:bg-red-700"
+                                    onClick={confirmArchive}
+                                    className="px-4 py-2 text-sm font-medium rounded-lg text-white bg-yellow-600 hover:bg-yellow-700"
                                 >
-                                    Delete User
+                                    Archive User
                                 </button>
                             </div>
                         </div>
                     </div>
                 </div>
             )}
-
         </div>
     );
 }
