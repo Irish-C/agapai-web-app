@@ -32,7 +32,6 @@ export default function CameraManager({ locations, onCameraUpdated }) {
 
     const fetchCameras = async () => {
         try {
-            // Note: Assuming backend now returns 'stream_url' in the cameras list
             const data = await fetchApi('/cameras', 'GET'); 
             if (data.status === 'success') {
                 setCameras(data.cameras);
@@ -55,7 +54,6 @@ export default function CameraManager({ locations, onCameraUpdated }) {
         e.preventDefault();
         setCamMessage({ text: '', type: '' });
         
-        // Include stream_url in the POST payload
         const cameraData = {
             cam_name: newCam.name,
             stream_url: newCam.url, 
@@ -75,13 +73,11 @@ export default function CameraManager({ locations, onCameraUpdated }) {
         }
     };
 
-    // --- UPDATED HANDLER TO OPEN MODAL ---
     const handleDeleteCamera = (camId) => {
         setCameraToDeleteId(camId);
         setIsDeleteModalOpen(true);
     };
 
-    // --- NEW FUNCTION TO CONFIRM DELETION ---
     const confirmDelete = async () => {
         if (!cameraToDeleteId) {
             return;
@@ -104,7 +100,6 @@ export default function CameraManager({ locations, onCameraUpdated }) {
             setCameraToDeleteId(null);
         }
     };
-    // ------------------------------------------
 
     const handleEditCamera = (cam) => {
         setEditingCam({
@@ -160,10 +155,14 @@ export default function CameraManager({ locations, onCameraUpdated }) {
     const cameraName = cameras.find(c => c.id === cameraToDeleteId)?.name || 'this camera';
 
     return (
-        <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-200 mt-12 max-w-4xl">
+        // Outer container structure from your previous version
+        <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-200 mt-12 max-w-4xl"> 
+            
+            {/* Heading */}
             <h2 className="text-2xl font-semibold text-gray-800 flex items-center mb-4 pb-2 border-b">
-                <FaCameraRetro className="mr-2 text-indigo-500" /> Camera Management
-            </h2> 
+                <FaCamera className="mr-2 text-teal-700" /> Camera Management
+            </h2>
+
             {camMessage.text && (
                 <div className={`mb-6 p-4 border rounded-xl font-medium ${messageClass(camMessage)}`}>
                     {camMessage.text}
@@ -171,9 +170,8 @@ export default function CameraManager({ locations, onCameraUpdated }) {
             )}
 
             {/* --- Add Camera Form --- */}
-            <h3 className="text-lg font-semibold text-gray-700 mb-2">Add New Camera</h3>
+            <h3 className="text-lg font-semibold text-gray-700 mb-2 px-3">Add New Camera</h3>
             <form onSubmit={handleAddCamera} className="grid grid-cols-1 md:grid-cols-5 gap-4 items-end mb-4 px-3"> 
-                {/* We add px-3 here since the root div no longer has p-0 */}
                 {/* Camera Name (col-span-2) */}
                 <div className="col-span-2"> 
                     <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="name">New Camera Name</label>
@@ -192,8 +190,7 @@ export default function CameraManager({ locations, onCameraUpdated }) {
                         type="url" id="url" name="url" value={newCam.url}
                         onChange={handleNewCamChange}
                         className="w-full border-gray-300 rounded-lg shadow-sm focus:ring-teal-500 focus:border-teal-500 pl-2 py-1" 
-                        // REQUIRED ATTRIBUTE
-                        required 
+                        required // Stream URL is mandatory
                     />
                 </div>
                 
@@ -223,7 +220,9 @@ export default function CameraManager({ locations, onCameraUpdated }) {
             </form>
 
             <h3 className="text-lg font-semibold text-gray-700 mb-2 px-3">Existing Cameras</h3>
-            <div className="space-y-2 px-3">
+            
+            {/* 🛑 SCROLLABLE WRAPPER: Added max-h-72 and overflow-y-auto */}
+            <div className="space-y-2 max-h-72 overflow-y-auto px-3 pr-2"> 
                 {cameras.length === 0 ? <p className="text-gray-500">No cameras added yet.</p> : null}
                 {cameras.map(cam => (
                     <div key={cam.id} className="p-3 border rounded-lg bg-gray-50">
@@ -247,8 +246,7 @@ export default function CameraManager({ locations, onCameraUpdated }) {
                                             type="url" id={`edit-url-${cam.id}`} name="stream_url"
                                             value={editingCam.stream_url || ''} onChange={handleEditChange}
                                             className="w-full border-gray-300 rounded-lg shadow-sm focus:ring-teal-500 focus:border-teal-500 pl-2 py-1"
-                                            // 🛑 REQUIRED ATTRIBUTE
-                                            required 
+                                            required
                                         />
                                     </div>
                                     {/* Location */}
