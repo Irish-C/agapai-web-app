@@ -20,10 +20,8 @@ export default function Settings({ user }) {
     // 2. Define the navigation structure with roles
     const fullNavItems = [
         { id: 'my_account', name: 'My Account', icon: FaUserCog, role: 'all' },
-        // Combined Tab
-        { id: 'management', name: 'Device & Location Management', icon: FaDharmachakra, role: 'Admin' }, 
+        { id: 'management', name: 'Device and Location', icon: FaDharmachakra, role: 'Admin' }, 
         { id: 'notification', name: 'Notifications', icon: FaBell, role: 'all' },
-        // User Management Tab (at the end)
         { id: 'user_management', name: 'User Management', icon: FaUsers, role: 'Admin' }, 
     ];
     
@@ -50,7 +48,6 @@ export default function Settings({ user }) {
             case 'notification':
                 return <CameraNotificationSettings />;
             case 'user_management': 
-                // Pass the user object to UserManager for its internal logic (e.g., cannot delete self)
                 return isAdmin ? <UserManager user={user} /> : <p className="text-red-500">Access Denied: You must be an Administrator to manage users.</p>; 
             default:
                 return <div>Please select a setting category.</div>;
@@ -73,12 +70,12 @@ export default function Settings({ user }) {
                     System Settings
                 </h1>
 
-                <div className="flex flex-col lg:flex-row gap-6 bg-white p-4 lg:p-8 rounded-xl shadow-lg border border-gray-200">
+                {/* 💥 FIX APPLIED HERE: Reduced padding on the white card from lg:p-8 to lg:p-5 */}
+                <div className="flex flex-col lg:flex-row gap-6 bg-white p-4 lg:p-5 rounded-xl shadow-lg border border-gray-200">
                     
                     {/* LEFT: Side Navigation Panel */}
                     <nav className="w-full lg:w-1/4 space-y-2 pb-4 lg:pb-0 lg:border-r lg:pr-6">
                         <h2 className="text-lg font-semibold text-gray-800 mb-3 border-b pb-2 hidden lg:block">Navigation</h2>
-                        {/* Now, the navItems array correctly shows 4 items for Admin */}
                         {navItems.map((item) => { 
                             const Icon = item.icon;
                             return (
@@ -96,7 +93,7 @@ export default function Settings({ user }) {
 
                     {/* Active Content Area */}
                     <div className="w-full lg:w-3/4">
-                        <h2 className="text-2xl font-bold text-gray-900 mb-6">
+                        <h2 className="text-2xl font-bold text-gray-900 mb-3"> 
                             {navItems.find(item => item.id === activeSection)?.name || 'Settings'}
                         </h2>
                         {renderActiveComponent()}
