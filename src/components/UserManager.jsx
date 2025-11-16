@@ -1,141 +1,171 @@
 import React, { useState, useEffect } from 'react';
-import { FaUserPlus, FaUsers, FaEdit, FaTrash, FaSpinner } from 'react-icons/fa';
-import { fetchUsers } from '../services/apiService.js'; 
+import { FaUser, FaSave, FaTimes, FaSpinner, FaLock } from 'react-icons/fa';
 
-export default function UserManager({ user }) {
-    const [users, setUsers] = useState([]);
-    const [isLoading, setIsLoading] = useState(false);
-    const [error, setError] = useState(null);
-    const [isModalOpen, setIsModalOpen] = useState(false);
-
-    // --- EFFECT: Fetch Users from API ---
-    useEffect(() => {
-        const loadUsers = async () => {
-            // Check if user is fully loaded before proceeding
-            if (!user || !user.userId) return;
-
-            setIsLoading(true);
-            setError(null);
-
-            try {
-                // Assuming fetchUsers is protected by admin_required in backend
-                const userData = await fetchUsers(); 
-                
-                // Ensure data is an array before setting state
-                setUsers(Array.isArray(userData) ? userData : []);
-            } catch (err) {
-                console.error("Error loading users:", err);
-                // The error message for the user is set here
-                setError(err.message || 'Failed to load user list. Check server connection or permissions.'); 
-            } finally {
-                setIsLoading(false);
-            }
-        };
-
-        loadUsers();
-    }, [user]); 
-
-
-    const handleDelete = (userId) => {
-        // NOTE: In a real app, this should be a custom modal, not window.confirm
-        if (window.confirm(`Are you sure you want to delete user ID ${userId}?`)) {
-            // TODO: Implement deleteUser(userId) API call here
-            setUsers(users.filter(u => u.id !== userId));
-            console.log(`Deleting user ${userId}`);
-        }
-    };
+/**
+ * Modal component for adding a new user or editing an existing user.
+ * @param {object} userToEdit - The user object (if editing), or null (if adding).
+ * @param {function} onSave - Function to call when saving the form (handles API call).
+ * @param {function} onClose - Function to close the modal.
+ * @param {Array} allRoles - List of available roles (e.g., ['Admin', 'Staff']).
+ */
+export default function UserEditModal({ userToEdit, onSave, onClose }) {
     
-    const handleAddUser = () => {
-        setIsModalOpen(true);
+    // Determine if we are editing or adding
+    const isEditing = !!userToEdit;
+    
+    // Initial form state based on whether we are editing an existing user or adding a new one
+    const [formData, setFormData] = useState({
+        id: userToEdit?.id || null,
+        firstname: userToEdit?.firstname || '',
+        lastname: userToEdit?.lastname || '',
+        username: userToEdit?.username || '',
+        role: userToEdit?.role || 'Staff', // Default to Staff
+        password: '',
+        confirmPassword: '',
+        // NOTE: In a real app, you would fetch available roles. Using a hardcoded list here.
+        availableRoles: ['Admin', 'Staff', 'Viewer']
+    });
+
+    const [message, setMessage] = useState('');
+    const [isLoading, setIsLoading] = useState(false);
+
+    const handleChange = (e) => {
+        const { name, value } = e.target;
+        setFormData(prev => ({ ...prev, [name]: value }));
     };
 
+    const handleFormSubmit = async (e) => {
+        e.preventDefault();
+        setMessage('');
+        
+        // Frontend Validation
+        if (!formData.firstname || !formData.lastname || !formData.username || !formData.role) {
+            setMessage('Please fill in all user details.');
+            return;
+        }
+
+        if (!isEditing && (!formData.password || formData.password.length < 8)) {
+            setMessage('New user must have a password of at least 8 characters.');
+            return;
+        }
+        
+        if (formData.password !== formData.confirmPassword) {
+            setMessage('Passwords do not match.');
+            return;
+        }
+
+        setIsLoading(true);
+        
+        // Pass the data up to the parent component (UserManager) to handle the API call
+        // We pass the role name and the password (if applicable)
+        onSave(formData)
+            .then(() => {
+                // If save was successful, parent will close modal
+            })
+            .catch((err) => {
+                // Display error message from parent API call
+                setMessage(err.message || 'Error saving user data.');
+            })
+            .finally(() => {
+                setIsLoading(false);
+            });
+    };
+
+    const title = isEditing ? `Edit User: ${userToEdit.username}` : 'Add New System User';
+    const primaryButtonText = isEditing ? 'Update User' : 'Create User';
 
     return (
-        <div className="space-y-6">
-            <div className="flex justify-between items-center mb-4">
-                <h3 className="text-xl font-semibold flex items-center">
-                    <FaUsers className="mr-2" /> Current System Users
-                </h3>
+        <div className="fixed inset-0 bg-black bg-opacity-60 z-50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg transform transition-all">
                 
-                <button 
-                    onClick={handleAddUser}
-                    className="flex items-center bg-teal-600 hover:bg-teal-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-150"
-                >
-                    <FaUserPlus className="mr-2" /> Add New User
-                </button>
+                {/* Header */}
+                <div className="p-5 border-b border-gray-200 flex justify-between items-center">
+                    <h3 className="text-xl font-bold text-gray-800 flex items-center">
+                        <FaUser className="mr-3 text-teal-600" /> {title}
+                    </h3>
+                    <button onClick={onClose} className="text-gray-400 hover:text-gray-700">
+                        <FaTimes size={20} />
+                    </button>
+                </div>
+
+                {/* Body */}
+                <form onSubmit={handleFormSubmit}>
+                    <div className="p-5 space-y-4">
+
+                        {message && (
+                            <div className="p-3 bg-red-100 text-red-700 border border-red-300 rounded-lg text-sm">
+                                {message}
+                            </div>
+                        )}
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {/* First Name */}
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="firstname">First Name</label>
+                                <input type="text" id="firstname" name="firstname" value={formData.firstname} onChange={handleChange} 
+                                    className="w-full border-gray-300 rounded-lg pl-2 py-2" required disabled={isLoading} />
+                            </div>
+
+                            {/* Last Name */}
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="lastname">Last Name</label>
+                                <input type="text" id="lastname" name="lastname" value={formData.lastname} onChange={handleChange} 
+                                    className="w-full border-gray-300 rounded-lg pl-2 py-2" required disabled={isLoading} />
+                            </div>
+
+                            {/* Username (Locked if editing) */}
+                            <div className="md:col-span-1">
+                                <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="username">Username</label>
+                                <input type="text" id="username" name="username" value={formData.username} onChange={handleChange} 
+                                    className={`w-full border-gray-300 rounded-lg pl-2 py-2 ${isEditing ? 'bg-gray-100' : ''}`} 
+                                    required disabled={isEditing || isLoading} />
+                            </div>
+
+                            {/* Role Selection */}
+                            <div className="md:col-span-1">
+                                <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="role">Access Role</label>
+                                <select id="role" name="role" value={formData.role} onChange={handleChange} 
+                                    className="w-full border-gray-300 rounded-lg pl-2 py-2" required disabled={isLoading}>
+                                    {formData.availableRoles.map(role => (
+                                        <option key={role} value={role}>{role}</option>
+                                    ))}
+                                </select>
+                            </div>
+                        </div>
+
+                        {/* --- Password Fields (Only required when adding, or optional when editing) --- */}
+                        <div className={`pt-4 border-t border-gray-100 grid grid-cols-1 md:grid-cols-2 gap-4 ${isEditing ? 'opacity-80' : ''}`}>
+                            <div className="md:col-span-1">
+                                <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="password">
+                                    <FaLock className="inline mr-1 text-red-500" /> {isEditing ? 'New Password (Optional)' : 'Password'}
+                                </label>
+                                <input type="password" id="password" name="password" value={formData.password} onChange={handleChange} 
+                                    className="w-full border-gray-300 rounded-lg pl-2 py-2" 
+                                    required={!isEditing} disabled={isLoading} />
+                            </div>
+                            <div className="md:col-span-1">
+                                <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="confirmPassword">Confirm Password</label>
+                                <input type="password" id="confirmPassword" name="confirmPassword" value={formData.confirmPassword} onChange={handleChange} 
+                                    className="w-full border-gray-300 rounded-lg pl-2 py-2" 
+                                    required={!isEditing} disabled={isLoading} />
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Footer / Action Buttons */}
+                    <div className="p-5 flex justify-end gap-3 border-t border-gray-200">
+                        <button type="button" onClick={onClose} disabled={isLoading}
+                            className="px-4 py-2 text-sm font-medium rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 transition">
+                            Cancel
+                        </button>
+                        <button type="submit" disabled={isLoading}
+                            className="px-4 py-2 text-sm font-medium rounded-lg text-white bg-teal-600 hover:bg-teal-700 flex items-center transition">
+                            {isLoading ? <FaSpinner className="animate-spin mr-2" /> : <FaSave className="mr-2" />}
+                            {primaryButtonText}
+                        </button>
+                    </div>
+                </form>
             </div>
-
-            {/* Display loading spinner */}
-            {isLoading && (
-                <div className="text-center p-8 text-gray-500">
-                    <FaSpinner className="animate-spin inline-block mr-2" /> Loading user data...
-                </div>
-            )}
-            
-            {/* Display error message */}
-            {error && !isLoading && (
-                <div className="p-3 bg-red-100 border border-red-400 text-red-700 rounded-lg">
-                    {error}
-                </div>
-            )}
-
-            {/* 🛑 Display table only if NOT loading AND NO error */}
-            {!isLoading && !error && (
-                <div className="overflow-x-auto bg-white border rounded-lg shadow-sm">
-                    <table className="min-w-full divide-y divide-gray-200">
-                        <thead className="bg-gray-50">
-                            <tr>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Username</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">First Name</th> 
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Last Name</th> 
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Role</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody className="bg-white divide-y divide-gray-200">
-                            {users.length === 0 && (
-                                <tr>
-                                    <td colSpan="5" className="px-6 py-4 text-center text-sm text-gray-500">
-                                        No users found. Try adding a new user.
-                                    </td>
-                                </tr>
-                            )}
-                            {users.map((u) => (
-                                <tr key={u.id}>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{u.username}</td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{u.firstname}</td> 
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{u.lastname}</td> 
-                                    <td className="px-6 py-4 whitespace-nowrap">
-                                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${u.role === 'Admin' ? 'bg-indigo-100 text-indigo-800' : 'bg-green-100 text-green-800'}`}>
-                                            {u.role}
-                                        </span>
-                                    </td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                                        <button 
-                                            className="text-indigo-600 hover:text-indigo-900 mr-3"
-                                            onClick={() => console.log(`Edit user ${u.id}`)}
-                                        >
-                                            <FaEdit className="inline-block" /> Edit
-                                        </button>
-                                        {/* Ensure the logged-in user cannot delete themselves */}
-                                        {u.id !== user.userId && ( 
-                                            <button 
-                                                className="text-red-600 hover:text-red-900"
-                                                onClick={() => handleDelete(u.id)}
-                                            >
-                                                <FaTrash className="inline-block" /> Delete
-                                            </button>
-                                        )}
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
-            )}
-            
-            {isModalOpen && <p>User Modal would be displayed here.</p>} 
-
         </div>
     );
 }
