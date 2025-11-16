@@ -132,3 +132,8 @@ export const changePassword = (oldPassword, newPassword) => {
         new_password: newPassword 
     });
 };
+
+export const archiveUser = (userId) => {
+    // Assumes backend route to set is_active=False
+    return fetchApi(`/users/${userId}/archive`, 'PATCH', { is_active: false }); 
+};
