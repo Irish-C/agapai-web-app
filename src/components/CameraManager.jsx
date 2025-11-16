@@ -156,11 +156,11 @@ export default function CameraManager({ locations, onCameraUpdated }) {
 
     return (
         // Outer container structure from your previous version
-        <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-200 mt-12 max-w-4xl"> 
+        <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-200 mt-2 max-w-4xl"> 
             
             {/* Heading */}
             <h2 className="text-2xl font-semibold text-gray-800 flex items-center mb-4 pb-2 border-b">
-                <FaCamera className="mr-2 text-teal-700" /> Camera Management
+                <FaCameraRetro className="mr-2 text-indigo-500" /> Camera Management
             </h2>
 
             {camMessage.text && (
