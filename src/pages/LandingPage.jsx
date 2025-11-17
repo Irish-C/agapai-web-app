@@ -1,4 +1,4 @@
-/* src/pages/LandingPage.jsx */
+// src/pages/LandingPage.jsx
 import { Link } from 'react-router-dom';
 import { FaUserCircle, FaSignInAlt, FaCamera, FaChartLine } from 'react-icons/fa';
 

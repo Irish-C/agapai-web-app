@@ -39,7 +39,7 @@ export default function App() {
             if (data.status === 'success' || data.token || data.access_token) {
                 const userData = { 
                     username: data.username, 
-                    // ✅ FIX: Use the role returned by the backend (data.role)
+                    // Use the role returned by the backend (data.role)
                     role: data.role, 
                     userId: data.user_id,
                     token: data.access_token || data.token 

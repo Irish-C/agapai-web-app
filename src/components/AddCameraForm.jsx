@@ -1,3 +1,4 @@
+// src/components/AddCameraForm.jsx
 import React, { useState, useEffect } from 'react';
 
 function AddCameraForm({ onCameraAdded }) {
