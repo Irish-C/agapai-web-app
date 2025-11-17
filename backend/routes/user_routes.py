@@ -242,7 +242,7 @@ def create_new_user():
 def delete_user_by_id(user_id):
     try:
         from flask import current_app
-        from models import EventLog # <-- Ensure this import is at the top/accessible
+        from models import EventLog 
         
         with current_app.app_context(): 
             
@@ -254,7 +254,7 @@ def delete_user_by_id(user_id):
             if user_id == current_admin_id:
                 return jsonify(msg="Cannot delete your own active account."), 403
 
-            # 🛑 KEEP THIS AS FAILSAFE: Manually set FK to NULL
+            # FAILSAFE: Manually set FK to NULL
             EventLog.query.filter_by(ack_by_user_id=user_id).update(
                 {'ack_by_user_id': None}, synchronize_session='fetch'
             )

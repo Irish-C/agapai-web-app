@@ -2,8 +2,7 @@ import React, { useState, useEffect } from 'react';
 import VideoFeed from './VideoFeed.jsx';
 import TodayReport from './TodayReport.jsx';
 import { useCameraSocket } from '../hooks/useCamera.js';
-// We fetch locally, so no need to import fetchCameraList from apiService
-import { FaCameraRetro, FaPlug, FaSpinner, FaArrowLeft, FaArrowRight } from 'react-icons/fa';
+import { FaPlug, FaSpinner, FaVideo } from 'react-icons/fa';
 
 export default function CameraGrid() {
     // Data from our simplified hook
@@ -12,11 +11,6 @@ export default function CameraGrid() {
     // State for the camera list itself
     const [cameraList, setCameraList] = useState([]);
     
-    // State for pagination (REMOVED)
-    // const [currentPage, setCurrentPage] = useState(1);
-    // const [totalPages, setTotalPages] = useState(0);
-    // const [totalCameras, setTotalCameras] = useState(0);
-
     // State for loading and errors
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -24,14 +18,14 @@ export default function CameraGrid() {
     // This state will track which camera is "focused". null = grid view.
     const [focusedCameraId, setFocusedCameraId] = useState(null);
 
-    // We fetch cameras inside useEffect. This now runs once on mount.
+    // Fetch cameras inside useEffect. Runs once on mount.
     useEffect(() => {
         const getCameras = async () => {
             setIsLoading(true);
             setError(null);
             try {
-                // Fetch all cameras, not just a page
-                const response = await fetch(`/api/cameras`); // <-- REMOVED PAGINATION
+                // Fetch all cameras
+                const response = await fetch(`/api/cameras`); 
                 
                 if (!response.ok) {
                     throw new Error(`Server error: ${response.status}`);
@@ -40,8 +34,7 @@ export default function CameraGrid() {
                 const data = await response.json();
 
                 if (data.status === 'success') {
-                    setCameraList(data.cameras); // <-- SIMPLIFIED
-                    // Removed all pagination state setters
+                    setCameraList(data.cameras);
                 } else {
                     setError('API did not return a valid camera list.');
                 }
@@ -59,22 +52,15 @@ export default function CameraGrid() {
     // Find the camera object if one is focused
     const focusedCamera = cameraList.find(c => c.id === focusedCameraId);
 
-    // --- Pagination Handlers (REMOVED) ---
-    // const goToNextPage = () => { ... };
-    // const goToPrevPage = () => { ... };
-
     const header = (
         <div className="flex items-center text-2xl font-extrabold text-gray-900 mb-4 border-b pb-2">
-            <FaCameraRetro className="mr-3 text-gray-900" />
+            <FaVideo className="mr-3 text-gray-900" />
             Live View
             <span className={`ml-4 px-3 py-1 text-sm rounded-full font-semibold ${isConnected ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
                 <FaPlug className='inline-block mr-1' /> {isConnected ? 'WebSocket Live' : 'WebSocket Disconnected'}
             </span>
         </div>
     );
-
-    // --- Pagination Controls Component (REMOVED) ---
-    // const paginationControls = ( ... );
 
     if (isLoading && cameraList.length === 0) { // Only show full-page loader on initial load
         return (
@@ -142,7 +128,6 @@ export default function CameraGrid() {
                             // This grid container stays the same: 1 col on mobile, 2 on desktop
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 {cameraList.map(camera => (
-                                    // --- THIS IS THE FIX ---
                                     // We wrap the VideoFeed in a div.
                                     // If there is only 1 camera, we tell this div to span 2 columns
                                     // on medium screens, making it fill the grid.
@@ -159,13 +144,12 @@ export default function CameraGrid() {
                                             onFocusChange={setFocusedCameraId} // Pass the setter
                                         />
                                     </div>
-                                    // --- END FIX ---
                                 ))}
                             </div>
                         )}
 
                         {/* Show message if no cameras are found at all */}
-                        {!isLoading && cameraList.length === 0 && ( // <-- UPDATED LOGIC
+                        {!isLoading && cameraList.length === 0 && ( 
                             <div className="text-center p-12 text-gray-500">
                                 <p>No cameras have been added yet.</p>
                                 <p>Please go to the Settings page to add a camera.</p>

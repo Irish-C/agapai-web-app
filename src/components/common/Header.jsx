@@ -1,7 +1,7 @@
 // src/components/common/Header.jsx
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { FaUserCircle, FaSignOutAlt, FaTachometerAlt, FaChartBar, FaCog, FaBars, FaTimes } from 'react-icons/fa';
+    import { FaUserCircle, FaSignOutAlt, FaTimes, FaCog , FaFile, FaBars, FaTh} from 'react-icons/fa';
 import agapaiLogo from '../../assets/images/logos/agapai-logo.png';
 
 export default function Header({ user, logout }) {
@@ -14,8 +14,8 @@ export default function Header({ user, logout }) {
     }
 
     const navItems = [
-        { name: 'Dashboard', path: '/dashboard', icon: FaTachometerAlt },
-        { name: 'Reports', path: '/reports', icon: FaChartBar },
+        { name: 'Dashboard', path: '/dashboard', icon: FaTh },
+        { name: 'Reports', path: '/reports', icon: FaFile },
         { name: 'Settings', path: '/settings', icon: FaCog },
     ];
 

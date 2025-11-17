@@ -26,8 +26,8 @@ CREATE TABLE event_type (
 
 CREATE TABLE users (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
-    firstname VARCHAR(100),
-    lastname VARCHAR(100),
+    firstname VARCHAR(100) NOT NULL,
+    lastname VARCHAR(100) NOT NULL,
     username VARCHAR(50) NOT NULL UNIQUE,
     password VARCHAR(255) NOT NULL,
     role_id BIGINT,
@@ -35,7 +35,7 @@ CREATE TABLE users (
 );
 
 CREATE TABLE camera (
-    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,   
     cam_name VARCHAR(100) NOT NULL,
     cam_status BOOLEAN DEFAULT TRUE,
     stream_url VARCHAR(255) COMMENT 'the url for livefeed',
