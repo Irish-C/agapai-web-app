@@ -109,12 +109,31 @@ export const fetchDailySummary = () => {
 };
 
 /**
- * Fetches historical event log data for the ReportsPage, applying a limit.
+ * Fetches historical event log data for the ReportsPage, applying a limit and date filters.
  * @param {number} limit - The maximum number of logs to return (20, 50, 100).
+ * @param {string} startDate - Optional start date for filtering (format: YYYY-MM-DD).
+ * @param {string} endDate - Optional end date for filtering (format: YYYY-MM-DD).
  */
-export const fetchReportsData = (limit) => { // Must accept 'limit' argument
-    // FIX 2: Pass the limit as a URL query parameter
-    return fetchApi(`/event_logs?limit=${limit}`, 'GET'); 
+export const fetchReportsData = (limit, startDate, endDate) => {
+    
+    // Start with the base query parameters for limit
+    const params = new URLSearchParams({
+        limit: limit,
+    });
+
+    // Add start_date parameter if startDate is provided (not an empty string)
+    if (startDate) {
+        params.append('start_date', startDate);
+    }
+
+    // Add end_date parameter if endDate is provided (not an empty string)
+    if (endDate) {
+        params.append('end_date', endDate);
+    }
+
+    // Construct the final URL with all parameters
+    // The resulting URL will look like: /event_logs?limit=20&start_date=2025-01-01
+    return fetchApi(`/event_logs?${params.toString()}`, 'GET');
 };
 
 // Fetch user profile data

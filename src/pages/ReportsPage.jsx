@@ -5,7 +5,6 @@
  */
 import React, { useState, useEffect } from 'react';
 import { fetchReportsData } from '../services/apiService';
-// Import FaArrowRight for the ">" symbol
 import { FaFileAlt, FaSpinner, FaExclamationTriangle, FaArrowRight } from 'react-icons/fa';
 
 export default function ReportsPage() {
@@ -14,12 +13,18 @@ export default function ReportsPage() {
     const [error, setError] = useState(null);
     const [limit, setLimit] = useState(20);
 
+    // NEW STATE: For Date Range Filtering
+    const [startDate, setStartDate] = useState(''); 
+    const [endDate, setEndDate] = useState('');
+
     useEffect(() => {
         const loadReportData = async () => {
             try {
                 setIsLoading(true);
                 setError(null);
-                const data = await fetchReportsData(limit);
+                
+                // MODIFIED: Pass limit AND date range to the API service
+                const data = await fetchReportsData(limit, startDate, endDate); 
                 
                 if (data.status === 'success' && Array.isArray(data.report)) {
                     setLogs(data.report);
@@ -33,9 +38,9 @@ export default function ReportsPage() {
                 setIsLoading(false);
             }
         }; 
-        // Initial and subsequent data load when 'limit' changes
-        loadReportData();
-    }, [limit]);
+        // oadReportData now runs when limit, startDate, or endDate changes
+        loadReportData(); 
+    }, [limit, startDate, endDate]);
 
     // Placeholder function for handling the file link click
     const handleFileClick = (filePath) => {
@@ -170,21 +175,54 @@ export default function ReportsPage() {
                 Review historical fall and inactivity alerts from all locations to ensure comprehensive 
                 resident monitoring and facility oversight.
             </p>
-            {/* 👈 NEW SELECTOR UI ELEMENT */}
-            <div className="flex justify-end items-center">
-                <label htmlFor="limit-select" className="text-sm font-medium text-gray-700 mr-2">
-                    Logs per page:
-                </label>
-                <select
-                    id="limit-select"
-                    value={limit}
-                    onChange={(e) => setLimit(Number(e.target.value))}
-                    className="p-2 border border-gray-300 rounded-lg text-sm"
-                >
-                    <option value={20}>20</option>
-                    <option value={50}>50</option>
-                    <option value={100}>100</option>
-                </select>
+            
+            {/* NEW: Filter Controls Container */}
+            <div className="flex justify-end items-center space-x-4">
+                
+                {/* NEW: Start Date Filter */}
+                <div className="flex items-center">
+                    <label htmlFor="start-date" className="text-sm font-medium text-gray-700 mr-2">
+                        Start Date:
+                    </label>
+                    <input
+                        type="date"
+                        id="start-date"
+                        value={startDate}
+                        onChange={(e) => setStartDate(e.target.value)}
+                        className="p-2 border border-gray-300 rounded-lg text-sm"
+                    />
+                </div>
+                
+                {/* NEW: End Date Filter */}
+                <div className="flex items-center">
+                    <label htmlFor="end-date" className="text-sm font-medium text-gray-700 mr-2">
+                        End Date:
+                    </label>
+                    <input
+                        type="date"
+                        id="end-date"
+                        value={endDate}
+                        onChange={(e) => setEndDate(e.target.value)}
+                        className="p-2 border border-gray-300 rounded-lg text-sm"
+                    />
+                </div>
+
+                {/* Existing: Logs per page selector */}
+                <div className="flex items-center">
+                    <label htmlFor="limit-select" className="text-sm font-medium text-gray-700 mr-2">
+                        Logs per page:
+                    </label>
+                    <select
+                        id="limit-select"
+                        value={limit}
+                        onChange={(e) => setLimit(Number(e.target.value))}
+                        className="p-2 border border-gray-300 rounded-lg text-sm"
+                    >
+                        <option value={20}>20</option>
+                        <option value={50}>50</option>
+                        <option value={100}>100</option>
+                    </select>
+                </div>
             </div>
             
             <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-200">
