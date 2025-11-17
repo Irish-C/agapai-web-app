@@ -7,6 +7,7 @@ from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identi
 from functools import wraps
 import traceback # Debugging server crashes
 from models import User, Role, EventLog
+from sqlalchemy.orm import joinedload
 
 user_routes = Blueprint('user_routes', __name__)
 
@@ -74,36 +75,48 @@ def login():
 def logout():
     return jsonify({"status": "success", "message": "Logout successful"}), 200
 
-
-# --- Get User Profile Endpoint ---
+# --- Get User Profile Endpoint (FIXED) ---
 @user_routes.route('/user/profile', methods=['GET'])
 @jwt_required()
 def get_user_profile():
+    # ENSURE ALL NECESSARY IMPORTS ARE LOCALIZED HERE FOR DIAGNOSTICS
+    from flask import current_app, jsonify
+    from models import User
+    import traceback
+    
+    user = None 
+
     try:
-        # User ID is safely extracted by the decorator
         user_id_str = get_jwt_identity()
         user_id = int(user_id_str)
-        user = User.query.get(user_id) 
+        
+        # FINAL STABILIZATION: The DB interaction must be safe.
+        user = db.session.get(
+            User, 
+            user_id, 
+            options=[joinedload(User.role)]
+    )
 
         if not user:
             return jsonify(msg="User not found"), 404
 
+        # This line is often the problem if the User model is malformed or the Role is missing
         role_name = user.role.role_name if user.role else 'User' 
-
+        
         profile_data = {
             'firstname': user.firstname or 'N/A', 
             'lastname': user.lastname or 'User',
             'username': user.username,
             'role': role_name
         }
-
+        
         return jsonify(profile_data), 200
 
     except Exception as e:
-        # Proper error handling
-        traceback.print_exc()
+        # Guarantee a stable return path to prevent the TypeError
+        traceback.print_exc() 
         return jsonify(msg="Internal server error fetching profile."), 500
-
+    
 # --- Change Password Endpoint ---
 @user_routes.route('/users/change-password', methods=['POST'])
 @jwt_required()

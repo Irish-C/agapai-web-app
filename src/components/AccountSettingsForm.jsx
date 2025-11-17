@@ -11,10 +11,8 @@ const initialProfileState = {
     role: 'Loading ...' 
 };
 
-// E 'user' prop containing { username, role, userId, token }
 export default function AccountSettingsForm({ user }) {
     
-    // Initialize profile primarily using the 'user' prop
     const [profile, setProfile] = useState(() => ({
         ...initialProfileState,
         username: user?.username || initialProfileState.username,
@@ -22,20 +20,17 @@ export default function AccountSettingsForm({ user }) {
     }));
     
     const [isProfileLoading, setIsProfileLoading] = useState(true);
-
     const [oldPassword, setOldPassword] = useState('');
     const [newPassword, setNewPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
-    
     const [isLoading, setIsLoading] = useState(false);
-    const [message, setMessage] = useState(null); // { type: 'success' | 'error', text: string }
+    const [message, setMessage] = useState(null); 
 
 
     // --- Effect to Fetch User Profile Details on Mount ---
     useEffect(() => {
-        // Ensure user object exists before trying to fetch
+        // Guard clause (only execute if user object has the necessary ID)
         if (!user || !user.userId) {
-            // If user data is missing (shouldn't happen on this protected route)
             setIsProfileLoading(false);
             return;
         }
@@ -43,21 +38,21 @@ export default function AccountSettingsForm({ user }) {
         // Async function to load profile data
         const loadProfile = async () => {
             setIsProfileLoading(true);
-            
+            let data = null; // Declare data outside try/catch for scope stability
+
             try {
-                // 1. Fetch data
-                const data = await fetchUserProfile();
+                // FIX 1: Revert to using the secure JWT-based endpoint (no userId argument)
+                data = await fetchUserProfile();
                 
-                // 2. Check if the response is valid data structure (instead of just crashing)
                 if (!data || typeof data.username === 'undefined') {
-                     // fetchApi might return an empty object or generic data.
-                     throw new Error('API returned empty or invalid profile structure.');
+                    throw new Error('API returned empty or invalid profile structure.');
                 }
                 
-                // SUCCESS PATH: Merge fetched names with prop basics
+                // SUCCESS PATH
                 setProfile({
                     ...user, 
                     ...data, // Fetched data
+                    // FIX 2: Safely use fetched data, falling back to literal defaults if fetched data is null
                     firstname: data.firstname || 'N/A', 
                     lastname: data.lastname || 'User',
                     username: user.username, 
@@ -67,22 +62,21 @@ export default function AccountSettingsForm({ user }) {
             } catch (error) {
                 console.error("PROFILE LOAD CRASH/FAIL:", error.message);
                 
-                // RECOVERY: Unlock UI and use guaranteed prop data as fallback
+                // RECOVERY: Use guaranteed data from props and display generic error
                 setProfile({
-                    firstname: 'N/A',
-                    lastname: 'User',
-                    username: user.username, 
-                    role: user.role,
+                    username: user.username || 'N/A', 
+                    role: user.role || 'User',
+                    firstname: user.firstname || 'N/A',
+                    lastname: user.lastname || 'User',
                 });
                 setMessage({ type: 'error', text: 'Failed to load user data. Please relogin.' });
             } finally {
                 setIsProfileLoading(false);
             }
         };
-
+        
         loadProfile();
-    }, [user]); 
-
+    }, [user]);
 
 const handleSubmit = async (e) => {
         e.preventDefault();
