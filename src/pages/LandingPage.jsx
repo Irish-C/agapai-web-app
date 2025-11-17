@@ -1,6 +1,5 @@
-// src/pages/LandingPage.jsx
 import { Link } from 'react-router-dom';
-import { FaUserCircle, FaSignInAlt, FaCamera, FaChartLine } from 'react-icons/fa';
+import { FaUserCircle, FaSignInAlt, FaVideo, FaChartLine } from 'react-icons/fa';
 
 import agapaiLogo from './../assets/images/logos/agapai-logo.png';
 import filter_bg from './../assets/images/bg/filter-bg.png';
@@ -18,8 +17,27 @@ export default function LandingPage() {
     >
         
         <div className="relative text-center text-white z-8 p-4 md:p-6 bg-opacity-100 rounded-2xl max-w-4xl mx-auto">
-            <img src={agapaiLogo} alt="AGAPAI Logo" className="w-40 h-40 mx-auto mb-2 rounded-full border-4 border-[#1b6e86] shadow-lg" 
-                 onError={(e) => { e.target.onerror = null; e.target.src="/placeholder-logo.png" }}/>
+            
+            {/* MODIFIED: Logo container for hover bubble */}
+            <div className="relative inline-block group mb-2">
+                <img 
+                    src={agapaiLogo} 
+                    alt="AGAPAI Logo" 
+                    className="w-40 h-40 mx-auto rounded-full border-4 border-[#1b6e86] shadow-lg cursor-help transition duration-300 transform group-hover:scale-105" 
+                    onError={(e) => { e.target.onerror = null; e.target.src="/placeholder-logo.png" }}
+                />
+
+                {/* Floating Bubble: Positioned on the right side */}
+                <div className="absolute top-1/2 left-full transform -translate-y-1/2 ml-4 
+                                w-64 p-3 rounded-lg shadow-xl 
+                                bg-gray-250 text-gray-50 text-sm font-regular
+                                opacity-0 invisible group-hover:opacity-100 group-hover:visible transition duration-300 pointer-events-none z-20">
+                    
+                    <p className="font-bold text-teal-500 mb-1">AGAPAI Name Origin</p>
+                    <p>From “Agap” (quick response) and “AI,” forming “Agapay” (Filipino for support), representing constant and vigilant care.</p>
+                </div>
+            </div>
+            {/* END OF LOGO SECTION */}
             
             <h1 className="text-8xl font-extrabold tracking-tight text-center">
             <span className="block text-[#c4fcff] text-9xl font-extrabold" 
@@ -57,7 +75,7 @@ export default function LandingPage() {
             <div className="mt-12 grid grid-cols-1 md:grid-cols-2 gap-8 text-left">
                 <div className="p-4 bg-opacity-70 rounded-xl bg-gradient-to-b from-[#2d3092] to-[#015954] border border-teal-400">
                     <h3 className="flex items-center text-xl font-bold text-teal-400 mb-2">
-                        <FaCamera className="mr-2" /> Real-Time Monitoring
+                        <FaVideo className="mr-2" /> Real-Time Monitoring
                     </h3>
                     <p className="text-sm text-gray-300">
                         Secure video streaming with low-latency AI processing for immediate incident detection.
@@ -81,4 +99,3 @@ export default function LandingPage() {
     </div>
   );
 }
-
