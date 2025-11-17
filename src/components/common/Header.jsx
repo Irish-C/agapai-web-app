@@ -81,7 +81,7 @@ export default function Header({ user, logout }) {
                             key={item.name}
                             to={item.path}
                             className={`flex items-center text-sm font-medium transition duration-150 ${
-                                isActive(item.path) ? 'text-teal-400 border-b-2 border-teal-400' : 'hover:text-teal-400'
+                                isActive(item.path) ? 'text-teal-400' : 'hover:text-gray-400'
                             }`}
                         >
                             <item.icon className="mr-1" />
@@ -95,9 +95,8 @@ export default function Header({ user, logout }) {
                     {/* MODIFIED: Link now points to /settings */}
                     <Link 
                         to="/settings" 
-                        className="flex items-center space-x-2 bg-gray-700 p-2 rounded-full transition duration-150 hover:bg-gray-600 cursor-pointer"
+                        className="flex items-center space-x-2 p-2 rounded-full transition duration-150 hover:bg-gray-600 cursor-pointer"
                     >
-                        {/* Changed icon color to teal-400 for visual consistency */}
                         <FaUserCircle className="w-5 h-5 text-teal-400" />
                         <span className="text-sm font-medium">{user?.username || 'User'}</span>
                     </Link>
