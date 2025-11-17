@@ -7,7 +7,7 @@ import { FaUser, FaSave, FaTimes, FaSpinner, FaLock } from 'react-icons/fa';
  * @param {object} userToEdit - The user object (if editing), or null (if adding).
  * @param {function} onSave - Function to call when saving the form (handles API call).
  * @param {function} onClose - Function to close the modal.
- * @param {Array} allRoles - List of available roles (e.g., ['Admin', 'Staff']).
+ * @param {Array} allRoles - List of available roles (e.g., ['Admin', 'User']).
  */
 export default function UserEditModal({ userToEdit, onSave, onClose }) {
     
@@ -20,10 +20,10 @@ export default function UserEditModal({ userToEdit, onSave, onClose }) {
         firstname: userToEdit?.firstname || '',
         lastname: userToEdit?.lastname || '',
         username: userToEdit?.username || '',
-        role: userToEdit?.role || 'Staff', // Default to Staff
+        role: userToEdit?.role || 'User', // Default to User
         password: '',
         confirmPassword: '',
-        // NOTE: In a real app, you would fetch available roles. Using a hardcoded list here.
+        // NOTE: Fetch available roles using a hardcoded list here.
         availableRoles: ['Admin', 'User']
     });
 
