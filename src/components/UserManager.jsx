@@ -1,10 +1,10 @@
+// src/components/UserManager.jsx
 import React, { useState, useEffect } from 'react';
 import { FaUserPlus, FaUsers, FaEdit, FaSpinner, FaArchive } from 'react-icons/fa'; // FaArchive imported
 import UserEditModal from './UserEditModal.jsx'; 
 import { fetchUsers, fetchApi } from '../services/apiService.js'; 
 
-// --- Assumed real API function for ARCHIVE (Replaces DELETE) ---
-// We assume this function is defined in apiService.js and handles PATCH to set is_active=False
+
 const archiveUser = (userId) => fetchApi(`/users/${userId}/archive`, 'PATCH', { is_active: false }); 
 
 // --- Assumed real API function for SAVE (Add/Edit) ---

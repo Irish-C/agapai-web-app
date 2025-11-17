@@ -1,5 +1,4 @@
 // src/components/CameraManager.jsx
-
 import React, { useState, useEffect } from 'react';
 import { fetchApi } from '../services/apiService';
 import { FaTrash, FaPlus, FaPencilAlt, FaSave, FaTimes, FaCameraRetro } from 'react-icons/fa';

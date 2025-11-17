@@ -1,3 +1,4 @@
+// src/components/CameraGrid.jsx
 import React, { useState, useEffect } from 'react';
 import VideoFeed from './VideoFeed.jsx';
 import TodayReport from './TodayReport.jsx';

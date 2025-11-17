@@ -1,6 +1,6 @@
 // src/pages/Settings.jsx
 import React, { useState } from 'react';
-import { FaUserCog, FaCogs, FaBell, FaUsers, FaDharmachakra, FaConnectdevelop} from 'react-icons/fa'; 
+import { FaUserCog, FaCogs, FaBell, FaUsers, FaConnectdevelop} from 'react-icons/fa'; 
 
 import AccountSettingsForm from '../components/AccountSettingsForm.jsx';
 import CameraNotificationSettings from '../components/CameraNotificationSettings.jsx';

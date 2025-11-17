@@ -1,5 +1,12 @@
+// src/components/VideoFeed.jsx
 import React from 'react';
-import { FaVideo, FaVideoSlash, FaSpinner, FaTimes, FaExpand } from 'react-icons/fa';
+import { 
+  FaVideo, 
+  FaVideoSlash, 
+  FaSpinner, 
+  FaTimes, 
+  FaExpand 
+} from 'react-icons/fa';
 
 /**
  * Renders a single camera feed box.

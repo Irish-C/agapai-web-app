@@ -1,3 +1,4 @@
+// src/components/CameraNotificationSettings.jsx
 import React from 'react';
 import { FaBell, FaToggleOn, FaEnvelope, FaVideo } from 'react-icons/fa';
 

@@ -1,4 +1,4 @@
-import React from 'react';
+// src/Navbar.js
 
 // Define the navigation items
 const generalNavItems = [
