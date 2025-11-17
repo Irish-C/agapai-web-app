@@ -58,8 +58,8 @@ export default function AccountSettingsForm({ user }) {
                 setProfile({
                     ...user, 
                     ...data, // Fetched data
-                    firstname: data.firstname, 
-                    lastname: data.lastname,
+                    firstname: data.firstname || 'N/A', 
+                    lastname: data.lastname || 'User',
                     username: user.username, 
                     role: user.role,
                 });
