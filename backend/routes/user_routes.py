@@ -6,7 +6,6 @@ from models import User, Role
 from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identity
 from functools import wraps
 import traceback # Debugging server crashes
-from flask import current_app, jsonify
 from models import User, Role, EventLog
 
 user_routes = Blueprint('user_routes', __name__)
@@ -81,31 +80,29 @@ def logout():
 @jwt_required()
 def get_user_profile():
     try:
-        from flask import current_app
-        with current_app.app_context(): 
-            user_id_str = get_jwt_identity()
-            user_id = int(user_id_str)
-            user = User.query.get(user_id) 
+        # User ID is safely extracted by the decorator
+        user_id_str = get_jwt_identity()
+        user_id = int(user_id_str)
+        user = User.query.get(user_id) 
 
-            if not user:
-                return jsonify(msg="User not found"), 404
+        if not user:
+            return jsonify(msg="User not found"), 404
 
-            role_name = user.role.role_name if user.role else 'User' 
+        role_name = user.role.role_name if user.role else 'User' 
 
-            profile_data = {
-                # Ensure KEYS match frontend expectations
-                'firstname': user.firstname or 'N/A', 
-                'lastname': user.lastname or 'User',
-                'username': user.username,
-                'role': role_name
-            }
+        profile_data = {
+            'firstname': user.firstname or 'N/A', 
+            'lastname': user.lastname or 'User',
+            'username': user.username,
+            'role': role_name
+        }
 
-            return jsonify(profile_data), 200 # <-- Returns the data object directly
+        return jsonify(profile_data), 200
 
     except Exception as e:
-        # ... (error handling) ...
+        # Proper error handling
+        traceback.print_exc()
         return jsonify(msg="Internal server error fetching profile."), 500
-    
 
 # --- Change Password Endpoint ---
 @user_routes.route('/users/change-password', methods=['POST'])
