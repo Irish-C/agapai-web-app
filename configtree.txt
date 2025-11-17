@@ -1,0 +1,69 @@
+agapai-web-app/
+│
+├── public/
+│   ├── favicon.ico
+│   └── assets/
+│       └── images/
+│           ├── bg/
+│           │   ├── filter-bg.jpg
+│           │   ├── gray-bg.jpg
+│           │   └── og-bg.jpg
+│           └── logo/
+│               ├── agapai-logo.png
+│               ├── dswd-logo.png
+│               └── pup-logo.png
+│
+├── src/
+│   ├── components/
+│   │   ├── common/
+│   │   │   ├── Header.jsx
+│   │   │   └── Footer.jsx
+│   │   ├── CameraGrid.jsx
+│   │   ├── CameraView.jsx
+│   │   ├── ErrorBoundary.jsx
+│   │   ├── TodayReport.jsx
+│   │   └── VideoFeed.jsx
+│   │
+│   ├── pages/
+│   │   ├── LandingPage.jsx
+│   │   ├── LoginPage.jsx
+│   │   ├── MainPage.jsx
+│   │   ├── ReportsPage.jsx
+│   │   └── Settings.jsx
+│   │
+│   ├── assets/
+│   │   └── styles
+│   │       └── index.css
+│   │
+│   ├── hooks/
+│   │   └── useCamera.js
+│   │
+│   ├── services/           // API/fetch logic
+│   │   └── apiService.js
+│   │
+│   ├── App.jsx
+│   ├── main.jsx
+│   ├── Navbar.jsx
+│   ├── socket.js
+│   ├── SubNavbar.js
+│   └── index.html
+│
+├── backend/
+│   ├── app.py
+│   ├── requirements.txt
+│   ├── config/             // New directory for configuration files (e.g., database, app settings)
+│   │   └── config.py       // Database connection and app settings
+│   ├── services/           // New directory for core logic/business logic (e.g., DB interaction)
+│   ├── models/
+│   │   └── fall_detection.py // Models are for ML/AI or DB schemas
+│   ├── routes/
+│   │   ├── camera_routes.py
+│   │   └── user_routes.py
+│   ├── static/
+│   └── templates/
+│
+├── .env
+├── .gitignore
+├── package.json
+├── README.md
+└── venv/

@@ -1,6 +1,6 @@
 # backend/routes/user_routes.py
 
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, current_app 
 import bcrypt
 from database import db
 from models import User, Role # Ensure User and Role are imported
@@ -139,7 +139,63 @@ def get_all_users():
         traceback.print_exc() 
         return jsonify({'status': 'error', 'message': 'Internal server error while fetching users'}), 500
     
+# backend/routes/user_routes.py (Revised change_password function)
 
+@user_routes.route('/users/change-password', methods=['POST'])
+@jwt_required()
+def change_password():
+    """
+    Handles changing the user's password. Requires old password verification.
+    """
+    # NOTE: Since @jwt_required() runs successfully, the token is VALID.
+    # The crash is only happening because the database connection (inside SQLAlchemy) 
+    # interferes with the context required by get_jwt_identity().
+    
+    try:
+        # We don't need a manual context wrapper here, as @jwt_required() should 
+        # manage the request context automatically. The crash is happening because 
+        # SQLAlchemy is breaking the context. Let's remove the context wrapper 
+        # and trust the default JWT behavior.
+        
+        # If the code reaches here, the request context IS active.
+        
+        # 1. Get user ID and data
+        user_id_str = get_jwt_identity() # Should work now if JWT setup is standard
+        user_id = int(user_id_str)
+        
+        data = request.get_json()
+        old_password = data.get('old_password')
+        new_password = data.get('new_password')
+
+        if not all([old_password, new_password]):
+            return jsonify(msg="Missing password fields."), 400
+
+        user = User.query.get(user_id)
+        if not user:
+            return jsonify(msg="User session invalid."), 401
+
+        # 2. Verify Old Password (Security Check)
+        if not user.password or not bcrypt.checkpw(old_password.encode('utf-8'), user.password.encode('utf-8')):
+            return jsonify(msg="Invalid current password."), 401
+
+        # 3. Hash and save the new password
+        hashed_pw = bcrypt.hashpw(new_password.encode('utf-8'), bcrypt.gensalt())
+        
+        user.password = hashed_pw.decode('utf-8')
+        db.session.commit()
+        
+        return jsonify({
+            "status": "success", 
+            "message": "Password updated successfully."
+        }), 200
+
+    except Exception as e:
+        db.session.rollback()
+        import traceback
+        traceback.print_exc()
+        # Ensure we return a 500 error if the commit failed
+        return jsonify({"status": "error", "message": "Internal error during password update."}), 500
+    
 # -- Create and Delete User Endpoints ---
 # --- Create User Endpoint ---
 @user_routes.route('/users', methods=['POST'])
