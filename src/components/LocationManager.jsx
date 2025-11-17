@@ -168,7 +168,7 @@ export default function LocationManager({ onLocationsUpdated }) {
             <h3 className="text-lg font-semibold text-gray-700 mb-2">Existing Locations</h3>
             
             {/* SCROLLABLE WRAPPER*/}
-            <div className="space-y-2 max-h-73.5 overflow-y-auto pr-2"> 
+            <div className="space-y-2 max-h-72 overflow-y-auto pr-2"> 
                 {locations.length === 0 ? <p className="text-gray-500">No locations added yet.</p> : null}
                 {locations.map(loc => (
                     <div key={loc.id} className="flex justify-between items-center p-3 border rounded-lg bg-gray-50">
