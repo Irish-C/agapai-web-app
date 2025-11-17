@@ -33,7 +33,7 @@ export default function Settings({ user }) {
     const renderActiveComponent = () => {
         switch (activeSection) {
             case 'my_account':
-                return <AccountSettingsForm />;
+                return <AccountSettingsForm user={user} />;
             
             case 'management':
                 return isAdmin ? (

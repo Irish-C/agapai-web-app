@@ -116,12 +116,8 @@ export const fetchReportsData = () => {
 };
 
 
-export const fetchUserProfile = (userId) => {
-    // Requires the calling component to pass the userId
-    if (!userId) {
-        throw new Error("User ID is required to fetch profile.");
-    }
-    return fetchApi(`/users/${userId}`, 'GET');
+export const fetchUserProfile = () => {
+    return fetchApi('/user/profile', 'GET');
 };
 
 /**
