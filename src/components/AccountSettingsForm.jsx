@@ -1,3 +1,4 @@
+// src/components/AccountSettingsForm.jsx
 import React, { useState, useEffect } from 'react';
 import { FaLock, FaKey, FaSave, FaSpinner, FaCheckCircle, FaExclamationCircle, FaUser } from 'react-icons/fa';
 import { fetchApi, fetchUserProfile, changePassword } from '../services/apiService'; 
@@ -45,11 +46,10 @@ export default function AccountSettingsForm({ user }) {
             
             try {
                 // 1. Fetch data
-                const data = await fetchUserProfile(); 
+                const data = await fetchUserProfile(user.userId);
                 
                 // 2. Check if the response is valid data structure (instead of just crashing)
                 if (!data || typeof data.username === 'undefined') {
-                     // If the API returns 401/403 but the error message isn't clean, 
                      // fetchApi might return an empty object or generic data.
                      throw new Error('API returned empty or invalid profile structure.');
                 }
@@ -65,7 +65,7 @@ export default function AccountSettingsForm({ user }) {
                 });
 
             } catch (error) {
-                console.error("🛑 PROFILE LOAD CRASH/FAIL:", error.message);
+                console.error("PROFILE LOAD CRASH/FAIL:", error.message);
                 
                 // RECOVERY: Unlock UI and use guaranteed prop data as fallback
                 setProfile({

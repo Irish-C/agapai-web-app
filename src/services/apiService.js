@@ -115,12 +115,13 @@ export const fetchReportsData = () => {
     return fetchApi('/event_logs', 'GET');
 };
 
-/**
- * Fetches the detailed profile for the currently logged-in user.
- * Assumes backend uses JWT identity to find the user.
- */
-export const fetchUserProfile = () => {
-    return fetchApi('/user/profile', 'GET');
+
+export const fetchUserProfile = (userId) => {
+    // Requires the calling component to pass the userId
+    if (!userId) {
+        throw new Error("User ID is required to fetch profile.");
+    }
+    return fetchApi(`/users/${userId}`, 'GET');
 };
 
 /**
