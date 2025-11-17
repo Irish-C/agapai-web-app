@@ -4,13 +4,13 @@
 const BASE_API_URL = '/api';
 const AUTH_TOKEN_KEY = 'authToken'; 
 
+
 // Export the user fetching function
 export const fetchUsers = () => {
     return fetchApi('/users', 'GET'); 
 };
 
-// --- REST OF THE FILE (Existing Functions) ---
-
+// Generic fetch function with error handling and token management
 export const fetchApi = async (endpoint, method = 'GET', data = null) => {
     const url = `${BASE_API_URL}${endpoint}`;
     
@@ -25,17 +25,15 @@ export const fetchApi = async (endpoint, method = 'GET', data = null) => {
 
     const token = localStorage.getItem(AUTH_TOKEN_KEY);
 
-    if (token) {
+    if (token) { // Attach token if available
         options.headers['Authorization'] = `Bearer ${token}`;
     } else {
         console.log(`fetchApi: No token found in localStorage for ${endpoint}.`);
     }
-
-    if (data) {
+    if (data) { // Attach body data for POST/PUT/PATCH
         options.body = JSON.stringify(data);
     }
-
-    try {
+    try { // Perform the fetch
         const response = await fetch(url, options);
 
         if (response.status === 401) {
@@ -47,6 +45,7 @@ export const fetchApi = async (endpoint, method = 'GET', data = null) => {
             throw new Error("Authentication failed or expired.");
         }
 
+        // Handle non-2xx responses
         if (!response.ok) {
             const errorData = await response.json().catch(() => ({}));
             const message = errorData.message || errorData.msg || `HTTP error! status: ${response.status} for ${url}`;
@@ -54,24 +53,26 @@ export const fetchApi = async (endpoint, method = 'GET', data = null) => {
             throw new Error(message);
         }
 
+        // Attempt to parse JSON response
         const contentType = response.headers.get("content-type");
         if (contentType && contentType.includes("application/json")) {
             return await response.json(); 
         } else {
             return { status: 'success', message: 'Operation successful' };
         }
-
+    // Catch network or parsing errors
     } catch (error) {
         console.error('Fetch API Error:', error);
         throw error;
     }
 };
 
-
+// Login function that saves token to localStorage
 export const loginUser = async (username, password) => {
     try {
         const response = await fetchApi('/login', 'POST', { username, password });
 
+        // Check for token in response
         if (response && (response.token || response.access_token)) {
             const token = response.token || response.access_token;
             console.log("loginUser: Login successful, saving token.");
@@ -91,38 +92,37 @@ export const loginUser = async (username, password) => {
     }
 };
 
+// Logout function that removes token from localStorage
 export const logoutUser = () => {
     localStorage.removeItem(AUTH_TOKEN_KEY);
     console.log("logoutUser: Token removed.");
 };
 
+// Fetch camera list for CameraGrid component
 export const fetchCameraList = () => {
     return fetchApi('/camera_status', 'GET');
 }
 
+// Fetch daily summary data for DashboardPage
 export const fetchDailySummary = () => {
     return fetchApi('/summary/daily', 'GET');
 };
 
 /**
- * Fetches historical event log data for the ReportsPage.
- * This function must exist in apiService.js.
- * @returns {Promise<object>} Time-series data.
+ * Fetches historical event log data for the ReportsPage, applying a limit.
+ * @param {number} limit - The maximum number of logs to return (20, 50, 100).
  */
-// Make sure the 'export' keyword is present here
-export const fetchReportsData = () => {
-    // Assuming your backend route for reports is '/event_logs'
-    return fetchApi('/event_logs', 'GET');
+export const fetchReportsData = (limit) => { // Must accept 'limit' argument
+    // FIX 2: Pass the limit as a URL query parameter
+    return fetchApi(`/event_logs?limit=${limit}`, 'GET'); 
 };
 
-
+// Fetch user profile data
 export const fetchUserProfile = () => {
     return fetchApi('/user/profile', 'GET');
 };
 
-/**
- * Sends a request to change the password.
- */
+// Change user password
 export const changePassword = (oldPassword, newPassword) => {
     return fetchApi('/users/change-password', 'POST', { 
         old_password: oldPassword, 
@@ -130,7 +130,8 @@ export const changePassword = (oldPassword, newPassword) => {
     });
 };
 
+// Archive (deactivate) a user
 export const archiveUser = (userId) => {
-    // Assumes backend route to set is_active=False
+    // backend route to set is_active=False
     return fetchApi(`/users/${userId}/archive`, 'PATCH', { is_active: false }); 
 };
