@@ -9,9 +9,9 @@ import agapaiLogo from './../assets/images/logos/agapai-logo.png';
 import dswdLogo from './../assets/images/logos/dswd-logo.png'; 
 import pupLogo from './../assets/images/logos/pup-logo.png'; 
 
-// LoginPage now receives the asynchronous 'login' function from App.jsx
+// LoginPage receives the asynchronous 'login' function from App.jsx
 export default function LoginPage({ login }) {
-    // 🛑 FIX: Removed hardcoded default credentials to force manual input
+    // Force manual input
     const [username, setUsername] = useState(''); 
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
@@ -133,11 +133,11 @@ export default function LoginPage({ login }) {
                 </form>
 
                 {/* Affiliation Logos */}
-                <div className="mt-8 pt-6 border-t border-gray-200 flex justify-around items-center space-x-4">
-                    <img src={dswdLogo} alt="DSWD Logo" className="h-10 w-auto opacity-70"
-                            onError={(e) => { e.target.onerror = null; e.target.src="/placeholder-logo.png" }}/>
-                    <img src={pupLogo} alt="PUP Logo" className="h-10 w-auto opacity-70" 
-                            onError={(e) => { e.target.onerror = null; e.target.src="/placeholder-logo.png" }}/>
+                <div className="mt-8 pt-6 border-t border-gray-200 flex justify-center items-center space-x-4">
+                    <img src={dswdLogo} alt="DSWD Logo" className="h-10 w-auto opacity-90"
+                        onError={(e) => { e.target.onerror = null; e.target.src="/placeholder-logo.png" }}/>
+                    <img src={pupLogo} alt="PUP Logo" className="h-10 w-auto opacity-90" 
+                        onError={(e) => { e.target.onerror = null; e.target.src="/placeholder-logo.png" }}/>
                 </div>
             </div>
         </div>
