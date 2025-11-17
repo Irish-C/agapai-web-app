@@ -5,7 +5,8 @@
  */
 import React, { useState, useEffect } from 'react';
 import { fetchReportsData } from '../services/apiService';
-import { FaFileAlt, FaSpinner, FaExclamationTriangle } from 'react-icons/fa';
+// Import FaArrowRight for the ">" symbol
+import { FaFileAlt, FaSpinner, FaExclamationTriangle, FaArrowRight } from 'react-icons/fa';
 
 export default function ReportsPage() {
     const [logs, setLogs] = useState([]);
@@ -35,6 +36,13 @@ export default function ReportsPage() {
         // Initial and subsequent data load when 'limit' changes
         loadReportData();
     }, [limit]);
+
+    // Placeholder function for handling the file link click
+    const handleFileClick = (filePath) => {
+        console.log(`File path clicked: ${filePath}`);
+        // TODO: Implement actual logic here (e.g., open file preview, download)
+        alert(`Simulating file view/download for: ${filePath}`);
+    };
 
     const renderContent = () => {
         if (isLoading) {
@@ -81,15 +89,15 @@ export default function ReportsPage() {
                             <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                 Camera
                             </th>
-                            {/* NEW: Table Header for File Path */}
-                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                File Path
-                            </th>
                             <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                 Status
                             </th>
                             <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                 Ack. By User
+                            </th>
+                            {/* MOVED: Table Header for File Path (Last Position) */}
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                File Path
                             </th>
                         </tr>
                     </thead>
@@ -109,10 +117,6 @@ export default function ReportsPage() {
                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
                                     {log.camera_name}
                                 </td>
-                                {/* NEW: Data Cell for File Path */}
-                                <td className="px-6 py-4 text-sm text-gray-700 max-w-xs truncate">
-                                    {log.file_path || 'N/A'}
-                                </td>
                                 <td className="px-6 py-4 whitespace-nowrap text-sm">
                                     <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
                                         log.status === 'unacknowledged' 
@@ -125,6 +129,25 @@ export default function ReportsPage() {
                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
                                     {/* CHANGED: Displaying Acknowledged By Username */}
                                     {log.status !== 'unacknowledged' ? (log.acknowledged_by_username || 'System') : 'Pending'}
+                                </td>
+                                {/* MOVED: Data Cell for File Path (Last Position), now clickable with '>' symbol */}
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                                    {log.file_path ? (
+                                        <a
+                                            href="#"
+                                            onClick={(e) => {
+                                                e.preventDefault(); // Prevent default link behavior
+                                                handleFileClick(log.file_path);
+                                            }}
+                                            className="flex items-center text-teal-600 hover:text-teal-800 font-medium transition duration-150 ease-in-out"
+                                            title={log.file_path} // Show full path on hover
+                                        >
+                                            View File
+                                            <FaArrowRight className="ml-2 text-xs" />
+                                        </a>
+                                    ) : (
+                                        'N/A'
+                                    )}
                                 </td>
                             </tr>
                         ))}
