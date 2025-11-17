@@ -31,7 +31,7 @@ export default function ReportsPage() {
             } finally {
                 setIsLoading(false);
             }
-        };  
+        }; 
         // Initial and subsequent data load when 'limit' changes
         loadReportData();
     }, [limit]);
@@ -81,6 +81,10 @@ export default function ReportsPage() {
                             <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                 Camera
                             </th>
+                            {/* NEW: Table Header for File Path */}
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                File Path
+                            </th>
                             <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                 Status
                             </th>
@@ -104,6 +108,10 @@ export default function ReportsPage() {
                                 </td>
                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
                                     {log.camera_name}
+                                </td>
+                                {/* NEW: Data Cell for File Path */}
+                                <td className="px-6 py-4 text-sm text-gray-700 max-w-xs truncate">
+                                    {log.file_path || 'N/A'}
                                 </td>
                                 <td className="px-6 py-4 whitespace-nowrap text-sm">
                                     <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
