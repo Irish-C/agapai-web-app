@@ -221,7 +221,7 @@ export default function CameraManager({ locations, onCameraUpdated }) {
             <h3 className="text-lg font-semibold text-gray-700 mb-2 px-3">Existing Cameras</h3>
             
             {/* SCROLLABLE WRAPPER */}
-            <div className="space-y-2 max-h-64 overflow-y-auto px-3 pr-2"> 
+            <div className="space-y-2 max-h-72 overflow-y-auto px-3 pr-2"> 
                 {cameras.length === 0 ? <p className="text-gray-500">No cameras added yet.</p> : null}
                 {cameras.map(cam => (
                     <div key={cam.id} className="p-3 border rounded-lg bg-gray-50">
