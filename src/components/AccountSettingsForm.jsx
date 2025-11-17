@@ -39,8 +39,7 @@ export default function AccountSettingsForm({ user }) {
             return;
         }
 
-// src/pages/AccountSettingsForm.jsx (Inside the loadProfile function)
-
+        // Async function to load profile data
         const loadProfile = async () => {
             setIsProfileLoading(true);
             
@@ -89,7 +88,7 @@ const handleSubmit = async (e) => {
         e.preventDefault();
         setMessage(null);
         
-        // 1. Frontend validation (remains unchanged)
+        // 1. Frontend validation
         if (newPassword.length < 8) {
             setMessage({ type: 'error', text: 'New password must be at least 8 characters long.' });
             return;
@@ -111,15 +110,13 @@ const handleSubmit = async (e) => {
                 setNewPassword('');
                 setConfirmPassword('');
             } else {
-                // This path should ideally be unreachable if fetchApi handles non-200 responses correctly
                 setMessage({ type: 'error', text: result.message || 'Password update failed.' });
             }
 
         } catch (error) {
             console.error("Password submission error:", error);
             
-            // 🛑 FIX: Use the error.message thrown by fetchApi (which contains the server's reason)
-            // Example message content: "Authentication failed or expired." OR "Invalid current password."
+            // Use the error.message thrown by fetchApi (which contains the server's reason)
             const errorText = error.message.includes("Invalid current password") 
                 ? "The current password you provided is incorrect." // Specific user-friendly override
                 : error.message || 'An unknown network error occurred.';
