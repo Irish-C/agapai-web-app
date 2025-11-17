@@ -60,7 +60,7 @@ export default function LoginPage({ login }) {
                 <div className="text-center mb-8">
                     <img src={agapaiLogo} alt="AGAPAI Logo" className="w-20 h-20 mx-auto mb-4 rounded-full border-2 border-teal-500 shadow-md" 
                             onError={(e) => { e.target.onerror = null; e.target.src="/placeholder-logo.png" }}/>
-                    <h2 className="text-3xl font-bold white">Login</h2>
+                    <h2 className="text-3xl font-bold white">LOGIN</h2>
                     <p className="text-sm text-white mt-2">Access the <span className="font-bold text-teal-400">AGAPAI</span> Dashboard</p>
                 </div>
 
@@ -125,7 +125,7 @@ export default function LoginPage({ login }) {
                             ) : (
                                 <>
                                     <FaSignInAlt className="mr-2" />
-                                    Login
+                                    LOGIN
                                 </>
                             )}
                         </button>
