@@ -194,7 +194,7 @@ def change_password():
         # Ensure we return a 500 error if the commit failed
         return jsonify({"status": "error", "message": "Internal error during password update."}), 500
     
-# -- Create and Delete User Endpoints ---
+# -- User Manager Endpoints ---
 # --- Create User Endpoint ---
 @user_routes.route('/users', methods=['POST'])
 @admin_required
@@ -279,3 +279,50 @@ def delete_user_by_id(user_id):
         import traceback
         traceback.print_exc()
         return jsonify({'status': 'error', 'message': f'Failed to delete user {user_id}.'}), 500
+    
+# --- Update User Endpoint ---    
+@user_routes.route('/users/<int:user_id>', methods=['PATCH'])
+@admin_required
+def update_user(user_id):
+    """
+    Handles updating an existing user's details (Admin only).
+    Allows optional password change.
+    """
+    try:
+        from flask import current_app
+        with current_app.app_context(): 
+            
+            data = request.get_json()
+            user_to_update = User.query.get(user_id)
+
+            if not user_to_update:
+                return jsonify(msg="User not found."), 404
+
+            # 1. Update basic fields (First Name, Last Name, Role)
+            if 'firstname' in data:
+                user_to_update.firstname = data['firstname']
+            if 'lastname' in data:
+                user_to_update.lastname = data['lastname']
+            
+            # 2. Update Role (Requires finding role_id from role name)
+            if 'role' in data:
+                new_role = Role.query.filter_by(role_name=data['role']).first()
+                if not new_role:
+                    return jsonify(msg=f"Role '{data['role']}' not found."), 404
+                user_to_update.role_id = new_role.id
+
+            # 3. Handle Password Change (Optional)
+            if 'password' in data and data['password']:
+                # The frontend validates that password matches confirmPassword
+                hashed_password = bcrypt.hashpw(data['password'].encode('utf-8'), bcrypt.gensalt())
+                user_to_update.password = hashed_password.decode('utf-8')
+
+            db.session.commit()
+
+            return jsonify({'status': 'success', 'message': f'User {user_id} updated successfully!'}), 200
+
+    except Exception as e:
+        db.session.rollback()
+        import traceback
+        traceback.print_exc()
+        return jsonify({'status': 'error', 'message': 'Failed to update user due to a server error.'}), 500

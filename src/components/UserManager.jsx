@@ -224,10 +224,10 @@ export default function UserManager({ user }) {
                         </div>
                         <div className="p-6">
                             <p className="text-gray-700 mb-4">
-                                Are you sure you want to **archive** user <strong className="font-semibold">{userToArchive.username}</strong>?
+                                Are you sure you want to archive user <strong className="font-semibold">{userToArchive.username}</strong>?
                             </p>
                             <p className="text-yellow-700 mb-6 font-medium">
-                                The user's account will be deactivated, but their historical acknowledgement records will be **preserved**.
+                                The user's account will be deactivated, but their historical acknowledgement records will be preserved.
                             </p>
                             <div className="flex justify-end space-x-3">
                                 <button
