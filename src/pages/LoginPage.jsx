@@ -17,7 +17,7 @@ export default function LoginPage({ login }) {
     const [isLoading, setIsLoading] = useState(false);
     const navigate = useNavigate();
 
-    // NEW FUNCTION: Handles logo click to navigate to the root path
+    // Handles logo click to navigate to the root path
     const handleLogoClick = () => {
         navigate('/');
     };
