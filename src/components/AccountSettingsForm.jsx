@@ -11,14 +11,15 @@ const initialProfileState = {
     role: 'Loading ...' 
 };
 
+// Component for Account Settings Form
 export default function AccountSettingsForm({ user }) {
-    
+    // Profile state
     const [profile, setProfile] = useState(() => ({
         ...initialProfileState,
         username: user?.username || initialProfileState.username,
         role: user?.role || initialProfileState.role,
     }));
-    
+    // Loading state for profile fetch
     const [isProfileLoading, setIsProfileLoading] = useState(true);
     const [oldPassword, setOldPassword] = useState('');
     const [newPassword, setNewPassword] = useState('');
@@ -129,7 +130,7 @@ const handleSubmit = async (e) => {
             {/* --------------------------------- 1. PROFILE INFORMATION --------------------------------- */}
             <div className="bg-white p-6 rounded-xl shadow-md border border-gray-100">
                 <h2 className="text-xl font-semibold text-gray-800 flex items-center mb-4 border-b pb-2">
-                    <FaUser className="mr-2 text-teal-600" />
+                    <FaUser className="mr-2 text-indigo-500" />
                     User Profile
                 </h2>
                 
