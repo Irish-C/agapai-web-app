@@ -15,6 +15,7 @@ event_routes = Blueprint('event_routes', __name__)
 @jwt_required()  # Protect this endpoint
 def get_event_logs():
     try:
+        limit_param = request.args.get('limit', default=None, type=int)
         # Joins based on SQL schema:
         log_query = db.session.query(
             EventLog,
@@ -38,8 +39,10 @@ def get_event_logs():
         ).order_by(
             EventLog.timestamp.desc()
         )
+        if limit_param is not None and limit_param > 0:
+            log_query = log_query.limit(limit_param) 
         
-        # Get all logs
+        # Get logs
         logs = log_query.all()
 
         # Serialize the data

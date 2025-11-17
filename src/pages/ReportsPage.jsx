@@ -11,13 +11,14 @@ export default function ReportsPage() {
     const [logs, setLogs] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState(null);
+    const [limit, setLimit] = useState(20);
 
     useEffect(() => {
         const loadReportData = async () => {
             try {
                 setIsLoading(true);
                 setError(null);
-                const data = await fetchReportsData();
+                const data = await fetchReportsData(limit);
                 
                 if (data.status === 'success' && Array.isArray(data.report)) {
                     setLogs(data.report);
@@ -30,10 +31,10 @@ export default function ReportsPage() {
             } finally {
                 setIsLoading(false);
             }
-        };
-
+        };  
+        // Initial and subsequent data load when 'limit' changes
         loadReportData();
-    }, []);
+    }, [limit]);
 
     const renderContent = () => {
         if (isLoading) {
@@ -138,6 +139,22 @@ export default function ReportsPage() {
                 Review historical fall and inactivity alerts from all locations to ensure comprehensive 
                 resident monitoring and facility oversight.
             </p>
+            {/* 👈 NEW SELECTOR UI ELEMENT */}
+            <div className="flex justify-end items-center">
+                <label htmlFor="limit-select" className="text-sm font-medium text-gray-700 mr-2">
+                    Logs per page:
+                </label>
+                <select
+                    id="limit-select"
+                    value={limit}
+                    onChange={(e) => setLimit(Number(e.target.value))}
+                    className="p-2 border border-gray-300 rounded-lg text-sm"
+                >
+                    <option value={20}>20</option>
+                    <option value={50}>50</option>
+                    <option value={100}>100</option>
+                </select>
+            </div>
             
             <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-200">
                 {renderContent()}
