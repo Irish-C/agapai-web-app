@@ -75,37 +75,35 @@ def logout():
     return jsonify({"status": "success", "message": "Logout successful"}), 200
 
 
+# backend/routes/user_routes.py (Inside get_user_profile)
+
 @user_routes.route('/user/profile', methods=['GET'])
 @jwt_required()
 def get_user_profile():
     try:
-        # 🛑 FIX: Explicitly push the application context
+        from flask import current_app
         with current_app.app_context(): 
             user_id_str = get_jwt_identity()
             user_id = int(user_id_str)
-            
-            # Database query is executed inside this context
             user = User.query.get(user_id) 
 
             if not user:
                 return jsonify(msg="User not found"), 404
 
-            # Defensive data retrieval
             role_name = user.role.role_name if user.role else 'User' 
 
             profile_data = {
+                # 🛑 CRITICAL: Ensure KEYS match frontend expectations (lowercase keys are safer)
                 'firstname': user.firstname or 'N/A', 
                 'lastname': user.lastname or 'User',
                 'username': user.username,
                 'role': role_name
             }
 
-            return jsonify(profile_data), 200
+            return jsonify(profile_data), 200 # <-- Returns the data object directly
 
     except Exception as e:
-        # If the code reaches here, it means a network or configuration error occurred
-        import traceback
-        traceback.print_exc() 
+        # ... (error handling) ...
         return jsonify(msg="Internal server error fetching profile."), 500
     
 
@@ -176,7 +174,7 @@ def change_password():
 
         # 2. Verify Old Password (Security Check)
         if not user.password or not bcrypt.checkpw(old_password.encode('utf-8'), user.password.encode('utf-8')):
-            return jsonify(msg="Invalid current password."), 401
+            return jsonify(msg="Invalid current password."), 403
 
         # 3. Hash and save the new password
         hashed_pw = bcrypt.hashpw(new_password.encode('utf-8'), bcrypt.gensalt())

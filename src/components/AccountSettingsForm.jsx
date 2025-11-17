@@ -10,7 +10,7 @@ const initialProfileState = {
     role: 'Loading...' 
 };
 
-// Component now expects 'user' prop containing { username, role, userId, token }
+// E 'user' prop containing { username, role, userId, token }
 export default function AccountSettingsForm({ user }) {
     
     // Initialize profile primarily using the 'user' prop
@@ -39,38 +39,44 @@ export default function AccountSettingsForm({ user }) {
             return;
         }
 
+// src/pages/AccountSettingsForm.jsx (Inside the loadProfile function)
+
         const loadProfile = async () => {
             setIsProfileLoading(true);
             
             try {
+                // 1. Fetch data
                 const data = await fetchUserProfile(); 
                 
-                const fetchedDetails = typeof data === 'object' && data !== null ? data : {};
-
+                // 2. Check if the response is valid data structure (instead of just crashing)
+                if (!data || typeof data.username === 'undefined') {
+                     // If the API returns 401/403 but the error message isn't clean, 
+                     // fetchApi might return an empty object or generic data.
+                     throw new Error('API returned empty or invalid profile structure.');
+                }
+                
                 // SUCCESS PATH: Merge fetched names with prop basics
                 setProfile({
                     ...user, 
-                    ...fetchedDetails,
-                    firstname: fetchedDetails.firstname || 'N/A', 
-                    lastname: fetchedDetails.lastname || 'User',
-                    username: user.username, // Always use prop for guaranteed username/role
+                    ...data, // Fetched data
+                    firstname: data.firstname || 'N/A', 
+                    lastname: data.lastname || 'User',
+                    username: user.username, 
                     role: user.role,
                 });
 
             } catch (error) {
-                console.error("Error fetching profile details:", error);
+                console.error("🛑 PROFILE LOAD CRASH/FAIL:", error.message);
                 
-                // 🛑 RECOVERY PATH FIX: Ensure UNLOADING by setting the profile using
-                // only the guaranteed data from the 'user' prop as a fallback.
+                // RECOVERY: Unlock UI and use guaranteed prop data as fallback
                 setProfile({
                     firstname: 'N/A',
                     lastname: 'User',
                     username: user.username, 
                     role: user.role,
                 });
-                setMessage({ type: 'error', text: 'Failed to load full profile details. Basic info displayed.' });
+                setMessage({ type: 'error', text: 'Failed to load user data. Please relogin.' });
             } finally {
-                // Guarantee this runs to unlock the UI
                 setIsProfileLoading(false);
             }
         };
@@ -79,11 +85,11 @@ export default function AccountSettingsForm({ user }) {
     }, [user]); 
 
 
-    const handleSubmit = async (e) => {
+const handleSubmit = async (e) => {
         e.preventDefault();
         setMessage(null);
         
-        // 1. Frontend validation
+        // 1. Frontend validation (remains unchanged)
         if (newPassword.length < 8) {
             setMessage({ type: 'error', text: 'New password must be at least 8 characters long.' });
             return;
@@ -105,17 +111,25 @@ export default function AccountSettingsForm({ user }) {
                 setNewPassword('');
                 setConfirmPassword('');
             } else {
+                // This path should ideally be unreachable if fetchApi handles non-200 responses correctly
                 setMessage({ type: 'error', text: result.message || 'Password update failed.' });
             }
 
         } catch (error) {
             console.error("Password submission error:", error);
-            setMessage({ type: 'error', text: error.message || 'An unknown network error occurred.' });
+            
+            // 🛑 FIX: Use the error.message thrown by fetchApi (which contains the server's reason)
+            // Example message content: "Authentication failed or expired." OR "Invalid current password."
+            const errorText = error.message.includes("Invalid current password") 
+                ? "The current password you provided is incorrect." // Specific user-friendly override
+                : error.message || 'An unknown network error occurred.';
+                
+            setMessage({ type: 'error', text: errorText });
         } finally {
             setIsLoading(false);
         }
     };
-
+    // Form validation state
     const isFormValid = oldPassword && newPassword && confirmPassword && newPassword === confirmPassword && !isProfileLoading;
 
     return (
