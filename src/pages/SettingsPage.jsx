@@ -63,7 +63,7 @@ export default function Settings({ user }) {
 
 
     return (
-        <div className="flex flex-col min-h-screen bg-gray-50">
+        <div className="flex flex-col min-h-screen">
             <main className="flex-grow container mx-auto p-6">
                 <h1 className="text-3xl font-extrabold text-gray-900 flex items-center mb-2">
                     <FaCogs className="mr-3 text-teal-600" />
