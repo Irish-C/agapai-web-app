@@ -108,7 +108,7 @@ export default function ReportsPage() {
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
                         {logs.map((log) => (
-                            <tr key={log.id} className="hover:bg-gray-50">
+                            <tr key={log.id} className="hover:bg-teal-100 transition duration-150">
                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
                                     {new Date(log.timestamp).toLocaleString()}
                                 </td>
