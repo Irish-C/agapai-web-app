@@ -5,10 +5,10 @@ import { fetchApi, fetchUserProfile, changePassword } from '../services/apiServi
 
 // Define default structure for loading state fallback
 const initialProfileState = { 
-    firstname: 'N/A', 
-    lastname: 'User', 
-    username: 'Loading...', 
-    role: 'Loading...' 
+    firstname: 'Loading', 
+    lastname: '...', 
+    username: 'Loading ...', 
+    role: 'Loading ...' 
 };
 
 // E 'user' prop containing { username, role, userId, token }
@@ -46,7 +46,7 @@ export default function AccountSettingsForm({ user }) {
             
             try {
                 // 1. Fetch data
-                const data = await fetchUserProfile(user.userId);
+                const data = await fetchUserProfile();
                 
                 // 2. Check if the response is valid data structure (instead of just crashing)
                 if (!data || typeof data.username === 'undefined') {
@@ -58,8 +58,8 @@ export default function AccountSettingsForm({ user }) {
                 setProfile({
                     ...user, 
                     ...data, // Fetched data
-                    firstname: data.firstname || 'N/A', 
-                    lastname: data.lastname || 'User',
+                    firstname: data.firstname, 
+                    lastname: data.lastname,
                     username: user.username, 
                     role: user.role,
                 });
