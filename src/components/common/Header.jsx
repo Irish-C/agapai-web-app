@@ -1,4 +1,3 @@
-// src/components/common/Header.jsx
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
     import { FaUserCircle, FaSignOutAlt, FaTimes, FaCog , FaFile, FaBars, FaTh} from 'react-icons/fa';
@@ -9,6 +8,8 @@ export default function Header({ user, logout }) {
     const [hidden, setHidden] = useState(false); // track header visibility
     const [lastScrollY, setLastScrollY] = useState(0);
     const location = useLocation();
+    
+    // Hide header on landing/root page
     if (location.pathname === '/' || location.pathname === '/landing') {
         return null;
     }
@@ -89,13 +90,17 @@ export default function Header({ user, logout }) {
                     ))}
                 </nav>
 
-                {/* User Info and Logout */}
+                {/* User Info (Profile Link) and Logout */}
                 <div className="hidden md:flex items-center space-x-4">
-                    <div className="flex items-center space-x-2 bg-gray-700 p-2 rounded-full">
+                    {/* MODIFIED: Link now points to /settings */}
+                    <Link 
+                        to="/settings" 
+                        className="flex items-center space-x-2 bg-gray-700 p-2 rounded-full transition duration-150 hover:bg-gray-600 cursor-pointer"
+                    >
+                        {/* Changed icon color to teal-400 for visual consistency */}
                         <FaUserCircle className="w-5 h-5 text-teal-400" />
-                        {/* FIXED: Using optional chaining to safely access username */}
                         <span className="text-sm font-medium">{user?.username || 'User'}</span>
-                    </div>
+                    </Link>
                     <button
                         onClick={logout}
                         className="flex items-center px-3 py-1 text-sm font-medium bg-red-600 rounded-full hover:bg-red-700 transition duration-150 shadow-md"
@@ -135,11 +140,22 @@ export default function Header({ user, logout }) {
                         ))}
                     </nav>
                     <div className="pt-4 border-t border-gray-700 flex flex-col space-y-2">
+                        {/* Static user display */}
                         <div className="flex items-center space-x-3 px-3 py-2 text-base">
                             <FaUserCircle className="w-6 h-6 text-teal-400" />
-                            {/* FIXED: Using optional chaining to safely access username */}
                             <span className="font-semibold">{user?.username || 'User'}</span>
                         </div>
+                        
+                        {/* MODIFIED: Profile link for mobile now points to /settings */}
+                        <Link
+                            to="/settings"
+                            onClick={() => setIsMenuOpen(false)}
+                            className="flex items-center justify-center w-full px-3 py-2 text-base font-medium bg-gray-700 rounded-lg hover:bg-gray-600 transition duration-150 shadow-md text-teal-400"
+                        >
+                            <FaUserCircle className="mr-2" />
+                            View Profile
+                        </Link>
+
                         <button
                             onClick={() => { logout(); setIsMenuOpen(false); }}
                             className="flex items-center justify-center w-full px-3 py-2 text-base font-medium bg-red-600 rounded-lg hover:bg-red-700 transition duration-150 shadow-md"
