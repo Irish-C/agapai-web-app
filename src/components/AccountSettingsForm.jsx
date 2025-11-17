@@ -124,7 +124,7 @@ const handleSubmit = async (e) => {
     const isFormValid = oldPassword && newPassword && confirmPassword && newPassword === confirmPassword && !isProfileLoading;
 
     return (
-        <div className="space-y-8">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
             
             {/* --------------------------------- 1. PROFILE INFORMATION --------------------------------- */}
             <div className="bg-white p-6 rounded-xl shadow-md border border-gray-100">
@@ -140,11 +140,11 @@ const handleSubmit = async (e) => {
                 ) : (
                     <div className="space-y-2 text-sm text-gray-700">
                         {/* Displaying Full Name */}
-                        <div className="flex justify-between border-b pb-1">
+                        <div className="flex justify-between">
                             <span className="font-medium">Full Name:</span>
                             <span>{profile.firstname} {profile.lastname}</span> 
                         </div>
-                        <div className="flex justify-between border-b pb-1">
+                        <div className="flex justify-between">
                             <span className="font-medium">Username:</span>
                             <span>{profile.username}</span>
                         </div>
