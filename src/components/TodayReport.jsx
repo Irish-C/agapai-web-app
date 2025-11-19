@@ -59,7 +59,7 @@ export default function TodayReport({ incidents, user }) { // <-- Accepts user p
     const isClear = incidentCount === 0;
 
     return (
-        <div className="space-y-6 sticky top-14 h-fit">
+        <div className="space-y-4 sticky top-2 h-fit">
 
             {/* 1. REAL-TIME INCIDENT LOG (WebSocket Data) */}
             <div className="bg-white p-4 rounded-xl shadow-lg border border-gray-200">
