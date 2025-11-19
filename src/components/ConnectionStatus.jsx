@@ -13,7 +13,7 @@ export default function ConnectionStatus({ onLogout }) {
     const handleDisconnect = () => {
       setConnected(false);
       
-      // ⬅️ CRITICAL: Call the logout function passed from App.jsx
+      // Call the logout function passed from App.jsx
       if (onLogout) {
           console.log("WebSocket disconnected. Initiating forced logout.");
           onLogout(); 
@@ -28,16 +28,20 @@ export default function ConnectionStatus({ onLogout }) {
       socket.off("connect", handleConnect);
       socket.off("disconnect", handleDisconnect);
     };
-  }, [onLogout]); // Include onLogout in dependency array
+  }, [onLogout]); 
 
   return (
-    <div className="fixed bottom-3 right-3 flex items-center gap-2 bg-gray-800 text-white px-3 py-2 rounded-xl shadow-md text-sm">
+    <div 
+      className="fixed bottom-3 right-3 z-[9999] flex items-center gap-2 bg-gray-800 text-white px-3 py-2 rounded-xl shadow-2xl border border-gray-700 text-sm"
+    >
       <span
         className={`h-3 w-3 rounded-full ${
-          connected ? "bg-green-400" : "bg-red-500"
+          connected ? "bg-green-400 animate-pulse" : "bg-red-500"
         }`}
       ></span>
-      <span>{connected ? "Connected" : "Disconnected"}</span>
+      <span className="font-medium">
+        {connected ? "Connected" : "Disconnected"}
+      </span>
     </div>
   );
 }
