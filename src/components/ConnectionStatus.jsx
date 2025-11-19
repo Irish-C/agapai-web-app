@@ -31,7 +31,7 @@ export default function ConnectionStatus({ onLogout }) {
   }, [onLogout]); // Include onLogout in dependency array
 
   return (
-    <div className="fixed top-3 right-3 flex items-center gap-2 bg-gray-800 text-white px-3 py-2 rounded-xl shadow-md text-sm">
+    <div className="fixed bottom-3 right-3 flex items-center gap-2 bg-gray-800 text-white px-3 py-2 rounded-xl shadow-md text-sm">
       <span
         className={`h-3 w-3 rounded-full ${
           connected ? "bg-green-400" : "bg-red-500"
