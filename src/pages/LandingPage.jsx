@@ -4,6 +4,7 @@ import { FaUserCircle, FaSignInAlt, FaVideo, FaChartLine, FaEnvelope, FaTimes, F
 
 import agapaiLogo from './../assets/images/logos/agapai-logo.png';
 import filter_bg from './../assets/images/bg/filter-bg.png';
+import elderNurse from './../assets/images/bg/elder-nurse.png';
 
 export default function LandingPage() {
     // 1. State to control the visibility of the contact panel
@@ -27,7 +28,7 @@ export default function LandingPage() {
             {/* -------------------------------------------------- */}
             {/* 2. CONTACT BUTTON (Trigger) - TOP RIGHT CORNER */}
             {/* -------------------------------------------------- */}
-            <div className="absolute top-4 right-4 z-20">
+            <div className="absolute top-4 right-4 z-50">
                 <button 
                     onClick={toggleContactPanel} // Use onClick to toggle the state
                     className="flex items-center px-4 py-2 text-sm font-semibold text-white rounded-full shadow-lg hover:bg-teal-700 transition duration-300"
@@ -99,7 +100,7 @@ export default function LandingPage() {
             </div>
 
             {/* --- REST OF THE ORIGINAL LANDING PAGE CONTENT --- */}
-            <div className="relative text-center text-white z-8 p-4 md:p-6 bg-opacity-100 rounded-2xl max-w-4xl mx-auto">
+            <div className="relative text-center text-white z-20 p-4 md:p-6 bg-opacity-100 rounded-2xl max-w-4xl mx-auto">
                 {/* ... ( Logo and Floating Bubble Code) ... */}
 
                 <div className="relative inline-block group mb-2">
@@ -124,14 +125,14 @@ export default function LandingPage() {
                 <h2 className="text-1xl font-regular mb-4 tracking-tight text-center">
                     <span className="block">Ka-AGAPAI sa Seguridad ng ating mga Lolo't Lola </span>
                 </h2>
-                <p className="text-1xl font-light italic mb-12 max-w-2xl mx-auto text-center">
+                <p className="text-1xl font-light italic mb-12 max-w-2xl z-50 mx-auto text-center">
                     A Vision-Based Monitoring and Alert System for Fall and Inactivity in Elderly Care Facility
                 </p>
 
                 <div className="flex flex-col md:flex-row space-y-4 md:space-y-0 md:space-x-6 justify-center">
                     <Link 
                         to="/login" 
-                        className="flex items-center justify-center px-8 py-3 text-lg font-semibold text-teal-900 bg-[#c4fcff] rounded-full shadow-lg hover:bg-teal-700 transition duration-300 transform hover:scale-105 group"
+                        className="flex items-center justify-center px-8 py-3 text-lg z-20 font-semibold text-teal-900 bg-[#c4fcff] rounded-full shadow-lg hover:bg-teal-700 transition duration-300 transform hover:scale-105 group"
                     >
                         <FaSignInAlt className="mr-3 w-6 h-6 group-hover:animate-pulse" />
                         Login to Get Started
@@ -139,15 +140,21 @@ export default function LandingPage() {
                 </div>
 
                 <div className="mt-12 grid grid-cols-1 md:grid-cols-2 gap-8 text-left">
-                    <div className="p-4 bg-opacity-70 rounded-xl bg-gradient-to-b from-[#2d3092] to-[#015954] border border-teal-400">
+                    <div className="p-4 bg-opacity-70 rounded-xl bg-gradient-to-b from-[#2d3092] to-[#015954] border border-teal-400 z-20">
                         <h3 className="flex items-center text-xl font-bold text-teal-400 mb-2">
                             <FaVideo className="mr-2" /> Real-Time Monitoring
                         </h3>
+
+                        <img
+                    src={elderNurse}
+                    alt="Elder and Nurse"
+                    className="absolute bottom-0 right-0 w-64 h-auto object-contain z-10 opacity-100 a-10 md:w-80 lg:w-96"
+                />
                         <p className="text-sm text-gray-300">
                             Secure video streaming with low-latency AI processing for immediate incident detection.
                         </p>
                     </div>
-                    <div className="p-4 bg-opacity-70 rounded-xl bg-gradient-to-b from-[#2d3092] to-[#015954] border border-teal-400">
+                    <div className="p-4 bg-opacity-70 rounded-xl bg-gradient-to-b from-[#2d3092] to-[#015954] border border-teal-400 z-20">
                         <h3 className="flex items-center text-xl font-bold text-teal-400 mb-2">
                             <FaChartLine className="mr-2" /> Comprehensive Reporting
                         </h3>
