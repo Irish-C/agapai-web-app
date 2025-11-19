@@ -144,12 +144,6 @@ export default function LandingPage() {
                         <h3 className="flex items-center text-xl font-bold text-teal-400 mb-2">
                             <FaVideo className="mr-2" /> Real-Time Monitoring
                         </h3>
-
-                        <img
-                    src={elderNurse}
-                    alt="Elder and Nurse"
-                    className="absolute bottom-0 right-0 w-64 h-auto object-contain z-10 opacity-100 a-10 md:w-80 lg:w-96"
-                />
                         <p className="text-sm text-gray-300">
                             Secure video streaming with low-latency AI processing for immediate incident detection.
                         </p>
@@ -170,4 +164,4 @@ export default function LandingPage() {
             </footer>
         </div>
     );
-}
+}   
