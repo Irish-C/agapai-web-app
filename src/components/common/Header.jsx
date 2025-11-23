@@ -185,7 +185,10 @@ export default function Header({ user, logout }) {
 
             {/* --------------------------- LOGOUT CONFIRMATION MODAL --------------------------- */}
             {showLogoutModal && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 z-[100] flex items-center justify-center p-4">
+                // CRITICAL FIX: Added pt-16 (padding-top 4rem) to push the modal content 
+                // below the fixed header (which is h-16) and re-center the content 
+                // in the remaining viewport space.
+                <div className="fixed inset-0 z-[100] flex items-center justify-center pt-16 p-4">
                     <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm">
                         <div className="p-6 border-b border-gray-200 flex justify-between items-center">
                             <h4 className="text-xl font-bold text-gray-800 flex items-center">
