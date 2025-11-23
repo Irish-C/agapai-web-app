@@ -35,7 +35,8 @@ export default function CameraGrid() {
                 const data = await response.json();
 
                 if (data.status === 'success') {
-                    setCameraList(data.cameras);
+                    // Assuming data.cameras contains the 'stream_url' field for each camera.
+                    setCameraList(data.cameras); 
                 } else {
                     setError('API did not return a valid camera list.');
                 }
@@ -75,12 +76,12 @@ export default function CameraGrid() {
     }
     
     if (error) {
-         return (
-            <div className="p-6">
-                {header}
-                <div className="p-4 bg-red-100 border border-red-400 text-red-700 rounded-lg mb-4">{error}</div>
-            </div>
-         );
+           return (
+             <div className="p-6">
+                 {header}
+                 <div className="p-4 bg-red-100 border border-red-400 text-red-700 rounded-lg mb-4">{error}</div>
+             </div>
+           );
     }
 
     return (
@@ -95,6 +96,8 @@ export default function CameraGrid() {
                         key={focusedCamera.id}
                         camId={focusedCamera.id}
                         location={focusedCamera.location}
+                        // CHANGE 1: Pass the stream_url to VideoFeed in Focus Mode
+                        streamUrl={focusedCamera.stream_url} 
                         frameData={cameraData[focusedCamera.id]}
                         isConnected={isConnected}
                         isFocused={true}
@@ -139,6 +142,8 @@ export default function CameraGrid() {
                                         <VideoFeed
                                             camId={camera.id}
                                             location={camera.location || camera.location_name} // Handle both formats
+                                            // CHANGE 2: Pass the stream_url to VideoFeed in Grid Mode
+                                            streamUrl={camera.stream_url}
                                             frameData={cameraData[camera.id]}
                                             isConnected={isConnected}
                                             isFocused={false}
