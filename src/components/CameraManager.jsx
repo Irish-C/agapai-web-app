@@ -213,7 +213,7 @@ export default function CameraManager({ locations, onCameraUpdated }) {
                         type="submit"
                         className="w-full flex items-center justify-center bg-green-600 text-white font-bold py-2 px-4 rounded-xl hover:bg-green-700 h-10"
                     >
-                        <FaPlus className="mr-1" /> Add
+                        Add
                     </button>
                 </div>
             </form>
