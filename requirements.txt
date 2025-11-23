@@ -1,9 +1,8 @@
 # --- Model Development ---
-opencv
-numpy
 
 # --- System Development ---
 bcrypt
+eventlet
 flask
 flask-socketio
 flask-jwt-extended
@@ -12,7 +11,7 @@ eventlet
 mysql-connector-python
 sqlalchemy
 requests
-aiohtt
+Pillow
 PyMySQL
 
 # --- Environment Management ---
@@ -22,7 +21,6 @@ python-dotenv
 gunicorn
 
 # --- Deployment Server ---
-ngix
 
 # --- Alert and Notification System ---
 
