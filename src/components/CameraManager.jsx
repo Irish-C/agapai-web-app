@@ -213,7 +213,7 @@ export default function CameraManager({ locations, onCameraUpdated }) {
                         type="submit"
                         className="w-full flex items-center justify-center bg-green-600 text-white font-bold py-2 px-4 rounded-xl hover:bg-green-700 h-10"
                     >
-                        Add
+                        <FaPlus className="mr-1" /> Add
                     </button>
                 </div>
             </form>
@@ -221,13 +221,13 @@ export default function CameraManager({ locations, onCameraUpdated }) {
             <h3 className="text-lg font-semibold text-gray-700 mb-2 px-3">Existing Cameras</h3>
             
             {/* SCROLLABLE WRAPPER */}
-            <div className="space-y-2 max-h-72 overflow-y-auto px-3 pr-2"> 
+            <div className="space-y-2 max-h-72 overflow-y-auto pr-2"> 
                 {cameras.length === 0 ? <p className="text-gray-500">No cameras added yet.</p> : null}
                 {cameras.map(cam => (
-                    <div key={cam.id} className="p-3 border rounded-lg bg-gray-50">
+                    <div key={cam.id} className="flex justify-between items-center p-3 border rounded-lg bg-gray-50"> 
                         {editingCam && editingCam.id === cam.id ? (
-                            /* --- Edit Mode --- */
-                            <form onSubmit={handleUpdateCamera} className="space-y-4">
+                            /* --- Edit Mode (Adjusted to fill space) --- */
+                            <form onSubmit={handleUpdateCamera} className="flex-grow space-y-4">
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4"> 
                                     {/* Camera Name */}
                                     <div>
@@ -266,36 +266,41 @@ export default function CameraManager({ locations, onCameraUpdated }) {
                                         onClick={handleCancelEdit}
                                         className="flex items-center bg-gray-500 text-white text-sm font-bold py-1 px-3 rounded-lg hover:bg-gray-600"
                                     >
-                                        Cancel
+                                        <FaTimes className="mr-1" /> Cancel
                                     </button>
                                     <button
                                         type="submit"
                                         className="flex items-center bg-green-600 text-white text-sm font-bold py-1 px-3 rounded-lg hover:bg-green-700"
                                     >
-                                        Save
+                                        <FaSave className="mr-1" /> Save
                                     </button>
                                 </div>
                             </form>
                         ) : (
-                            /* --- View Mode --- */
-                            <div className="flex justify-between items-center">
-                                <div>
+                            /* --- View Mode (FIXED LAYOUT) --- */
+                            <div className="flex justify-between items-center w-full">
+                                {/* Use flex-grow and min-w-0 to allow text content to shrink and truncate */}
+                                <div className="flex-grow min-w-0 pr-4"> 
                                     <strong className="text-gray-900">{cam.name}</strong>
                                     <span className="text-gray-600 text-sm ml-2">(Location: {cam.location_name || 'N/A'})</span>
+                                    {/* Ensure URL truncates if too long */}
                                     <div className="text-xs text-gray-500 truncate mt-1">
                                         URL: {cam.stream_url || 'N/A'}
                                     </div>
                                 </div>
-                                <div className="flex gap-2">
+                                {/* Button group - ensure buttons maintain original text look */}
+                                <div className="flex-shrink-0 flex gap-2">
                                     <button
                                         onClick={() => handleEditCamera(cam)}
                                         className="flex items-center bg-blue-600 text-white text-sm font-bold py-1 px-3 rounded-lg hover:bg-blue-700"
+                                        // Removed icon to revert to text, as per the image
                                     >
                                         Edit
                                     </button>
                                     <button
                                         onClick={() => handleDeleteCamera(cam.id)}
                                         className="flex items-center bg-red-600 text-white text-sm font-bold py-1 px-3 rounded-lg hover:bg-red-700"
+                                        // Removed icon to revert to text, as per the image
                                     >
                                         Remove
                                     </button>
@@ -312,7 +317,7 @@ export default function CameraManager({ locations, onCameraUpdated }) {
                     <div className="bg-white rounded-xl shadow-2xl w-full max-w-md">
                         <div className="p-6 border-b border-gray-200">
                             <h4 className="text-xl font-bold text-red-600 flex items-center">
-                                Confirm Deletion
+                                <FaTrash className="mr-2" /> Confirm Deletion
                             </h4>
                         </div>
                         <div className="p-6">

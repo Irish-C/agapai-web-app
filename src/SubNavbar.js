@@ -15,12 +15,12 @@ export default function SubNavbar({ activePage, cameraLayout, setCameraLayout })
     if (activePage === 'Live View' || activePage === 'Camera Layout') {
       return (
         <div className="flex items-center space-x-2">
-          {/* These buttons match your mockup style */}
+          {/* These buttons match*/}
           <button className="px-3 py-1 bg-white rounded-md shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50">Live View</button>
           <button className="px-3 py-1 bg-white rounded-md shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50">Camera Layout</button>
           <button className="px-3 py-1 bg-white rounded-md shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50">Reports</button>
           
-          {/* This dropdown is now controlled by state from MainDashboard.js */}
+          {/* This dropdown is controlled by state from MainDashboard.js */}
           <select 
             value={cameraLayout} 
             onChange={(e) => setCameraLayout(e.target.value)}

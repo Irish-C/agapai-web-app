@@ -108,7 +108,7 @@ def mock_stream_loop():
     """Continuously sends mock video frames and periodic incidents."""
     print("Starting mock stream loop...")
     incident_timer = time.time()
-    INCIDENT_INTERVAL = 30  # seconds
+    INCIDENT_INTERVAL = 240  # seconds
 
     while MOCK_STREAM_RUNNING and not mock_stream_event.is_set():
         
@@ -145,7 +145,7 @@ def mock_stream_loop():
         if current_time - incident_timer > INCIDENT_INTERVAL:
             mock_incident = {
                 'type': 'Fall Detected',
-                'location': 'Living Room', # You could update this to use a real location
+                'location': 'Sebastian', # Update this to use a real location
                 'timestamp': int(current_time)
             }
             socketio.emit('incident_alert', mock_incident)

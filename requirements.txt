@@ -1,5 +1,6 @@
 # --- Model Development ---
-
+opencv
+numpy
 
 # --- System Development ---
 bcrypt
@@ -20,8 +21,10 @@ python-dotenv
 # --- Production Server ---
 gunicorn
 
-# --- Alert and Notification System ---
-paho-mqtt
+# --- Deployment Server ---
+ngix
 
-# --- Frontend Tooling (optional if integrated through Node.js) ---
+# --- Alert and Notification System ---
+
+# --- Frontend Tooling ---
 tailwindcss
