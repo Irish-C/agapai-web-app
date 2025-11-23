@@ -1,3 +1,4 @@
+// src/pages/LoginPage.jsx
 import React, { useState } from 'react';
 import { FaLock, FaSignInAlt, FaUser, FaKey, FaSpinner } from 'react-icons/fa';
 import { useNavigate } from 'react-router-dom';
@@ -16,11 +17,6 @@ export default function LoginPage({ login }) {
     const [error, setError] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const navigate = useNavigate();
-
-    // Handles logo click to navigate to the root path
-    const handleLogoClick = () => {
-        navigate('/');
-    };
 
     const handleSubmit = async (e) => {
     e.preventDefault();
@@ -62,19 +58,8 @@ export default function LoginPage({ login }) {
                 
                 {/* Logo and Title */}
                 <div className="text-center mb-8">
-                    {/* MODIFIED: Wrapped logo in a clickable div with cursor style and onClick handler */}
-                    <div 
-                        onClick={handleLogoClick} 
-                        className="cursor-pointer transition duration-300 transform hover:scale-105"
-                    >
-                        <img 
-                            src={agapaiLogo} 
-                            alt="AGAPAI Logo" 
-                            className="w-20 h-20 mx-auto mb-4 rounded-full border-2 border-teal-500 shadow-md" 
-                            onError={(e) => { e.target.onerror = null; e.target.src="/placeholder-logo.png" }}
-                        />
-                    </div>
-                    {/* END MODIFIED */}
+                    <img src={agapaiLogo} alt="AGAPAI Logo" className="w-20 h-20 mx-auto mb-4 rounded-full border-2 border-teal-500 shadow-md" 
+                            onError={(e) => { e.target.onerror = null; e.target.src="/placeholder-logo.png" }}/>
                     <h2 className="text-3xl font-bold white">LOGIN</h2>
                     <p className="text-sm text-white mt-2">Access the <span className="font-bold text-teal-400">AGAPAI</span> Dashboard</p>
                 </div>
