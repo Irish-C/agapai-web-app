@@ -12,7 +12,7 @@
             "driver": "MySQL",
             "name": "testconnection",
             "database": "agapai_db",
-            "username": "root",
+            "username": "agapai",
             "askForPassword": true
         }
     ]

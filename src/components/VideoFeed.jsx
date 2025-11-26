@@ -49,7 +49,7 @@ export default function VideoFeed({
   } else if (!isConnected) {
     // Case 2: WebSocket is globally disconnected
     content = (
-      <div className="flex flex-col items-center justify-center h-full text-red-500">
+      <div className="flex flex-col items-ce+nter justify-center h-full text-red-500">
         <FaVideoSlash className="text-4xl mb-2" />
         <span>Disconnected</span>
       </div>
@@ -74,9 +74,11 @@ export default function VideoFeed({
     // Case 5: We have data! Show the image from the base64 string.
     content = (
       <img 
-        src={`data:image/jpeg;base64,${frameData}`} 
+//         src={`data:image/jpeg;base64,${frameData}`} 
+        style={{ height: '130%', width:'100%' }}
+        src={streamUrl} 
         alt={`${location} Feed`}
-        className="w-full h-full object-cover"
+//         className="w-full h-full object-cover"
       />
     );
   }
@@ -114,7 +116,7 @@ export default function VideoFeed({
 
       {/* Video Area: changes height if focused */}
       <div 
-        className={`w-full bg-gray-900 flex items-center justify-center relative
+        className={`w-full bg-gray-900 flex items-center justify-center relative pt-xl
           ${isFocused ? 'h-[75vh]' : 'aspect-video'}
         `}
       >

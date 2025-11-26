@@ -97,7 +97,8 @@ export default function CameraGrid() {
                         camId={focusedCamera.id}
                         location={focusedCamera.location}
                         // CHANGE 1: Pass the stream_url to VideoFeed in Focus Mode
-                        streamUrl={focusedCamera.stream_url} 
+                        // streamUrl={focusedCamera.stream_url} 
+                        streamUrl="http://localhost:4050/video_feed"
                         frameData={cameraData[focusedCamera.id]}
                         isConnected={isConnected}
                         isFocused={true}
@@ -143,12 +144,14 @@ export default function CameraGrid() {
                                             camId={camera.id}
                                             location={camera.location || camera.location_name} // Handle both formats
                                             // CHANGE 2: Pass the stream_url to VideoFeed in Grid Mode
-                                            streamUrl={camera.stream_url}
+                                            // streamUrl={camera.stream_url}
+                                            streamUrl="http://localhost:4050/video_feed"
                                             frameData={cameraData[camera.id]}
                                             isConnected={isConnected}
                                             isFocused={false}
                                             onFocusChange={setFocusedCameraId} // Pass the setter
                                         />
+                                        {/* <img src="http://localhost:4050/video_feed"></img> */}
                                     </div>
                                 ))}
                             </div>
