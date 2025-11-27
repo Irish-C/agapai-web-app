@@ -35,7 +35,7 @@ export default function CameraGrid() {
                 const data = await response.json();
 
                 if (data.status === 'success') {
-                    // Assuming data.cameras contains the 'stream_url' field for each camera.
+                    // Assuming data.cameras contains the location name and ID.
                     setCameraList(data.cameras); 
                 } else {
                     setError('API did not return a valid camera list.');
@@ -49,10 +49,14 @@ export default function CameraGrid() {
         };
 
         getCameras();
-    }, []); // <-- Dependency array emptied to run once
+    }, []); 
 
     // Find the camera object if one is focused
     const focusedCamera = cameraList.find(c => c.id === focusedCameraId);
+
+    // Helper function to generate the correct stream URL (proxied via main backend)
+    // NOTE: This URL points to the route you created in app.py: /api/live_stream/<int:cam_id>
+    const getStreamUrl = (camId) => `http://127.0.0.1:4050/video_feed`;
 
     const header = (
         <div className="flex items-center text-2xl font-extrabold text-gray-900 mb-4 border-b pb-2">
@@ -95,10 +99,9 @@ export default function CameraGrid() {
                     <VideoFeed
                         key={focusedCamera.id}
                         camId={focusedCamera.id}
-                        location={focusedCamera.location}
-                        // CHANGE 1: Pass the stream_url to VideoFeed in Focus Mode
-                        // streamUrl={focusedCamera.stream_url} 
-                        streamUrl="http://localhost:4050/video_feed"
+                        location={focusedCamera.location || focusedCamera.loc_name} // Use location or loc_name
+                        // FIX 1: Use the proxy URL based on the camera ID
+                        streamUrl={getStreamUrl(focusedCamera.id)} 
                         frameData={cameraData[focusedCamera.id]}
                         isConnected={isConnected}
                         isFocused={true}
@@ -109,7 +112,7 @@ export default function CameraGrid() {
                         className="mt-4 px-4 py-2 bg-blue-500 text-white rounded"
                     >
                         Back to Grid
-                    </button>
+                    </button>+
                 </div>
 
             ) : (
@@ -119,39 +122,24 @@ export default function CameraGrid() {
                     <div className="flex-grow lg:w-3/4">
                         {header}
                         
-                        {/* Pagination Controls (REMOVED) */}
-
-                        {/* Show loading spinner only when fetching new pages */}
-                        {isLoading && (
-                            <div className='flex items-center justify-center p-12 text-xl text-gray-700'>
-                                <FaSpinner className='animate-spin mr-2' /> Loading cameras...
-                            </div>
-                        )}
-
                         {/* Show grid only when not loading */}
                         {!isLoading && cameraList.length > 0 && (
-                            // This grid container stays the same: 1 col on mobile, 2 on desktop
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 {cameraList.map(camera => (
-                                    // We wrap the VideoFeed in a div.
-                                    // If there is only 1 camera, we tell this div to span 2 columns
-                                    // on medium screens, making it fill the grid.
                                     <div 
                                         key={camera.id} 
                                         className={cameraList.length === 1 ? 'md:col-span-2' : ''}
                                     >
                                         <VideoFeed
                                             camId={camera.id}
-                                            location={camera.location || camera.location_name} // Handle both formats
-                                            // CHANGE 2: Pass the stream_url to VideoFeed in Grid Mode
-                                            // streamUrl={camera.stream_url}
-                                            streamUrl="http://localhost:4050/video_feed"
+                                            location={camera.location || camera.loc_name} // Handle both formats
+                                            // FIX 2: Use the proxy URL based on the camera ID
+                                            streamUrl={getStreamUrl(camera.id)}
                                             frameData={cameraData[camera.id]}
                                             isConnected={isConnected}
                                             isFocused={false}
                                             onFocusChange={setFocusedCameraId} // Pass the setter
                                         />
-                                        {/* <img src="http://localhost:4050/video_feed"></img> */}
                                     </div>
                                 ))}
                             </div>

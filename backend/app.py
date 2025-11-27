@@ -3,8 +3,10 @@ import eventlet
 eventlet.monkey_patch(thread=False) # Thread=False avoids context errors
 
 
-from flask import Flask, request, jsonify, send_from_directory
+from flask import Flask, request, jsonify, send_from_directory, Response
 from flask_socketio import SocketIO, emit
+# from hardware import HardwareAlertSystem 
+# # Added the line above for Hardware integration
 from dotenv import load_dotenv
 import os
 import time
@@ -14,6 +16,7 @@ from io import BytesIO
 from PIL import Image, ImageDraw, ImageFont
 import threading    
 from flask_jwt_extended import JWTManager
+import requests # <-- ADDED for Video Proxy
 
 from models import Location, EventType, EventClass, Camera, Role
 from database import db
@@ -55,6 +58,9 @@ socketio = SocketIO(
     cors_allowed_origins=["http://localhost:5173", "http://127.0.0.1:5173", "*"],
     async_mode='eventlet'
 )
+
+# Initialize the Hardware Alert System, passing the socketio instance
+# hardware_system = HardwareAlertSystem(socketio)
 
 # Register Blueprints
 app.register_blueprint(user_routes, url_prefix='/api')
@@ -106,6 +112,7 @@ def generate_mock_frame(cam_id, cam_name):
 
 def mock_stream_loop():
     """Continuously sends mock video frames and periodic incidents."""
+    global MOCK_STREAM_RUNNING
     print("Starting mock stream loop...")
     incident_timer = time.time()
     INCIDENT_INTERVAL = 240  # seconds
@@ -132,17 +139,19 @@ def mock_stream_loop():
                     with frame_lock:
                         MOCK_FRAME_DATA[cam.id] = frame_base64
 
-                    socketio.emit('camera_frame', {
-                        'cam_id': cam.id,  # <-- SEND THE DATABASE ID
-                        'frame': frame_base64
-                    })
+                    # Only emit if MOCK_STREAM_RUNNING is True
+                    if MOCK_STREAM_RUNNING:
+                        socketio.emit('camera_frame', {
+                            'cam_id': cam.id,  # <-- SEND THE DATABASE ID
+                            'frame': frame_base64
+                        })
 
             except Exception as e:
                 print(f"Error in mock stream loop: {e}")
 
         # 2. Simulate Periodic Incident Alert
         current_time = time.time()
-        if current_time - incident_timer > INCIDENT_INTERVAL:
+        if MOCK_STREAM_RUNNING and (current_time - incident_timer > INCIDENT_INTERVAL):
             mock_incident = {
                 'type': 'Fall Detected',
                 'location': 'Sebastian', # Update this to use a real location
@@ -159,22 +168,94 @@ def mock_stream_loop():
 
 # --- SocketIO Event Handlers ---
 
+# --- SocketIO Event Handlers ---
+
 @socketio.on('connect')
 def handle_connect(auth=None):
-    # ...
-    global MOCK_STREAM_THREAD # Ensure you're modifying the global variable
+    """Handles client connection and starts the mock stream if not running."""
+    global MOCK_STREAM_THREAD, MOCK_STREAM_RUNNING, mock_stream_event
+    print(f'Client connected: {request.sid}')
+    
     with frame_lock:
-        # Start the background thread only if it hasn't been started yet
-        if MOCK_STREAM_THREAD is None:
+        # Check if the thread object is None. 
+        # In Eventlet mode, this is the most reliable check to see if the task has been started.
+        if MOCK_STREAM_THREAD is None: # <--- CHANGED: Removed 'or not MOCK_STREAM_THREAD.is_alive()'
             print("Starting mock stream thread...")
+            MOCK_STREAM_RUNNING = True
+            mock_stream_event.clear() # Clear the stop flag
+            # Start the background thread
             MOCK_STREAM_THREAD = socketio.start_background_task(mock_stream_loop)
-
+            
 @socketio.on('disconnect')
 def handle_disconnect():
     """Handles client disconnections."""
     print(f'Client disconnected: {request.sid}')
 
+# 💡 NEW SOCKET HANDLERS for controlling the mock stream from frontend 💡
+
+@socketio.on('stop_mock_stream')
+def handle_stop_mock_stream():
+    """Stops the mock frame and incident emission."""
+    global MOCK_STREAM_RUNNING
+    MOCK_STREAM_RUNNING = False
+    print("Mock stream emission stopped by client request.")
+    emit('mock_stream_status', {'running': False, 'message': 'Mock stream paused.'})
+
+@socketio.on('start_mock_stream')
+def handle_start_mock_stream():
+    """Starts/Resumes the mock frame and incident emission."""
+    global MOCK_STREAM_RUNNING, MOCK_STREAM_THREAD, mock_stream_event
+    
+    # 1. Update the flag
+    MOCK_STREAM_RUNNING = True
+    
+    # 2. Check if the thread is alive (it might have been stopped gracefully)
+    if MOCK_STREAM_THREAD is None or not MOCK_STREAM_THREAD.is_alive():
+        print("Mock stream thread restarting...")
+        mock_stream_event.clear()
+        MOCK_STREAM_THREAD = socketio.start_background_task(mock_stream_loop)
+    else:
+        print("Mock stream emission resumed.")
+        
+    emit('mock_stream_status', {'running': True, 'message': 'Mock stream running.'})
+
+
 # --- Flask Routes (REST API & Main Entry Point) ---
+
+# 💡 NEW ROUTE for Video Proxy 💡
+PICAM_HOST = os.getenv('PICAM_HOST', 'localhost')
+PICAM_PORT = os.getenv('PICAM_PORT', 4050)
+PICAM_FEED_URL = f"http://{PICAM_HOST}:{PICAM_PORT}/video_feed"
+
+@app.route('/api/live_stream/<int:cam_id>', methods=['GET'])
+def live_stream_proxy(cam_id):
+    """
+    Proxies the Motion JPEG stream from the separate Pi Camera Flask app 
+    (running on port 4050) to the main backend (port 5173).
+    """
+    
+    # NOTE: cam_id is currently ignored, as we assume one Pi Camera for now.
+    
+    try:
+        # Stream the request from the Pi Cam app
+        response = requests.get(PICAM_FEED_URL, stream=True, timeout=5)
+        
+        # Check if the Pi Cam app is actually running
+        if response.status_code == 200:
+            # Return the response directly to the client
+            return Response(
+                response.iter_content(chunk_size=1024),
+                mimetype=response.headers['Content-Type'],
+                content_type=response.headers['Content-Type']
+            )
+        else:
+            return f"Error: Pi Camera stream unavailable (Status: {response.status_code})", 503
+
+    except requests.exceptions.RequestException as e:
+        # The Pi Camera app is likely not running or unreachable
+        print(f"Error connecting to Pi Camera stream at {PICAM_FEED_URL}: {e}")
+        return jsonify({'status': 'error', 'message': 'Camera stream connection failed. Is picam.py running?'}), 503
+
 
 @app.route('/create_db')
 def create_db():
@@ -248,7 +329,6 @@ def serve_index(path):
 def get_camera_status():
     """
     Returns camera status from the DATABASE now.
-    This replaces the old mock route.
     """
     try:
         cameras = Camera.query.all()
@@ -262,6 +342,37 @@ def get_camera_status():
         return jsonify({'status': 'success', 'cameras': status_list}), 200
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 500
+    
+# # Hardware Alert System API Endpoint of Ultralytics
+# @app.route('/api/fall-detected', methods=['POST'])
+# def fall_detected_hook():
+#     """Endpoint called by the Ultralytics detection script."""
+#     data = request.get_json()
+#     location = data.get('location', 'Unknown Camera')
+    
+#     # This calls the method that rings the physical alarm and emits the socket.io event
+#     hardware_system.trigger_alert(location=location) 
+    
+#     # You would typically also add database logging here
+    
+#     return jsonify({"status": "Alert triggered"}), 200
+
+
+# Remote Silence Endpoint (Web Interface) - API endpoint that frontend's acknowledgeAlert function calls.
+# @app.route('/api/acknowledge-alert', methods=['POST'])
+# # You should add authentication/token validation here for a real system
+# def acknowledge_alert_hook():
+#     """Endpoint called by the web dashboard to silence the alarm."""
+    
+#     # Check if alarm is active and silence it
+#     success = hardware_system.handle_remote_silence() 
+
+#     if success:
+#         return jsonify({"success": True, "message": "Alarm silenced and snoozed."}), 200
+#     else:
+#         return jsonify({"success": False, "message": "No active alarm to silence."}), 200
+
+
 
 # --- Start Server ---
 
@@ -275,8 +386,10 @@ if __name__ == '__main__':
     except KeyboardInterrupt:
         print("Server shutting down...")
     finally:
+        # Graceful shutdown logic
         MOCK_STREAM_RUNNING = False
         mock_stream_event.set()
         if MOCK_STREAM_THREAD and MOCK_STREAM_THREAD.join():
-            MOCK_STREAM_THREAD.join()
+            # Using eventlet.sleep to give background task a chance to exit
+            socketio.sleep(0.5) 
         print("Server shutdown complete.")

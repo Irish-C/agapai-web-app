@@ -154,3 +154,32 @@ export const archiveUser = (userId) => {
     // backend route to set is_active=False
     return fetchApi(`/users/${userId}/archive`, 'PATCH', { is_active: false }); 
 };
+
+// // Alert System Handle Remote Silence
+// export const acknowledgeAlert = async (incidentId, token) => {
+//     try {
+//         const response = await fetch(`${API_BASE_URL}/api/acknowledge-alert`, {
+//             method: 'POST',
+//             headers: {
+//                 'Content-Type': 'application/json',
+//                 // Assuming your backend uses the token for authentication/authorization
+//                 'Authorization': `Bearer ${token}`, 
+//             },
+//             body: JSON.stringify({
+//                 incident_id: incidentId, // Optional, for logging purposes on the backend
+//             }),
+//         });
+
+//         // Backend should return a status indicating if the alarm was active and silenced
+//         if (!response.ok) {
+//             throw new Error('Server response failed to acknowledge alert.');
+//         }
+
+//         const data = await response.json();
+//         return data.success; // The backend should send back { success: true/false }
+
+//     } catch (error) {
+//         console.error('Error in acknowledgeAlert API:', error);
+//         return false;
+//     }
+// };

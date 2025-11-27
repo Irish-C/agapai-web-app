@@ -6,7 +6,7 @@ import {
   FaSpinner, 
   FaTimes, 
   FaExpand,
-    FaLink // Added for showing the URL
+    FaLink 
 } from 'react-icons/fa';
 
 /**
@@ -29,7 +29,7 @@ export default function VideoFeed({
   let content;
 
   if (isConnected && hasStreamUrl && !hasFrameData) {
-    // Case 1: Connected, but the stream is not yet delivering frames (either MJPEG or WebSocket).
+    // Case 1: Connected, but the stream is not yet delivering frames (MJPEG stream placeholder).
     // We display the URL as a debugging placeholder since the camera isn't running.
     content = (
       <div className="p-4 flex flex-col items-center justify-center h-full text-gray-400">
@@ -49,7 +49,7 @@ export default function VideoFeed({
   } else if (!isConnected) {
     // Case 2: WebSocket is globally disconnected
     content = (
-      <div className="flex flex-col items-ce+nter justify-center h-full text-red-500">
+      <div className="flex flex-col items-center justify-center h-full text-red-500">
         <FaVideoSlash className="text-4xl mb-2" />
         <span>Disconnected</span>
       </div>
@@ -63,7 +63,7 @@ export default function VideoFeed({
       </div>
     );
   } else if (!hasFrameData && isFocused) {
-    // Case 4: Focused, but no data (to avoid showing a confusing spinner on a big screen)
+    // Case 4: Focused, but no data
      content = (
       <div className="flex flex-col items-center justify-center h-full text-gray-500">
         <FaVideo className="text-4xl mb-2" />
@@ -71,19 +71,19 @@ export default function VideoFeed({
       </div>
     );
   } else {
-    // Case 5: We have data! Show the image from the base64 string.
+    // Case 5: We have data! Show the image from the base64 string (Mock Stream)
+    // The src is set using the base64-encoded frameData passed via SocketIO
     content = (
       <img 
-//         src={`data:image/jpeg;base64,${frameData}`} 
-        style={{ height: '130%', width:'100%' }}
         src={streamUrl} 
         alt={`${location} Feed`}
-//         className="w-full h-full object-cover"
+        style={{width: "100%", height:"130%"}}
+        className="w-full h-full object-cover" // Ensure it covers the container
       />
     );
   }
 
-  const isLive = hasFrameData && isConnected; // Status check now depends only on receiving frames.
+  const isLive = hasFrameData && isConnected; 
 
   // Handle click:
   const handleFocusClick = () => {
@@ -116,7 +116,7 @@ export default function VideoFeed({
 
       {/* Video Area: changes height if focused */}
       <div 
-        className={`w-full bg-gray-900 flex items-center justify-center relative pt-xl
+        className={`w-full bg-gray-900 flex items-center justify-center relative
           ${isFocused ? 'h-[75vh]' : 'aspect-video'}
         `}
       >

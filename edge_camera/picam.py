@@ -9,6 +9,7 @@ import threading
 from collections import Counter
 import os
 import requests
+import triggerAlert
 
 # --- CONFIGURATION ---
 import os
@@ -181,11 +182,12 @@ def run_tracking():
                 
                 # --- B. IMMEDIATE LOGGING & ALARM TRIGGER (Falls) ---
                 if 'fall' in class_name.lower():
+                     triggerAlert.main_alert_loop()
                      timestamp = datetime.now().strftime("%H:%M:%S")
                      alert_msg = f"[{timestamp}] ⚠️  CRITICAL ALERT: {class_name.upper()} DETECTED! (ID: {track_id})"
                      print(alert_msg)
                      write_log(alert_msg) 
-
+                     
                      # <--- SEND SIGNAL TO MAIN BACKEND --->
                      send_alert_to_backend(class_name, track_id)
 

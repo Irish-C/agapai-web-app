@@ -1,4 +1,7 @@
 # --- Model Development ---
+ultralytics -headless
+picamera2
+numpy
 
 # --- System Development ---
 bcrypt

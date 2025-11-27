@@ -12,8 +12,8 @@ class HardwareAlertSystem:
         
         # active_high=False is standard for Relay Modules. 
         # If your relay triggers immediately on boot (reverse logic), change to True.
-        self.strobe = OutputDevice(17, active_high=False, initial_value=False)
-        self.siren = OutputDevice(24, active_high=False, initial_value=False)
+        self.strobe = OutputDevice(17, active_high=False, initial_value=True) 
+        self.siren = OutputDevice(24, active_high=False, initial_value=True)
         
         # Button: GPIO 27 (pull_up=True means connecting Pin 27 to GND triggers it)
         self.ack_button = Button(27, pull_up=True, bounce_time=0.1)
