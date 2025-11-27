@@ -25,7 +25,9 @@ from routes.camera_routes import camera_routes
 from routes.event_routes import event_routes
 from routes.settings_routes import settings_routes
 
-
+# --- NEW: Import the Hardware Logic ---
+# Make sure hardware.py is in the same folder as app.py
+from hardware import HardwareAlertSystem
 # --- Configuration & Initialization ---
 
 # Load environment variables from .env
@@ -60,7 +62,7 @@ socketio = SocketIO(
 )
 
 # Initialize the Hardware Alert System, passing the socketio instance
-# hardware_system = HardwareAlertSystem(socketio)
+hardware_system = HardwareAlertSystem(socketio)
 
 # Register Blueprints
 app.register_blueprint(user_routes, url_prefix='/api')
@@ -222,6 +224,47 @@ def handle_start_mock_stream():
 
 # --- Flask Routes (REST API & Main Entry Point) ---
 
+# 💡 NEW ROUTE for Log Download Proxy 💡
+@app.route('/api/download_log', methods=['GET'])
+def download_log_proxy():
+    """
+    Proxies the log file download request from the frontend to the separate 
+    Pi Camera Flask app (picam.py) running on port 4050.
+    """
+    
+    # Get the date query parameter passed by the frontend (e.g., ?date=YYYY-MM-DD)
+    date_param = request.args.get('date')
+    if not date_param:
+        return jsonify({'status': 'error', 'message': 'Date parameter is required.'}), 400
+
+    # Construct the full URL for the picam.py download endpoint
+    PICAM_DOWNLOAD_URL = f"http://{PICAM_HOST}:{PICAM_PORT}/download_log?date={date_param}"
+    
+    try:
+        # Stream the request from the Pi Cam app
+        response = requests.get(PICAM_DOWNLOAD_URL, stream=True, timeout=5)
+        
+        # Check if the Pi Cam app is running and the file was found
+        if response.status_code == 200:
+            # Return the response directly to the client, preserving file headers
+            return Response(
+                response.iter_content(chunk_size=1024),
+                mimetype=response.headers.get('Content-Type'),
+                headers={'Content-Disposition': response.headers.get('Content-Disposition')}
+            )
+        else:
+            # Pass through the error message (e.g., "No logs found for...")
+            return Response(
+                response.text,
+                status=response.status_code,
+                mimetype='text/plain'
+            )
+
+    except requests.exceptions.RequestException as e:
+        print(f"Error connecting to Pi Camera download URL: {e}")
+        return jsonify({'status': 'error', 'message': 'Camera stream server unreachable. Check picam.py.'}), 503
+
+
 # 💡 NEW ROUTE for Video Proxy 💡
 PICAM_HOST = os.getenv('PICAM_HOST', 'localhost')
 PICAM_PORT = os.getenv('PICAM_PORT', 4050)
@@ -356,6 +399,33 @@ def get_camera_status():
 #     # You would typically also add database logging here
     
 #     return jsonify({"status": "Alert triggered"}), 200
+
+@app.route('/api/trigger_alert', methods=['POST'])
+def trigger_alert_api():
+    """
+    elooooooooooooooooooooEndpoint for the Camera Detection Script to trigger the alarm.
+    Payload: { "location": "Living Room", "confidence": 0.85 }
+    """
+
+    
+    # global HardwareAlertSystem
+    # if not HardwareAlertSystem  :
+    #     return jsonify({"status": "error", "message": "Hardware not initialized"}), 500
+
+    data = request.json or {}
+    location = data.get('location', 'Unknown Location')
+
+    socketio.emit('incident_alert', {
+            'type': 'Fall Detected',
+            'location': location,   
+            'timestamp': int(time.time())
+        })  
+    
+    # # Trigger the hardware logic (Strobe + Siren + Popup)
+    hardware_system.trigger_alert(location)
+
+    print(f"=========================here================================")
+    return jsonify({"status": "triggered", "message": "Alert processed"}), 200
 
 
 # Remote Silence Endpoint (Web Interface) - API endpoint that frontend's acknowledgeAlert function calls.

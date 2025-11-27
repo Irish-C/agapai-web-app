@@ -1,18 +1,33 @@
 // src/components/TodayReport.jsx
 import React, { useState, useEffect } from 'react'; // <-- Added useState and useEffect
-import { FaExclamationTriangle, FaCheckCircle, FaChartBar } from 'react-icons/fa';
+import { 
+    FaExclamationTriangle, 
+    FaCheckCircle, 
+    FaChartBar, 
+    FaCalendarAlt, // <-- New Icon
+    FaDownload,    // <-- New Icon
+    FaFileAlt      // <-- New Icon
+} from 'react-icons/fa';
 import { fetchDailySummary } from '../services/apiService.js'; // <-- Import the new service function
 
 /**
- * Renders the Today's Incident Log and Activity Summary sidebar.
+ * Renders the Today's Incident Log, Activity Summary, and Log Downloader sidebar.
  * It receives 'incidents' (real-time data) and 'user' (for the token) as props.
  */
 export default function TodayReport({ incidents, user }) { // <-- Accepts user prop
     
-    // State to hold the fetched 24-hour activity data
+    // --- STATE: Activity Summary (Original) ---
     const [activityData, setActivityData] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState(null);
+
+    // --- STATE: Log Downloader (New) ---
+    // Default to today's date in YYYY-MM-DD format
+    const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+
+    // CONFIGURATION: Replace with your Raspberry Pi's IP Address and the backend port (from picam.py)
+    const RPI_BASE_URL = "http://192.168.2.106:4050"; 
+
 
     // --- Data Fetching Effect for 24h Summary ---
     useEffect(() => {
@@ -37,7 +52,7 @@ export default function TodayReport({ incidents, user }) { // <-- Accepts user p
                     { label: 'Mov.', value: rawData.moving_time, percentage: `${Math.round((rawData.moving_time / total) * 100) || 0}%`, color: 'bg-teal-500' },
                     { label: 'Rest', value: rawData.resting_time, percentage: `${Math.round((rawData.resting_time / total) * 100) || 0}%`, color: 'bg-green-500' },
                     // Incident is often a separate metric, here we just show count
-                    { label: 'Incid.', value: incident_count, percentage: `${incident_count > 0 ? 5 : 0}%`, color: 'bg-red-500' },
+                    { label: 'Incid.', value: incident_count, percentage: `${incident_count > 0 ? 5 : 0}%`, color: 'bg-red-500'}
                 ];
 
                 setActivityData(newActivityData);
@@ -57,6 +72,12 @@ export default function TodayReport({ incidents, user }) { // <-- Accepts user p
     // --- Determine System Status ---
     const incidentCount = incidents.length;
     const isClear = incidentCount === 0;
+
+    // --- HELPER: Date Formatter ---
+    const formatDateDisplay = (dateString) => {
+        const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+        return new Date(dateString).toLocaleDateString(undefined, options);
+    };
 
     return (
         <div className="space-y-4 sticky top-2 h-fit">
@@ -118,6 +139,58 @@ export default function TodayReport({ incidents, user }) { // <-- Accepts user p
                     </div>
                 )}
                 <p className="text-xs text-gray-500 mt-4 text-center">Data refreshed daily.</p>
+            </div>
+
+            {/* 3. LOG PANEL / EXPORT LOGS (New Feature) */}
+            <div className="bg-white p-4 rounded-xl shadow-lg border border-gray-200">
+                <h3 className="text-xl font-bold text-gray-800 mb-4 flex items-center border-b pb-2">
+                    <FaFileAlt className="mr-2 text-blue-600" />
+                    Export Daily Logs
+                </h3>
+
+                <div className="space-y-4">
+                    {/* Date Selection */}
+                    <div>
+                        <label className="text-xs text-gray-500 mb-1 block font-bold">SELECT DATE</label>
+                        <input
+                            type="date"
+                            value={selectedDate}
+                            onChange={(e) => setSelectedDate(e.target.value)}
+                            className="bg-gray-50 border border-gray-300 rounded-md text-gray-800 px-4 py-2 
+                                     focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 
+                                     transition-all w-full cursor-pointer"
+                        />
+                        <p className="mt-1 text-xs text-blue-600 font-medium text-right">
+                            {formatDateDisplay(selectedDate)}
+                        </p>
+                    </div>
+
+                    {/* Download Button */}
+                    <div>
+                        <label className="text-xs text-gray-500 mb-1 block font-bold">ACTION</label>
+                        <a
+                            // Link points to the Flask backend route we updated in picam.py
+                            href={`${RPI_BASE_URL}/download_log?date=${selectedDate}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 text-white 
+                                     font-semibold py-2 px-4 rounded-md shadow hover:shadow-lg transform hover:-translate-y-0.5 
+                                     transition-all duration-200 w-full"
+                        >
+                            <FaDownload className="text-sm" />
+                            <span>Download Log File</span>
+                        </a>
+                        <p className="text-xs text-gray-400 mt-2 text-center">
+                            Downloads a .txt file of all events.
+                        </p>
+                    </div>
+
+                    {/* Note to the User */}
+                    <div className="p-3 bg-blue-50 border border-blue-200 rounded-md text-xs text-blue-800">
+                        <strong>Note:</strong> Logs are only available if the monitoring system was active on the selected date. 
+                        If you receive a "No logs found" error, no activity was recorded for that day.
+                    </div>
+                </div>
             </div>
         </div>
     );

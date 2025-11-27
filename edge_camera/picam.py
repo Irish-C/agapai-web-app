@@ -5,6 +5,7 @@ from datetime import datetime
 import time
 from picamera2 import Picamera2
 from flask import Flask, Response, request, send_file, jsonify
+from flask_cors import CORS # <--- ADDED: Critical for web access
 import threading
 from collections import Counter
 import os
@@ -25,11 +26,12 @@ SKIP_FRAMES = 3
 SITTING_ALERT_THRESHOLD_SECONDS = 10 
 HOST_PORT = 4050
 LOG_INTERVAL = 1.0 
-LOG_DIR = "daily_logs" 
+
+# Log Directory setup (Uses BASE_DIR for robust pathing)
+LOG_DIR = os.path.join(BASE_DIR, "daily_logs") 
 
 # --- BACKEND CONNECTION CONFIG ---
-# This is where we send the alert data (Node/Express or other Python backend)
-BACKEND_URL = "http://localhost:5000/api/trigger_alert"
+BACKEND_URL = "http://127.0.0.1:5000/api/trigger_alert"
 ALERT_COOLDOWN = 5.0  # Seconds to wait before sending another alert for the same fall
 
 # Global variables
@@ -39,6 +41,7 @@ last_alert_sent_time = 0
 
 # Initialize Flask App
 app = Flask(__name__)
+CORS(app) # <--- ADDED: Enables cross-origin requests for the web app
 
 # Colors and Fonts
 COLOR_MAP = {
@@ -58,6 +61,7 @@ FALL_ALERT_COLOR = (0, 0, 255)
 def write_log(message):
     """Writes a message to a daily log file."""
     try:
+        # Create LOG_DIR relative to BASE_DIR if it doesn't exist
         if not os.path.exists(LOG_DIR):
             os.makedirs(LOG_DIR)
         date_str = datetime.now().strftime("%Y-%m-%d")
@@ -70,39 +74,34 @@ def write_log(message):
 # --- TRIGGER FUNCTION ---
 def send_alert_to_backend(fall_type, track_id):
     """Sends a signal to the Main Web App to turn on Hardware Alarm."""
-    global last_alert_sent_time
-    
-    # Check cooldown (don't spam server if it's been less than 5 seconds)
-    if (time.time() - last_alert_sent_time) < ALERT_COOLDOWN:
-        return
-
     try:
         print(f" -> 📡 Sending Signal to Backend for {fall_type}...")
         
-        # NOTE: We no longer trigger hardware here. We strictly act as a sensor.
-        # The Main App (localhost:5000) will receive this and turn on the Siren/Strobe.
-
-        # Notify Backend
         payload = {
             "location": "Camera 1 (Pi)", 
             "fall_type": fall_type,
             "track_id": int(track_id)
         }
-        # Send POST request (Fire and forget, short timeout)
-        requests.post(BACKEND_URL, json=payload, timeout=0.5)
+        requests.post("http://localhost:5000/api/trigger_alert", json=payload, timeout=0.5)
         
-        last_alert_sent_time = time.time()
-        print(" -> ✅ Signal Sent Successfully!")
+        # last_alert_sent_time = time.time()
+        print(" -> ✅ Signal Sent Successfullyy!")
+        return
         
     except Exception as e:
         print(f" -> ❌ FAILED to contact Backend: {e}")
+
 
 # --- BACKGROUND THREAD: CAMERA & YOLO ---
 def run_tracking():
     global output_frame, lock
     
     print(f"Loading model from {MODEL_PATH}...")
-    model = YOLO(MODEL_PATH)
+    try:
+        model = YOLO(MODEL_PATH)
+    except Exception as e:
+        print(f"FATAL: Could not load model from {MODEL_PATH}. {e}")
+        return
     
     # State Management
     sitting_start_times = {} 
@@ -130,7 +129,7 @@ def run_tracking():
 
     print("Camera started. AI processing running in background...")
     print("---------------------------------------------------")
-    print(f"LOGS STARTED. Updates every {LOG_INTERVAL}s.")
+    print(f"LOGS STARTED. Saving to {LOG_DIR}. Updates every {LOG_INTERVAL}s.")
     print("---------------------------------------------------")
 
     while True:
@@ -153,7 +152,7 @@ def run_tracking():
                 last_clss = results[0].boxes.cls.cpu().numpy().astype(int)
                 last_confs = results[0].boxes.conf.cpu().numpy()
 
-            # --- REAL-TIME TERMINAL & FILE LOGGING ---
+            # --- REAL-TIME TERMINAL & FILE LOGGING (Status) ---
             current_time = time.time()
             timestamp = datetime.now().strftime("%H:%M:%S")
 
@@ -180,16 +179,14 @@ def run_tracking():
                 
                 current_class_counts[class_name] = current_class_counts.get(class_name, 0) + 1
                 
-                # --- B. IMMEDIATE LOGGING & ALARM TRIGGER (Falls) ---
+                # --- IMMEDIATE LOGGING & ALARM TRIGGER (Falls) ---
                 if 'fall' in class_name.lower():
                      triggerAlert.main_alert_loop()
+                     send_alert_to_backend(class_name, track_id)
                      timestamp = datetime.now().strftime("%H:%M:%S")
                      alert_msg = f"[{timestamp}] ⚠️  CRITICAL ALERT: {class_name.upper()} DETECTED! (ID: {track_id})"
                      print(alert_msg)
-                     write_log(alert_msg) 
-                     
-                     # <--- SEND SIGNAL TO MAIN BACKEND --->
-                     send_alert_to_backend(class_name, track_id)
+                     write_log(alert_msg)
 
                 # --- TIMER LOGIC (Sitting) ---
                 timer_str = ""
@@ -270,13 +267,17 @@ def video_feed():
 
 @app.route("/download_log")
 def download_log():
+    """Serves the log file for a specific date as an attachment (for Log Panel)."""
     date_param = request.args.get('date') 
     if not date_param:
         return "Error: Date parameter required", 400
+    
     filename = f"log_{date_param}.txt"
     filepath = os.path.join(LOG_DIR, filename)
+    
     if os.path.exists(filepath):
-        return send_file(filepath, as_attachment=True)
+        # send_file correctly handles file downloading
+        return send_file(filepath, as_attachment=True, download_name=filename)
     else:
         return f"No logs found for date: {date_param}", 404
 
