@@ -19,15 +19,18 @@ To know more about the App looks and features → [AGAPAI Web App](APP.md)
 - [Key components](#key-components)
 - [Pages](#pages)
 - [License](#license)
-- [Acknowledgements](#acknowledgements)
+- [References](#references)
+
 
 
 # Prerequisites
 Before you begin, ensure you have the following installed:
-- Node.js: v18.0.0 or higher
-- Python: 3.10+ (for ML/Hardware services)
-- Database: Access to a database compatible with Prisma (PostgreSQL/SQLite)
-- Git: For version control
+- `Node.js`: v18.0.0 or higher
+- `Python`: 3.10+ (for ML/Hardware services)
+- Database: Access to a database compatible with `Prisma` (PostgreSQL/SQLite)
+- `Git`: For version control
+
+
 
 # Installation
 1. Clone the Repository.
@@ -58,6 +61,7 @@ Before you begin, ensure you have the following installed:
    npx prisma generate
    ```
 
+
 # Development Setup
 The project uses concurrently to run both the Express server and the Vite frontend with a single command.
 ```bash
@@ -66,9 +70,19 @@ npm run start
 - API Server: Running on http://localhost:3000
 - Vite Client: Running on http://localhost:5173 (Proxied to API)
 
+
+
 # Contribution
-## Commits
-Follow the proper commits. See [SEMANTICS](https://gist.github.com/joshbuchea/6f47e86d2510bce28f8e7f42ae84c716).
+### How to Contribute (as project member)
+1. Clone the repository and create a new branch for your feature or bug fix.
+2. Make your changes and ensure the code follows the project's coding standards.
+3. Test your changes thoroughly.
+4. Commit your changes with clear and descriptive messages. See [SEMANTICS](https://gist.github.com/joshbuchea/6f47e86d2510bce28f8e7f42ae84c716).
+5. Reference any related issues or tickets in the commit message.
+6. Push your branch to the remote repository.
+7. Create a pull request for review and merging.
+
+
 
 # Architecture
 
@@ -80,6 +94,7 @@ MVC Architecture is used to separate concerns and organize the codebase effectiv
 | React + Vite | Client | Frontend application for user interface |
 | Prisma ORM | Database | Database modeling & migrations |
 | Socket.IO | Presentation | WebSocket communication for live camera feeds & alerts |
+
 
 
 # Project Structure
@@ -94,6 +109,7 @@ agapai-web-app/
 ├── package.json                     # NPM dependencies & scripts
 └── README.md                        # Project documentation
 ```
+
 
 ## Frontend
 The client side uses React with Vite.
@@ -134,6 +150,7 @@ agapai-web-app/
 - `sockets/` for Socket.IO client services for real-time communication
 
 
+
 ## Backend
 The server side uses Node.js with Express.
 ```
@@ -152,6 +169,7 @@ agapai-web-app/
     └── index.ts                     # Server entry point
 ```
 
+
 # Key Components
 ##  Routing
 - Frontend: React Router is used for client-side routing.
@@ -167,6 +185,8 @@ agapai-web-app/
 ## Theme
 - Tailwind CSS is used for styling and theming the application.
 - Custom themes and tokens are defined in the `theme/` folder.
+
+
 
 # PAGES
 
@@ -196,5 +216,12 @@ agapai-web-app/
 - 🔄`UpdatePage` for application updates and release notes.
 
 
+
 # License
 This project is licensed under the MIT License - see the [LICENSE](LICENSE.md) file for details.
+
+
+
+# Thank You
+- [Avinava's Template](https://github.com/Avinava/simple-vite-react-express)
+- [Josh Buchea's Commit Semantics](https://gist.github.com/joshbuchea/6f47e86d2510bce28f8e7f42ae84c716)
