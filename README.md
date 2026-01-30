@@ -1,76 +1,190 @@
-# **AGAPAI: Smart Elderly Care Monitoring System**
+# AGAPAI WEB APP
 
-**AGAPAI** is a specialized web application built for **real-time monitoring** and **centralized management** of security cameras in elderly care facilities or homes. It uses modern technologies to deliver instant alerts, streamlined device control, and secure user access.
+This repository contains the source code for the AGAPAI web application. 
+Below are the [Instructions](#table-of-contents) to set up the development environmen and run the application locally.
 
----
+To know more about the App looks and features → [AGAPAI Web App](APP.md)
 
-## **Core Features & Value Proposition**
 
-AGAPAI ensures **secure**, **reliable**, and **organized** control over your monitoring infrastructure.
 
----
+# Table of Contents
+- [Prerequisites](#prerequisites)
+- [Installation](#installation)
+- [Development Setup](#development-setup)
+- [Contribution](#contribution)
+- [Architecture](#architecture)
+- [Project Structure](#project-structure)
+- [Key components](#key-components)
+- [License](#license)
+- [Acknowledgements](#acknowledgements)
 
-### **Security & Access**
 
-- **Role-Based Access Control (RBAC):**  
-  Limits sensitive settings (User Management, Device Management) to **Admin-only** operations.
+# Prerequisites
+Before you begin, ensure you have the following installed:
+- Node.js: v18.0.0 or higher
+- Python: 3.10+ (for ML/Hardware services)
+- Database: Access to a database compatible with Prisma (PostgreSQL/SQLite)
+- Git: For version control
 
-- **Secure Authentication:**  
-  Implements JWT-based authentication for protected API usage.
+# Installation
+1. Clone the Repository.
+   ```bash
+   git clone https://github.com/Irish-C/agapai-web-app.git
+   cd agapai-web-app
+   npm install
+    ```
+2. Install Root and Backend Dependencies.
+   ```bash
+   cd server
+   pip install -r requirements.txt
+   ```
+  
+3. Install Frontend Dependencies:
+    ```bash
+    cd client && npm install
+    ```
 
----
+4. Environment Variables: Create a .env file in the root directory and add your database URL
+    ```env
+    DATABASE_URL="your_database_url_here"
+    ```
 
-### 📷 **Device & Data Management**
+5. Database Migration: Run Prisma migrations to set up the database schema.
+   ```bash
+   npx prisma migrate dev --name init
+   npx prisma generate
+   ```
 
-- **Real-Time Camera Feeds:**  
-  Stream live RTSP/HTTP camera feeds directly from the dashboard.
+# Development Setup
+The project uses concurrently to run both the Express server and the Vite frontend with a single command.
+```bash
+npm run start
+```
+- API Server: Running on http://localhost:3000
+- Vite Client: Running on http://localhost:5173 (Proxied to API)
 
-- **Unified Management Dashboard:**  
-  Manage **Locations** and **Cameras** in a single, structured interface.
+# Contribution
+## Commits
+Follow the proper commits. See [SEMANTICS](https://gist.github.com/joshbuchea/6f47e86d2510bce28f8e7f42ae84c716).
 
-- **Full CRUD Support:**  
-  Create, read, update, and delete all cameras and locations.
+# Architecture
 
-- **Scrollable Lists:**  
-  Clean UI for handling large device/location lists without clutter.
+MVC Architecture is used to separate concerns and organize the codebase effectively.
 
-- **Safety Prompts:**  
-  Critical actions (like deleting devices or locations) require confirmation via modal pop-ups.
-
----
-
-### **Real-Time Communication**
-
-- **Instant Alerts:**  
-  Receives simulated fall/inactivity alerts via WebSockets from the backend inference engine.
-
-- **Responsive UI:**  
-  Smooth experience across desktop and mobile devices.
-
----
-
-## **Technologies Used**
-
-A modern, asynchronous backend paired with a dynamic React frontend.
-
-| Area | Technology | Purpose |
+| Stack | Layer | Use |
 |------|------------|---------|
-| **Frontend** | React.js (Vite) | UI framework & client-side routing |
-| **Styling** | Tailwind CSS | Utility-first responsive design |
-| **APIs / Icons** | React Router, React Icons | Routing & iconography |
-| **Backend** | Python / Flask | RESTful API + core logic |
-| **Authentication** | Flask-JWT-Extended, Bcrypt | Secure token auth + password hashing |
-| **Database** | SQLAlchemy | ORM & database modeling |
-| **Real-time** | Flask-SocketIO (Eventlet) | WebSocket-based live updates & alerts |
+| NodeJS + ExpressJS | Server | Backend API server & business logic |
+| React + Vite | Client | Frontend application for user interface |
+| Prisma ORM | Database | Database modeling & migrations |
+| Socket.IO | Presentation | WebSocket communication for live camera feeds & alerts |
 
----
 
-## 🚀 **Installation & Setup**
+# Project Structure
 
-To run AGAPAI locally, install and configure both the backend and frontend components.
+## Root
+```
+agapai-web-app/
+├── .env.example                     # Example environment variables
+├── index.html                       # Main HTML file
+├── .gitignore                       # Git ignore rules
+├── package.json                     # NPM dependencies & scripts
+└── README.md                        # Project documentation
+```
 
----
+## Frontend
+```
+agapai-web-app/
+└── client/                          # React + Vite frontend
+    ├── public/                      # Static assets (index.html, icons)
+    ├── src/
+    │   ├── assets/                  # Images, branding, backgrounds
+    │   ├── components/
+    │   │   └── layout/              # Global UI (Navbar, Header, footer)
+    │   ├── features/                # Feature-based modules (domain logic)
+    │   ├── hooks/                   # Custom React hooks (API, sockets)
+    │   ├── pages/                   # Route-level pages / views
+    │   ├── services/                # API clients & reusable logic
+    │   └── theme/                   # Tailwind config, tokens, globals
+    └── vite.config.ts               # Vite configuration
+```
 
-### 1. **Backend Setup (Python / Flask)**
+## Backend
+```
+agapai-web-app/
+└── server/                          # Express / Node.js backend
+    ├── prisma/                      # Prisma schema & migrations
+    ├── hardware/                    # Hardware-related logic/modules
+    ├── ml/                          # Machine learning models / scripts
+    ├── src/
+    │   ├── controllers/             # Request handlers
+    │   ├── middlewares/             # Auth, validation, error handling
+    │   ├── models/                  # Data models / ORM mappings
+    │   ├── routes/                  # API route definitions
+    │   ├── services/                # Business logic layer
+    │   └── utils/                   # Shared helpers & utilities
+    └── index.ts                     # Server entry point
+```
 
-_Requires Python 3.9+ installed on your machine._
+# Key components
+## ROUTING
+- Frontend: React Router is used for client-side routing.
+- Backend: Express Router is used for defining API endpoints.
+
+## STATE MANAGEMENT
+- React Context API is used for global state management.
+
+## API COMMUNICATION
+- Axios is used for making HTTP requests from the frontend to the backend API.
+- Socket.IO is used for real-time communication (camera feeds, alerts).
+
+## PAGES
+
+### Main
+- ✅`LoginPage` for user authentication.
+- ✅`LandingPage` for information about the app.
+- ✅`MainPage` for viewing camera feeds and alerts.
+- ✅`SettingsPage` for application settings and configurations.
+- ✅`ReportsPage` for viewing system reports and analytics.
+
+### Settings
+- ✅`ProfileView` for user profile management.
+- 🔄`HelpView` for user assistance and documentation.
+- 🔄`NotificationsView` for managing alerts and notifications.
+- 🔄`SupportView` for customer support and contact.
+- 🔄`FeedbackView` for user feedback and suggestions.
+- 🔄`ActivityLogView` for tracking user activities and changes.
+
+### Information
+- 🔄`AboutView` for information about the application and team.
+- 🔄`FAQView` for frequently asked questions and answers.
+- 🔄`TermsView` for terms of service and legal information.
+- 🔄`PrivacyPolicyView` for privacy policy details.
+
+### Miscellaneous
+- 🔄`NotFoundPage` for handling 404 errors.
+- 🔄`UpdatePage` for application updates and release notes.
+
+## FEATURES
+
+### Key Folders
+
+- `camera/` for camera feedback features.
+- `dashboard/` for viewing camera feeds and alerts
+- `manager/` for managing cameras, locations, and users.
+
+### Forms & Modals
+
+- `forms/` for adding, editing, and deleting cameras and locations
+- `modals/` for user authentication and management
+
+### Auth and Alerts
+- `auth/` for authentication system (login, logout, user management)
+- `alerts/` for real-time alerts and notifications for camera feeds and system events
+
+### Services
+- `api/` for API client services to interact with the backend
+- `sockets/` for Socket.IO client services for real-time communication
+
+
+# License
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
