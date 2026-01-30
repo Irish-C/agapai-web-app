@@ -14,7 +14,10 @@ To know more about the App looks and features → [AGAPAI Web App](APP.md)
 - [Contribution](#contribution)
 - [Architecture](#architecture)
 - [Project Structure](#project-structure)
+- [Frontend](#frontend)
+- [Backend](#backend)
 - [Key components](#key-components)
+- [Pages](#pages)
 - [License](#license)
 - [Acknowledgements](#acknowledgements)
 
@@ -82,6 +85,7 @@ MVC Architecture is used to separate concerns and organize the codebase effectiv
 # Project Structure
 
 ## Root
+The root.
 ```
 agapai-web-app/
 ├── .env.example                     # Example environment variables
@@ -92,6 +96,7 @@ agapai-web-app/
 ```
 
 ## Frontend
+The client side uses React with Vite.
 ```
 agapai-web-app/
 └── client/                          # React + Vite frontend
@@ -107,8 +112,30 @@ agapai-web-app/
     │   └── theme/                   # Tailwind config, tokens, globals
     └── vite.config.ts               # Vite configuration
 ```
+### Main Features 
+(src/features/)
+- `camera/` for camera feedback features.
+- `dashboard/` for viewing camera feeds and alerts
+- `manager/` for managing cameras, locations, and users.
+
+### Forms & Modals 
+(src/features/)
+- `forms/` for adding, editing, and deleting cameras and locations
+- `modals/` for user authentication and management
+
+### Auth and Alerts 
+(src/features/)
+- `auth/` for authentication system (login, logout, user management)
+- `alerts/` for real-time alerts and notifications for camera feeds and system events
+
+### Services 
+(src/services/)
+- `api/` for API client services to interact with the backend
+- `sockets/` for Socket.IO client services for real-time communication
+
 
 ## Backend
+The server side uses Node.js with Express.
 ```
 agapai-web-app/
 └── server/                          # Express / Node.js backend
@@ -125,19 +152,23 @@ agapai-web-app/
     └── index.ts                     # Server entry point
 ```
 
-# Key components
-## ROUTING
+# Key Components
+##  Routing
 - Frontend: React Router is used for client-side routing.
 - Backend: Express Router is used for defining API endpoints.
 
-## STATE MANAGEMENT
+## State Management
 - React Context API is used for global state management.
 
-## API COMMUNICATION
-- Axios is used for making HTTP requests from the frontend to the backend API.
-- Socket.IO is used for real-time communication (camera feeds, alerts).
+## API Communication
+- `Axios` is used for making HTTP requests from the frontend to the backend API.
+- `Socket.IO` is used for real-time communication (camera feeds, alerts).
 
-## PAGES
+## Theme
+- Tailwind CSS is used for styling and theming the application.
+- Custom themes and tokens are defined in the `theme/` folder.
+
+# PAGES
 
 ### Main
 - ✅`LoginPage` for user authentication.
@@ -164,27 +195,6 @@ agapai-web-app/
 - 🔄`NotFoundPage` for handling 404 errors.
 - 🔄`UpdatePage` for application updates and release notes.
 
-## FEATURES
-
-### Key Folders
-
-- `camera/` for camera feedback features.
-- `dashboard/` for viewing camera feeds and alerts
-- `manager/` for managing cameras, locations, and users.
-
-### Forms & Modals
-
-- `forms/` for adding, editing, and deleting cameras and locations
-- `modals/` for user authentication and management
-
-### Auth and Alerts
-- `auth/` for authentication system (login, logout, user management)
-- `alerts/` for real-time alerts and notifications for camera feeds and system events
-
-### Services
-- `api/` for API client services to interact with the backend
-- `sockets/` for Socket.IO client services for real-time communication
-
 
 # License
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE.md) file for details.
