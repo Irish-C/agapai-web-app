@@ -1,16 +1,16 @@
-# 🏡 **AGAPAI: Smart Elderly Care Monitoring System**
+# **AGAPAI: Smart Elderly Care Monitoring System**
 
 **AGAPAI** is a specialized web application built for **real-time monitoring** and **centralized management** of security cameras in elderly care facilities or homes. It uses modern technologies to deliver instant alerts, streamlined device control, and secure user access.
 
 ---
 
-## ✨ **Core Features & Value Proposition**
+## **Core Features & Value Proposition**
 
 AGAPAI ensures **secure**, **reliable**, and **organized** control over your monitoring infrastructure.
 
 ---
 
-### 🔐 **Security & Access**
+### **Security & Access**
 
 - **Role-Based Access Control (RBAC):**  
   Limits sensitive settings (User Management, Device Management) to **Admin-only** operations.
@@ -39,7 +39,7 @@ AGAPAI ensures **secure**, **reliable**, and **organized** control over your mon
 
 ---
 
-### ⚡ **Real-Time Communication**
+### **Real-Time Communication**
 
 - **Instant Alerts:**  
   Receives simulated fall/inactivity alerts via WebSockets from the backend inference engine.
@@ -49,7 +49,7 @@ AGAPAI ensures **secure**, **reliable**, and **organized** control over your mon
 
 ---
 
-## 💻 **Technologies Used**
+## **Technologies Used**
 
 A modern, asynchronous backend paired with a dynamic React frontend.
 
