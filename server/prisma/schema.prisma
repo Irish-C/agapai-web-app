@@ -1,0 +1,85 @@
+// prisma/schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Role {
+  id        BigInt @id @default(autoincrement())
+  role_name String @unique @db.VarChar(50)
+  users     User[]
+
+  @@map("roles")
+}
+
+model User {
+  id                BigInt     @id @default(autoincrement())
+  firstname         String     @db.VarChar(100)
+  lastname          String     @db.VarChar(100)
+  username          String     @unique @db.VarChar(50)
+  password          String     @db.VarChar(255)
+  role_id           BigInt?
+  role              Role?      @relation(fields: [role_id], references: [id])
+  acknowledged_logs EventLog[]
+
+  @@map("users")
+}
+
+model Location {
+  id       BigInt   @id @default(autoincrement())
+  loc_name String   @unique @db.VarChar(100)
+  cameras  Camera[]
+
+  @@map("location")
+}
+
+model EventType {
+  id              BigInt       @id @default(autoincrement())
+  event_type_name String       @unique @db.VarChar(50)
+  classes         EventClass[]
+
+  @@map("event_type")
+}
+
+model EventClass {
+  id            BigInt    @id @default(autoincrement())
+  class_name    String    @db.VarChar(100)
+  event_type_id BigInt
+  event_type    EventType @relation(fields: [event_type_id], references: [id])
+  logs          EventLog[]
+
+  @@map("event_class")
+}
+
+model Camera {
+  id         BigInt    @id @default(autoincrement())
+  cam_name   String    @db.VarChar(100)
+  cam_status Boolean   @default(true)
+  stream_url String    @db.VarChar(255)
+  loc_id     BigInt?
+  location   Location? @relation(fields: [loc_id], references: [id])
+  logs       EventLog[]
+
+  @@map("camera")
+}
+
+model EventLog {
+  id             BigInt     @id @default(autoincrement())
+  timestamp      DateTime   @default(now()) @db.Timestamp
+  event_status   String     @default("unacknowledged") @db.VarChar(50)
+  file_path      String?    @db.VarChar(255)
+  cam_id         BigInt?
+  event_class_id BigInt?
+  ack_by_user_id BigInt?
+  
+  camera         Camera?    @relation(fields: [cam_id], references: [id])
+  event_class    EventClass? @relation(fields: [event_class_id], references: [id])
+  acknowledged_by User?      @relation(fields: [ack_by_user_id], references: [id])
+
+  @@map("event_logs")
+}

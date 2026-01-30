@@ -1,0 +1,23 @@
+# --- Core Vision & AI ---
+# Using 'ultralytics' instead of 'ultralytics-headless' if you need 
+# to debug with a window on the Pi, otherwise keep -headless.
+ultralytics
+numpy
+
+# --- Hardware Interface (Raspberry Pi) ---
+# Ensure you are on Bookworm OS for picamera2
+picamera2
+RPi.GPIO
+
+# --- Backend Communication ---
+# Used for the Python script to send alerts/data to your Express API
+requests
+python-dotenv
+
+# --- Image Processing ---
+Pillow
+
+# --- Utilities ---
+# (Optional) If your Python scripts still need to talk directly to DB 
+# without going through Express/Prisma
+psycopg2-binary

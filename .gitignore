@@ -1,1 +1,34 @@
-node_modules
+# Dependency folders
+node_modules/
+client/node_modules/
+server/node_modules/
+
+# Production build outputs
+dist/
+client/dist/
+build/
+
+# Local environment files
+.env
+.env.local
+.env.*.local
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+*.log
+
+# Editor/System files
+.vscode/
+.DS_Store
+thumbs.db
+
+# SQLite local databases
+/server/prisma/*.db
+/server/prisma/*.db-journal
+
+# Python bytecode
+__pycache__/
+*.py[cod]
+*$py.class

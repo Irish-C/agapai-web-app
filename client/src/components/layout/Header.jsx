@@ -1,0 +1,226 @@
+import React, { useState, useEffect } from 'react';
+import { Link, useLocation } from 'react-router-dom';
+import { FaUserCircle, FaSignOutAlt, FaTimes, FaCog , FaFile, FaBars, FaTh, FaQuestionCircle} from 'react-icons/fa';
+import agapaiLogo from './logo/agapai-logo.png';
+
+export default function Header({ user, logout }) {
+    const [isMenuOpen, setIsMenuOpen] = useState(false);
+    const [hidden, setHidden] = useState(false); // track header visibility
+    const [lastScrollY, setLastScrollY] = useState(0);
+    const location = useLocation();
+    
+    // NEW STATE: Control the visibility of the logout confirmation modal
+    const [showLogoutModal, setShowLogoutModal] = useState(false);
+    
+    // Hide header on landing/root page
+    if (location.pathname === '/' || location.pathname === '/landing') {
+        return null;
+    }
+
+    const navItems = [
+        { name: 'Dashboard', path: '/dashboard', icon: FaTh },
+        { name: 'Reports', path: '/reports', icon: FaFile },
+        { name: 'Settings', path: '/settings', icon: FaCog },
+    ];
+
+    const toggleMenu = () => setIsMenuOpen(!isMenuOpen);
+    const isActive = (path) => location.pathname === path;
+
+    // Scroll effect to hide/show header
+    useEffect(() => {
+        const handleScroll = () => {
+            const currentScrollY = window.scrollY;
+            if (currentScrollY > lastScrollY && currentScrollY > 50) {
+                // scrolling down
+                setHidden(true);
+            } else {
+                // scrolling up
+                setHidden(false);
+            }
+            setLastScrollY(currentScrollY);
+        };
+
+        window.addEventListener('scroll', handleScroll);
+        return () => window.removeEventListener('scroll', handleScroll);
+    }, [lastScrollY]);
+
+    // Function executed upon confirming logout
+    const handleConfirmLogout = () => {
+        setShowLogoutModal(false); // Close modal first
+        logout(); // Execute the actual logout function passed via props
+        setIsMenuOpen(false); // Close mobile menu if open
+    };
+
+    // Function to open the modal (used by both desktop and mobile buttons)
+    const openLogoutModal = () => {
+        setShowLogoutModal(true);
+    };
+
+    return (
+        <header
+        className={`bg-gradient-to-b from-[#2d3092] to-[#015954] text-white shadow-lg sticky top-0 z-20 transition-transform duration-300 ${
+            hidden ? '-translate-y-full' : 'translate-y-0'
+        }`}
+        >
+        <div className="container mx-auto px-4 sm:px-6 lg:px-8 flex justify-between items-center h-16">
+            {/* Logo and App Title */}
+            <Link
+            to="/dashboard"
+            className="flex items-center space-x-3 transition duration-300 hover:opacity-90"
+            >
+            <img
+                src={agapaiLogo}
+                alt="AGAPAI Logo"
+                className="h-12 w-auto rounded-full"
+                onError={(e) => {
+                e.target.onerror = null;
+                e.target.src = 'https://placehold.co/32x32/14b8a6/ffffff?text=A';
+                }}
+            />
+            <div className="flex flex-col leading-tight">
+                <span className="text-4xl font-bold text-[#c4fcff] tracking-wider">
+                AGAPAI
+                </span>
+                <span className="text-[0.75rem] italic text-gray-300 tracking-wide">
+                A Vision-Based Monitoring and Alert System for Fall and Inactivity in
+                Elderly Care Facility
+                </span>
+            </div>
+            </Link>
+
+
+                {/* Desktop Navigation Links */}
+                <nav className="hidden md:flex space-x-6">
+                    {navItems.map((item) => (
+                        <Link
+                            key={item.name}
+                            to={item.path}
+                            className={`flex items-center text-sm font-medium transition duration-150 ${
+                                isActive(item.path) ? 'text-teal-400' : 'hover:text-gray-400'
+                            }`}
+                        >
+                            <item.icon className="mr-1" />
+                            {item.name}
+                        </Link>
+                    ))}
+                </nav>
+
+                {/* User Info (Profile Link) and Logout */}
+                <div className="hidden md:flex items-center space-x-4">
+                    {/* Profile Link now points to /settings */}
+                    <Link 
+                        to="/settings" 
+                        className="flex items-center space-x-2 p-2 rounded-full transition duration-150 hover:bg-gray-600 cursor-pointer"
+                    >
+                        <FaUserCircle className="w-5 h-5 text-teal-400" />
+                        <span className="text-sm font-medium">{user?.username || 'User'}</span>
+                    </Link>
+                    <button
+                        // MODIFIED: Open modal instead of logging out directly
+                        onClick={openLogoutModal}
+                        className="flex items-center px-3 py-1 text-sm font-medium bg-red-600 rounded-full hover:bg-red-700 transition duration-150 shadow-md"
+                    >
+                        <FaSignOutAlt className="mr-1" />
+                        Logout
+                    </button>
+                </div>
+
+                {/* Mobile Menu Button */}
+                <button
+                    onClick={toggleMenu}
+                    className="md:hidden p-2 rounded-lg hover:bg-gray-700 transition duration-150"
+                >
+                    {isMenuOpen ? <FaTimes className="w-6 h-6" /> : <FaBars className="w-6 h-6" />}
+                </button>
+            </div>
+
+            {/* Mobile Menu Dropdown */}
+            {isMenuOpen && (
+                <div className="md:hidden bg-gray-900 p-4 border-t border-gray-700">
+                    <nav className="flex flex-col space-y-2 mb-4">
+                        {navItems.map((item) => (
+                            <Link
+                                key={item.name}
+                                to={item.path}
+                                onClick={() => setIsMenuOpen(false)}
+                                className={`flex items-center px-3 py-2 text-base font-medium rounded-lg transition duration-150 ${
+                                    isActive(item.path)
+                                        ? 'bg-gray-700 text-teal-400'
+                                        : 'text-gray-200 hover:bg-gray-700 hover:text-teal-400'
+                                }`}
+                            >
+                                <item.icon className="mr-3 w-5 h-5" />
+                                {item.name}
+                            </Link>
+                        ))}
+                    </nav>
+                    <div className="pt-4 border-t border-gray-700 flex flex-col space-y-2">
+                        {/* Static user display */}
+                        <div className="flex items-center space-x-3 px-3 py-2 text-base">
+                            <FaUserCircle className="w-6 h-6 text-teal-400" />
+                            <span className="font-semibold">{user?.username || 'User'}</span>
+                        </div>
+                        
+                        {/* Profile link for mobile now points to /settings */}
+                        <Link
+                            to="/settings"
+                            onClick={() => setIsMenuOpen(false)}
+                            className="flex items-center justify-center w-full px-3 py-2 text-base font-medium bg-gray-700 rounded-lg hover:bg-gray-600 transition duration-150 shadow-md text-teal-400"
+                        >
+                            <FaUserCircle className="mr-2" />
+                            View Profile
+                        </Link>
+
+                        <button
+                            // MODIFIED: Open modal instead of logging out directly
+                            onClick={openLogoutModal}
+                            className="flex items-center justify-center w-full px-3 py-2 text-base font-medium bg-red-600 rounded-lg hover:bg-red-700 transition duration-150 shadow-md"
+                        >
+                            <FaSignOutAlt className="mr-2" />
+                            Logout
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            {/* --------------------------- LOGOUT CONFIRMATION MODAL --------------------------- */}
+            {showLogoutModal && (
+                // CRITICAL FIX: Added pt-16 (padding-top 4rem) to push the modal content 
+                // below the fixed header (which is h-16) and re-center the content 
+                // in the remaining viewport space.
+                <div className="fixed inset-0 z-[100] flex items-center justify-center pt-16 p-4">
+                    <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm">
+                        <div className="p-6 border-b border-gray-200 flex justify-between items-center">
+                            <h4 className="text-xl font-bold text-gray-800 flex items-center">
+                                <FaQuestionCircle className="mr-3 text-red-500" /> Confirm Logout
+                            </h4>
+                            <button onClick={() => setShowLogoutModal(false)} className="text-gray-500 hover:text-gray-800">
+                                <FaTimes className="w-5 h-5" />
+                            </button>
+                        </div>
+                        <div className="p-6">
+                            <p className="text-gray-700 mb-6">
+                                Are you sure you want to log out of your account? You will need to sign in again to view the dashboard.
+                            </p>
+                            <div className="flex justify-end space-x-3">
+                                <button
+                                    onClick={() => setShowLogoutModal(false)}
+                                    className="px-4 py-2 text-sm font-medium rounded-lg border border-gray-300 text-gray-700 bg-white hover:bg-gray-50 transition duration-150"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={handleConfirmLogout}
+                                    className="px-4 py-2 text-sm font-medium rounded-lg text-white bg-red-600 hover:bg-red-700 transition duration-150"
+                                >
+                                    <FaSignOutAlt className="mr-1 inline-block" /> Confirm Logout
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+            {/* --------------------------------------------------------------------------------- */}
+        </header>
+    );
+}
