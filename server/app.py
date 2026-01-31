@@ -5,8 +5,6 @@ eventlet.monkey_patch(thread=False) # Thread=False avoids context errors
 
 from flask import Flask, request, jsonify, send_from_directory, Response
 from flask_socketio import SocketIO, emit
-# from hardware import HardwareAlertSystem 
-# # Added the line above for Hardware integration
 from dotenv import load_dotenv
 import os
 import time
@@ -16,14 +14,22 @@ from io import BytesIO
 from PIL import Image, ImageDraw, ImageFont
 import threading    
 from flask_jwt_extended import JWTManager
-import requests # <-- ADDED for Video Proxy
+import requests
 
 from models import Location, EventType, EventClass, Camera, Role
 from database import db
+
+# Import Blueprints
 from routes.user_routes import user_routes
 from routes.camera_routes import camera_routes
 from routes.event_routes import event_routes
 from routes.settings_routes import settings_routes
+
+# Register Blueprints
+app.register_blueprint(user_routes, url_prefix='/api')
+app.register_blueprint(camera_routes, url_prefix='/api')
+app.register_blueprint(event_routes, url_prefix='/api')
+app.register_blueprint(settings_routes, url_prefix='/api')
 
 # --- NEW: Import the Hardware Logic ---
 # Make sure hardware.py is in the same folder as app.py

@@ -1,9 +1,13 @@
 // src/App.jsx
 import React, { useState, useEffect } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
-import { loginUser, fetchCameraList, logoutUser } from './src/services/apiService.js';
+
+//image
 import agapai_Bg from './src/assets/bg/gray-bg.png';
-import { socket } from './src/services/socket.js'; // Ensure this points to your socket.js
+
+// services
+import { loginUser, fetchCameraList, logoutUser } from './src/services/apiService.js';
+import { socket } from './src/services/socket.js';
 
 // components
 import Header from './src/components/layout/Header.jsx';

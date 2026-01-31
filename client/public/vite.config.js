@@ -1,6 +1,7 @@
+// client/vite.config.js
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
-import tailwindcss from '@tailwindcss/vite';
+import tailwindcss from 'tailwindcss';
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
@@ -8,14 +9,16 @@ export default defineConfig({
     host: '0.0.0.0',
     port: 5173,
     proxy: {
+      // Directs standard API calls to Flask
       '/api': {
-        target: 'http://localhost:3000', 
+        target: 'http://localhost:5000', 
         changeOrigin: true,
         secure: false,
       },
+      // Directs WebSocket traffic to Flask-SocketIO
       '/socket.io': {
-        target: 'http://localhost:3000',
-        ws: true,
+        target: 'http://localhost:5000',
+        ws: true, // Enables WebSocket proxying
         changeOrigin: true,
         secure: false,
       }

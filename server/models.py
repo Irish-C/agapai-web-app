@@ -1,4 +1,4 @@
-# backend/models.py
+# server/models.py
 from database import db
 
 # Python version of the 'roles' table

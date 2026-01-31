@@ -1,3 +1,4 @@
+import React from 'react';
 import CameraGrid from '../features/camera/CameraGrid.jsx';
 
 /**

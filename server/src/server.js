@@ -11,7 +11,7 @@ const app = express();
 const PORT = 3000;
 
 // 3. Global BigInt Fix
-// This must stay! It prevents errors when sending database IDs to the frontend.
+// It prevents errors when sending database IDs to the frontend.
 BigInt.prototype.toJSON = function() {
   return this.toString();
 };

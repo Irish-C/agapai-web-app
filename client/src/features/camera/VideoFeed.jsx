@@ -1,4 +1,5 @@
 // src/components/VideoFeed.jsx
+import React from 'react';
 import { FaVideo, FaVideoSlash, FaSpinner, FaTimes, FaExpand, FaLink } from 'react-icons/fa';
 
 export default function VideoFeed({ 

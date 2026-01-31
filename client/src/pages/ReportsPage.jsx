@@ -1,8 +1,5 @@
-/* src/pages/ReportsPage.jsx
+// src/pages/ReportsPage.jsx
 
- * This component fetches real event logs from the apiService
- * and displays them in a table format.
- */
 import React, { useState, useEffect } from 'react';
 import { FaFileAlt, FaSpinner, FaExclamationTriangle, FaArrowRight } from 'react-icons/fa';
 import { fetchReportsData } from '../services/apiService';
