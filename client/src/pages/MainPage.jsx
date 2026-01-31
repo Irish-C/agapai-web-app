@@ -1,5 +1,4 @@
-import React from 'react';
-import CameraGrid from './src/components/CameraGrid.jsx';
+import CameraGrid from '../features/camera/CameraGrid.jsx';
 
 /**
  * Main dashboard view displaying video feeds and incident reports.

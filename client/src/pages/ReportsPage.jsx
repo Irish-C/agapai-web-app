@@ -4,8 +4,8 @@
  * and displays them in a table format.
  */
 import React, { useState, useEffect } from 'react';
-import { fetchReportsData } from './services/apiService';
 import { FaFileAlt, FaSpinner, FaExclamationTriangle, FaArrowRight } from 'react-icons/fa';
+import { fetchReportsData } from '../services/apiService';
 
 export default function ReportsPage() {
     const [logs, setLogs] = useState([]);

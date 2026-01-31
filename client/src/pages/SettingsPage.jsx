@@ -2,10 +2,10 @@
 import React, { useState } from 'react';
 import { FaUserCog, FaCogs, FaBell, FaUsers, FaConnectdevelop} from 'react-icons/fa'; 
 
-import AccountSettingsForm from './components/AccountSettingsForm.jsx';
-import CameraNotificationSettings from './src/components/CameraNotificationSettings.jsx';
-import UserManager from './src/components/UserManager.jsx'; 
-import ManagementDashboard from "./src/components/ManagementDashboard.jsx";
+import AccountSettingsForm from '../features/form/AccountSettingsForm.jsx';
+import CameraNotificationSettings from '../features/camera/CameraNotificationSettings.jsx';
+import UserManager from '../features/manager/UserManager.jsx'; 
+import ManagementDashboard from "../features/manager/ManagementDashboard.jsx";
 
 export default function Settings({ user }) {
     const isAdmin = user && user.role === 'Admin'; 

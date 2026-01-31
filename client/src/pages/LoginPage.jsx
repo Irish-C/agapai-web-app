@@ -3,11 +3,11 @@ import React, { useState } from 'react';
 import { FaLock, FaSignInAlt, FaUser, FaKey, FaSpinner } from 'react-icons/fa';
 import { useNavigate } from 'react-router-dom';
 
-// Assets path updated based on the new hierarchy
-import og_bg from './../src/assets/bg/filter-bg.png';
-import agapaiLogo from './../src/assets/logo/agapai-logo.png';
-import dswdLogo from './../src/assets/logo/dswd-logo.png'; 
-import pupLogo from './../src/assets/logo/pup-logo.png'; 
+// Assets path
+import og_bg from '../assets/bg/filter-bg.png';
+import agapaiLogo from '../assets/logo/agapai-logo.png';
+import dswdLogo from '../assets/logo/dswd-logo.png'; 
+import pupLogo from '../assets/logo/pup-logo.png'; 
 
 // LoginPage receives the asynchronous 'login' function from App.jsx
 export default function LoginPage({ login }) {

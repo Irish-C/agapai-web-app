@@ -1,11 +1,24 @@
-import { useState } from 'react'; // Import useState
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { FaUserCircle, FaSignInAlt, FaVideo, FaChartLine, FaEnvelope, FaTimes, FaPhoneAlt } from 'react-icons/fa'; // Added FaTimes, FaPhoneAlt
+import { FaUserCircle, FaSignInAlt, FaVideo, FaChartLine, FaEnvelope, FaTimes, FaPhoneAlt } from 'react-icons/fa'; 
+import agapaiLogo from '../assets/logo/agapai-logo.png';
+import filter_bg from '../assets/bg/filter-bg.png';
 
-import agapaiLogo from './src/assets/logo/agapai-logo.png';
-import filter_bg from './src/assets/bg/filter-bg.png';
-
-export default function LandingPage() {
+/*************  ✨ Windsurf Command ⭐  *************/
+/**
+ * LandingPage component - main entry point of the application
+ * 
+ * This component renders the main landing page with a background image, 
+ * a contact panel that slides in from the right side, and a main content area 
+ * with a logo, tagline, and a call-to-action button.
+ * 
+ * State variables:
+ * - isContactPanelOpen: boolean flag to control the visibility of the contact panel
+ * 
+ * Function:
+ * - toggleContactPanel: toggles the isContactPanelOpen state variable
+ */
+/*******  a7175d98-5716-4d7b-a6ba-1c632f001660  *******/export default function LandingPage() {
     // 1. State to control the visibility of the contact panel
     const [isContactPanelOpen, setIsContactPanelOpen] = useState(false);
 
