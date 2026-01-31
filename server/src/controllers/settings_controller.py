@@ -1,24 +1,31 @@
-# server/controllers/settings_controller.py
-from flask import jsonify
+from database import db
 
-def save_notifications_logic(user_id, data):
+async def save_notifications_logic(user_id, data):
     """
-    Handles the logic for saving user preferences.
+    Handles the logic for saving user preferences using Prisma.
     """
     try:
+        # 1. Extract data from the request
         alert_threshold = data.get('alert_threshold')
         email_notifications = data.get('email_notifications')
-        
-        # --- PLACEHOLDER FOR ACTUAL DB SAVE ---
-        # user = User.query.get(user_id)
-        # user.preferences.update(...)
-        # db.session.commit()
-        
-        print(f"MOCK SAVE: User {user_id} saved settings:")
-        print(f"  - Alert Threshold: {alert_threshold}")
-        print(f"  - Email Notifications: {email_notifications}")
-        
-        return {"status": "success", "message": "Notification settings saved"}, 200
+
+        # 2. Update the database
+        # We use int(user_id) because JWT identities are often stored as strings
+        updated_user = await db.user.update(
+            where={'id': int(user_id)},
+            data={
+                # Ensure these field names match your schema.prisma exactly
+                'email_notifications': data.get('email_notifications') is True,
+                'alert_threshold': int(alert_threshold) if alert_threshold else 0
+            }
+        )
+
+        return {
+            "status": "success", 
+            "message": "Notification settings saved",
+            "user": updated_user.username
+        }, 200
 
     except Exception as e:
+        print(f"Settings Save Error: {e}")
         return {"status": "error", "message": str(e)}, 500

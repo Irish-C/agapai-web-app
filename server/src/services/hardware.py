@@ -1,8 +1,23 @@
 import time
 from threading import Timer
-from gpiozero import OutputDevice, Button
+
+try:
+    from gpiozero import OutputDevice, Button
+    print("[HARDWARE] gpiozero loaded successfully.")
+except (ImportError, ModuleNotFoundError):
+    # Mock classes so the code doesn't crash on non-Pi devices
+    print("[HARDWARE] gpiozero not found. Using Mock classes for development.")
+    class OutputDevice:
+        def __init__(self, pin, active_high=False, initial_value=False): self.pin = pin
+        def on(self): print(f"MOCK: Pin {self.pin} turned ON")
+        def off(self): print(f"MOCK: Pin {self.pin} turned OFF")
+    
+    class Button:
+        def __init__(self, pin, pull_up=True, bounce_time=0.1): self.pin = pin
+        self.when_pressed = None
 
 class HardwareAlertSystem:
+    # ... the rest of your class code remains exactly the same ...
     def __init__(self, socketio):
         self.socketio = socketio
         

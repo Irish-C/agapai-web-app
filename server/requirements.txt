@@ -1,23 +1,23 @@
-# --- Core Vision & AI ---
-# Using 'ultralytics' instead of 'ultralytics-headless' if you need 
-# to debug with a window on the Pi, otherwise keep -headless.
-ultralytics
-numpy
+# --- Backend Framework ---
+flask
+flask-jwt-extended
+flask-socketio
+flask-cors
 
-# --- Hardware Interface (Raspberry Pi) ---
-# Ensure you are on Bookworm OS for picamera2
-picamera2
-RPi.GPIO
+# --- Database (Prisma) ---
+prisma              # REPLACES flask-sqlalchemy
+psycopg2-binary     # Required for PostgreSQL communication
 
-# --- Backend Communication ---
-# Used for the Python script to send alerts/data to your Express API
-requests
+# --- Real-time & Server ---
+gunicorn
 python-dotenv
 
-# --- Image Processing ---
+# --- AI & Vision (Pi Optimized) ---
+ultralytics
+numpy
 Pillow
+picamera2           # Ensure you are on Raspberry Pi Bookworm OS
+RPi.GPIO
 
-# --- Utilities ---
-# (Optional) If your Python scripts still need to talk directly to DB 
-# without going through Express/Prisma
-psycopg2-binary
+# --- Security & Utils ---
+requests

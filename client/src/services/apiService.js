@@ -1,7 +1,6 @@
 // src/services/apiService.js
 
-// Base URL is intentionally relative because Vite proxies /api to http://localhost:5000
-const BASE_API_URL = '/api';
+const BASE_API_URL = 'http://127.0.0.1:5000/api';
 const AUTH_TOKEN_KEY = 'authToken'; 
 
 

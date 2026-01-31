@@ -1,59 +1,53 @@
-# server/controllers/user_controller.py
-import bcrypt
-from flask import jsonify
+from prisma import Prisma
+from werkzeug.security import check_password_hash, generate_password_hash
 from flask_jwt_extended import create_access_token
-from models import User, Role, EventLog
+from flask import jsonify
 from database import db
-from sqlalchemy.orm import joinedload
 
-def login_logic(data):
-    username = data.get('username')
-    password = data.get('password')
-
-    if not username or not password:
-        return {"error": "Missing username or password", "code": 400}
-
-    user = User.query.filter_by(username=username).first()
-    if user and user.password:
-        if bcrypt.checkpw(password.encode('utf-8'), user.password.encode('utf-8')):
-            access_token = create_access_token(identity=str(user.id))
-            return {
-                "status": "success",
-                "user_id": user.id,
-                "role": user.role.role_name if user.role else 'User',
-                "access_token": access_token
-            }, 200
-
-    return {"error": "Invalid username or password", "code": 401}
-
-def get_profile_logic(user_id):
-    user = db.session.get(User, user_id, options=[joinedload(User.role)])
-    if not user:
-        return {"error": "User not found", "code": 404}
+async def login_logic(data):
+    if not db.is_connected(): 
+        await db.connect()
     
-    return {
+    user = await db.user.find_unique(where={'username': data.get('username')})
+    
+    if user and check_password_hash(user.password, data.get('password')):
+        token = create_access_token(identity=str(user.id))
+        return jsonify({"status": "success", "access_token": token}), 200 # Wrapped!
+        
+    return jsonify({"status": "error", "message": "Invalid credentials"}), 401 # Wrapped!
+
+async def get_profile_logic(user_id):
+    if not db.is_connected():
+        await db.connect()
+
+    user = await db.user.find_unique(where={'id': int(user_id)})
+    
+    if not user:
+        return jsonify({"error": "User not found"}), 404 
+    
+    return jsonify({
         "firstname": user.firstname or 'N/A',
         "lastname": user.lastname or 'User',
-        "username": user.username,
-        "role": user.role.role_name if user.role else 'User'
-    }, 200
+        "username": user.username
+    }), 200
 
-def create_user_logic(data):
-    if User.query.filter_by(username=data['username']).first():
-        return {"error": "Username already exists", "code": 409}
+async def create_user_logic(data):
+    if not db.is_connected():
+        await db.connect()
 
-    role = Role.query.filter_by(role_name=data['role']).first()
-    if not role:
-        return {"error": "Role not found", "code": 404}
+    existing_user = await db.user.find_unique(where={'username': data['username']})
+    if existing_user:
+        return jsonify({"error": "Username already exists"}), 409
 
-    hashed_pw = bcrypt.hashpw(data['password'].encode('utf-8'), bcrypt.gensalt())
-    new_user = User(
-        firstname=data['firstname'],
-        lastname=data['lastname'],
-        username=data['username'],
-        password=hashed_pw.decode('utf-8'),
-        role_id=role.id
+    hashed_pw = generate_password_hash(data['password'])
+    
+    new_user = await db.user.create(
+        data={
+            'firstname': data.get('firstname'),
+            'lastname': data.get('lastname'),
+            'username': data['username'],
+            'password': hashed_pw,
+        }
     )
-    db.session.add(new_user)
-    db.session.commit()
-    return {"status": "success", "message": "User created"}, 201
+    
+    return jsonify({"status": "success", "message": "User created"}), 201

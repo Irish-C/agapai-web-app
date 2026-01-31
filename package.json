@@ -4,21 +4,15 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "server": "cd server && nodemon src/server.js",
+    "server": "cd server && . venv/bin/activate && python3 app.py",
     "client": "cd client && npm run dev",
     "dev": "vite",
-    "build": "vite build",
-    "preview": "vite preview",
+    "build": "cd client && npm run build",
+    "preview": "cd client && npm run preview",
     "start": "concurrently \"npm run server\" \"npm run client\""
   },
   "dependencies": {
-    "@prisma/adapter-pg": "^7.3.0",
-    "@tailwindcss/vite": "^4.1.16",
     "axios": "^1.13.2",
-    "cors": "^2.8.6",
-    "dotenv": "^17.2.3",
-    "express": "^5.2.1",
-    "pg": "^8.17.2",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "react-icons": "^5.5.0",
@@ -26,8 +20,8 @@
     "socket.io-client": "^4.8.1"
   },
   "devDependencies": {
-    "@prisma/client": "^7.3.0",
     "@tailwindcss/postcss": "^4.1.16",
+    "@tailwindcss/vite": "^4.1.16",
     "@types/react": "^19.2.2",
     "@types/react-dom": "^19.2.2",
     "@vitejs/plugin-react": "^5.1.0",
@@ -38,7 +32,6 @@
     "eslint-plugin-react": "^7.37.5",
     "eslint-plugin-react-hooks": "^7.0.1",
     "eslint-plugin-react-refresh": "^0.4.24",
-    "nodemon": "^3.1.11",
     "postcss": "^8.5.6",
     "prisma": "^7.3.0",
     "tailwindcss": "^4.1.16",
