@@ -1,7 +1,7 @@
 // src/components/AccountSettingsForm.jsx
 import React, { useState, useEffect } from 'react';
 import { FaLock, FaKey, FaSave, FaSpinner, FaCheckCircle, FaExclamationCircle, FaUser } from 'react-icons/fa';
-import { fetchApi, fetchUserProfile, changePassword } from './services/apiService'; 
+import { fetchApi, fetchUserProfile, changePassword } from '../../services/apiService'; 
 
 // Define default structure for loading state fallback
 const initialProfileState = { 

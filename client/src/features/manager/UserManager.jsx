@@ -1,8 +1,8 @@
 // src/components/UserManager.jsx
 import React, { useState, useEffect } from 'react';
-import { FaUserPlus, FaUsers, FaEdit, FaSpinner, FaArchive } from 'react-icons/fa'; // FaArchive imported
+import { FaUserPlus, FaUsers, FaEdit, FaSpinner, FaArchive } from 'react-icons/fa';
 import UserEditModal from '../modal/UserEditModal.jsx'; 
-import { fetchUsers, fetchApi } from '/src/services/apiService.js'; 
+import { fetchUsers, fetchApi } from '../../services/apiService.js'; 
 
 
 const archiveUser = (userId) => fetchApi(`/users/${userId}/archive`, 'PATCH', { is_active: false }); 

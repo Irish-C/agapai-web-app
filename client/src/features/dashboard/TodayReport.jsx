@@ -1,14 +1,7 @@
 // src/components/TodayReport.jsx
-import React, { useState, useEffect } from 'react'; // <-- Added useState and useEffect
-import { 
-    FaExclamationTriangle, 
-    FaCheckCircle, 
-    FaChartBar, 
-    FaCalendarAlt, // <-- New Icon
-    FaDownload,    // <-- New Icon
-    FaFileAlt      // <-- New Icon
-} from 'react-icons/fa';
-import { fetchDailySummary } from '/src/services/apiService.js'; // <-- Import the new service function
+import React, { useState, useEffect } from 'react';
+import { FaExclamationTriangle, FaCheckCircle, FaChartBar, FaCalendarAlt,FaDownload, FaFileAlt} from 'react-icons/fa';
+import { fetchDailySummary } from '../../services/apiService.js'; 
 
 /**
  * Renders the Today's Incident Log, Activity Summary, and Log Downloader sidebar.

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { FaUserCircle, FaSignOutAlt, FaTimes, FaCog , FaFile, FaBars, FaTh, FaQuestionCircle} from 'react-icons/fa';
-import agapaiLogo from './logo/agapai-logo.png';
+import agapaiLogo from '../../assets/logo/agapai-logo.png';
 
 export default function Header({ user, logout }) {
     const [isMenuOpen, setIsMenuOpen] = useState(false);

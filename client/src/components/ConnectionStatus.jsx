@@ -1,6 +1,6 @@
 // src/components/ConnectionStatus.jsx
 import React, { useEffect, useState } from "react";
-import { socket } from "../socket";
+import { socket } from "../services/socket";
 import { FaPlug } from "react-icons/fa"; 
 
 // Accept the onLogout prop

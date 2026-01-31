@@ -1,14 +1,7 @@
 // src/components/LocationManager.jsx
 import React, { useState, useEffect } from 'react';
-import { fetchApi } from './services/apiService'; 
-import { 
-    FaMapMarkerAlt, 
-    FaTrash, 
-    FaPlus,
-    FaPencilAlt,
-    FaSave,
-    FaTimes
-} from 'react-icons/fa';
+import { FaMapMarkerAlt, FaTrash, FaPlus,FaPencilAlt,FaSave,FaTimes } from 'react-icons/fa';
+import { fetchApi } from '../../services/apiService'; 
 
 // This component manages adding, editing, and deleting locations
 export default function LocationManager({ onLocationsUpdated }) {

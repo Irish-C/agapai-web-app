@@ -1,18 +1,6 @@
 // src/components/VideoFeed.jsx
-import React from 'react';
-import { 
-  FaVideo, 
-  FaVideoSlash, 
-  FaSpinner, 
-  FaTimes, 
-  FaExpand,
-    FaLink 
-} from 'react-icons/fa';
+import { FaVideo, FaVideoSlash, FaSpinner, FaTimes, FaExpand, FaLink } from 'react-icons/fa';
 
-/**
- * Renders a single camera feed box.
- * Receives props from CameraGrid.jsx
- */
 export default function VideoFeed({ 
   camId, 
   location, 
