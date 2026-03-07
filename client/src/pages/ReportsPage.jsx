@@ -10,7 +10,6 @@ export default function ReportsPage() {
     const [error, setError] = useState(null);
     const [limit, setLimit] = useState(20);
 
-    // NEW STATE: For Date Range Filtering
     const [startDate, setStartDate] = useState(''); 
     const [endDate, setEndDate] = useState('');
 
@@ -20,9 +19,10 @@ export default function ReportsPage() {
                 setIsLoading(true);
                 setError(null);
                 
-                // MODIFIED: Pass limit AND date range to the API service
                 const data = await fetchReportsData(limit, startDate, endDate); 
                 
+                // Note: Ensure your backend returns 'data' or 'report'. 
+                // Adjust 'data.report' to 'data.data' if you changed the backend key name.
                 if (data.status === 'success' && Array.isArray(data.report)) {
                     setLogs(data.report);
                 } else {
@@ -35,14 +35,11 @@ export default function ReportsPage() {
                 setIsLoading(false);
             }
         }; 
-        // oadReportData now runs when limit, startDate, or endDate changes
         loadReportData(); 
     }, [limit, startDate, endDate]);
 
-    // Placeholder function for handling the file link click
     const handleFileClick = (filePath) => {
         console.log(`File path clicked: ${filePath}`);
-        // TODO: Implement actual logic here (e.g., open file preview, download)
         alert(`Simulating file view/download for: ${filePath}`);
     };
 
@@ -65,94 +62,65 @@ export default function ReportsPage() {
             );
         }
 
-        if (logs.length === 0) {
-            return (
-                <div className="flex justify-center items-center p-10 text-gray-500">
-                    <span className="text-lg">No event logs found in the database.</span>
-                </div>
-            );
-        }
-
-        // Render the table with logs
+        // --- ALWAYS RENDER THE TABLE STRUCTURE ---
         return (
             <div className="overflow-x-auto shadow-md rounded-lg border border-gray-200">
                 <table className="min-w-full divide-y divide-gray-200 bg-white">
                     <thead className="bg-gray-50">
                         <tr>
-                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Timestamp
-                            </th>
-                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Incident Classification
-                            </th>
-                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Location
-                            </th>
-                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Camera
-                            </th>
-                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Status
-                            </th>
-                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Ack. By User
-                            </th>
-                            {/* MOVED: Table Header for File Path (Last Position) */}
-                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                File Path
-                            </th>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Timestamp</th>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Incident Classification</th>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Location</th>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Camera</th>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ack. By User</th>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">File Path</th>
                         </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
-                        {logs.map((log) => (
-                            <tr key={log.id} className="hover:bg-teal-100 transition duration-150">
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
-                                    {new Date(log.timestamp).toLocaleString()}
-                                </td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700 font-medium">
-                                    {/* CHANGED: Displaying Event Class Name */}
-                                    {log.event_class_name || 'N/A'}
-                                </td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
-                                    {log.location}
-                                </td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
-                                    {log.camera_name}
-                                </td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm">
-                                    <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                                        log.status === 'unacknowledged' 
-                                            ? 'bg-red-100 text-red-800' 
-                                            : 'bg-green-100 text-green-800'
-                                    }`}>
-                                        {log.status}
-                                    </span>
-                                </td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
-                                    {/* CHANGED: Displaying Acknowledged By Username */}
-                                    {log.status !== 'unacknowledged' ? (log.acknowledged_by_username || 'System') : 'Pending'}
-                                </td>
-                                {/* MOVED: Data Cell for File Path (Last Position), now clickable with '>' symbol */}
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
-                                    {log.file_path ? (
-                                        <a
-                                            href="#"
-                                            onClick={(e) => {
-                                                e.preventDefault(); // Prevent default link behavior
-                                                handleFileClick(log.file_path);
-                                            }}
-                                            className="flex items-center text-teal-600 hover:text-teal-800 font-medium transition duration-150 ease-in-out"
-                                            title={log.file_path} // Show full path on hover
-                                        >
-                                            View File
-                                            <FaArrowRight className="ml-2 text-xs" />
-                                        </a>
-                                    ) : (
-                                        'N/A'
-                                    )}
+                        {logs.length > 0 ? (
+                            logs.map((log) => (
+                                <tr key={log.id} className="hover:bg-teal-100 transition duration-150">
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                                        {new Date(log.timestamp).toLocaleString()}
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700 font-medium">
+                                        {log.event_class_name || 'N/A'}
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                                        {log.location}
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                                        {log.camera_name}
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm">
+                                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                                            log.status === 'unacknowledged' ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'
+                                        }`}>
+                                            {log.status}
+                                        </span>
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                                        {log.status !== 'unacknowledged' ? (log.acknowledged_by_username || 'System') : 'Pending'}
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                                        {log.file_path ? (
+                                            <a href="#" onClick={(e) => { e.preventDefault(); handleFileClick(log.file_path); }} 
+                                               className="flex items-center text-teal-600 hover:text-teal-800 font-medium">
+                                                View File <FaArrowRight className="ml-2 text-xs" />
+                                            </a>
+                                        ) : 'N/A'}
+                                    </td>
+                                </tr>
+                            ))
+                        ) : (
+                            // Empty State Row inside the table
+                            <tr>
+                                <td colSpan="7" className="px-6 py-10 text-center text-gray-500 italic">
+                                    No event logs found in the database.
                                 </td>
                             </tr>
-                        ))}
+                        )}
                     </tbody>
                 </table>
             </div>
@@ -163,58 +131,24 @@ export default function ReportsPage() {
         <div className="container mx-auto p-6 space-y-6">
             <div className="flex items-center space-x-3">
                 <FaFileAlt className="text-3xl text-teal-600" />
-                <h1 className="text-3xl font-bold text-gray-800">
-                    Event Log History
-                </h1>
+                <h1 className="text-3xl font-bold text-gray-800">Event Log History</h1>
             </div>
             <p className="text-gray-600 mx-4 sm:mx-8 lg:mx-16">
-                These are the complete audit logs of all vision-based events detected by the system. 
-                Review historical fall and inactivity alerts from all locations to ensure comprehensive 
-                resident monitoring and facility oversight.
+                Review historical fall and inactivity alerts from all locations to ensure comprehensive resident monitoring.
             </p>
             
-            {/* NEW: Filter Controls Container */}
-            <div className="flex justify-end items-center space-x-4">
-                
-                {/* NEW: Start Date Filter */}
+            <div className="flex flex-wrap justify-end items-center gap-4">
                 <div className="flex items-center">
-                    <label htmlFor="start-date" className="text-sm font-medium text-gray-700 mr-2">
-                        Start Date:
-                    </label>
-                    <input
-                        type="date"
-                        id="start-date"
-                        value={startDate}
-                        onChange={(e) => setStartDate(e.target.value)}
-                        className="p-2 border border-gray-300 rounded-lg text-sm"
-                    />
+                    <label className="text-sm font-medium text-gray-700 mr-2">Start Date:</label>
+                    <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="p-2 border rounded-lg text-sm" />
                 </div>
-                
-                {/* NEW: End Date Filter */}
                 <div className="flex items-center">
-                    <label htmlFor="end-date" className="text-sm font-medium text-gray-700 mr-2">
-                        End Date:
-                    </label>
-                    <input
-                        type="date"
-                        id="end-date"
-                        value={endDate}
-                        onChange={(e) => setEndDate(e.target.value)}
-                        className="p-2 border border-gray-300 rounded-lg text-sm"
-                    />
+                    <label className="text-sm font-medium text-gray-700 mr-2">End Date:</label>
+                    <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="p-2 border rounded-lg text-sm" />
                 </div>
-
-                {/* Existing: Logs per page selector */}
                 <div className="flex items-center">
-                    <label htmlFor="limit-select" className="text-sm font-medium text-gray-700 mr-2">
-                        Logs per page:
-                    </label>
-                    <select
-                        id="limit-select"
-                        value={limit}
-                        onChange={(e) => setLimit(Number(e.target.value))}
-                        className="p-2 border border-gray-300 rounded-lg text-sm"
-                    >
+                    <label className="text-sm font-medium text-gray-700 mr-2">Logs per page:</label>
+                    <select value={limit} onChange={(e) => setLimit(Number(e.target.value))} className="p-2 border rounded-lg text-sm">
                         <option value={20}>20</option>
                         <option value={50}>50</option>
                         <option value={100}>100</option>
