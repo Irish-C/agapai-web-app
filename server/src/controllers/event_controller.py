@@ -34,6 +34,21 @@ async def create_event_logic(data):
     except Exception as e:
         return {"status": "error", "message": str(e)}, 500
 
+async def get_event_types_logic():
+    try:
+        # Using Prisma to get unique event classifications from your DB
+        # Replace 'event_log' with your actual model name if different
+        types = await db.event_log.find_many(
+            distinct=['event_class_name'],
+            select={'event_class_name': True}
+        )
+        
+        # Format the list for the frontend pills
+        return [{"name": t['event_class_name']} for t in types]
+    except Exception as e:
+        print(f"Error fetching types: {e}")
+        return []
+
 async def get_event_logs_logic(filters=None):
     try:
         # Get limit from filters, default to 50 if not provided
@@ -102,3 +117,20 @@ async def mark_viewed_logic(log_id, user_id):
         return {"status": "success", "message": "Event acknowledged"}, 200
     except Exception as e:
         return {"status": "error", "message": str(e)}, 500
+
+async def get_event_types():
+    try:
+        # Fetch unique types/classes from your database using Prisma or SQL
+        # Replace 'event_log' with your actual table name
+        types = await db.event_log.find_many(
+            distinct=['event_class_name'],
+            select={'event_class_name': True}
+        )
+        
+        # Format for the frontend: [{'name': 'Fall'}, {'name': 'Inactivity'}]
+        formatted_types = [{"name": t['event_class_name']} for t in types]
+        
+        return formatted_types
+    except Exception as e:
+        print(f"Error fetching types: {e}")
+        return []
