@@ -3,17 +3,14 @@
 const BASE_API_URL = 'http://127.0.0.1:5000/api';
 const AUTH_TOKEN_KEY = 'authToken'; 
 
-
-// Export the user fetching function
-export const fetchUsers = () => {
-    return fetchApi('/users', 'GET'); 
-};
-
-// Generic fetch function with error handling and token management
+/**
+ * Generic fetch function with error handling and token management.
+ * This is the engine for all API calls in the AGAPAI system.
+ */
 export const fetchApi = async (endpoint, method = 'GET', data = null) => {
     const url = `${BASE_API_URL}${endpoint}`;
     
-    console.log(`fetchApi: Requesting ${endpoint}...`);
+    console.log(`fetchApi: Requesting ${method} ${endpoint}...`);
     
     const options = {
         method,
@@ -24,17 +21,18 @@ export const fetchApi = async (endpoint, method = 'GET', data = null) => {
 
     const token = localStorage.getItem(AUTH_TOKEN_KEY);
 
-    if (token) { // Attach token if available
+    if (token) {
         options.headers['Authorization'] = `Bearer ${token}`;
-    } else {
-        console.log(`fetchApi: No token found in localStorage for ${endpoint}.`);
     }
-    if (data) { // Attach body data for POST/PUT/PATCH
+
+    if (data) {
         options.body = JSON.stringify(data);
     }
-    try { // Perform the fetch
+
+    try {
         const response = await fetch(url, options);
 
+        // Handle 401 Unauthorized (Expired or missing token)
         if (response.status === 401) {
             if (!endpoint.includes('/login')) {
                 console.error('fetchApi: 401 Unauthorized. Redirecting to login.');
@@ -47,7 +45,7 @@ export const fetchApi = async (endpoint, method = 'GET', data = null) => {
         // Handle non-2xx responses
         if (!response.ok) {
             const errorData = await response.json().catch(() => ({}));
-            const message = errorData.message || errorData.msg || `HTTP error! status: ${response.status} for ${url}`;
+            const message = errorData.message || errorData.msg || `HTTP error! status: ${response.status}`;
             console.error('API Error Response:', errorData);
             throw new Error(message);
         }
@@ -59,14 +57,14 @@ export const fetchApi = async (endpoint, method = 'GET', data = null) => {
         } else {
             return { status: 'success', message: 'Operation successful' };
         }
-    // Catch network or parsing errors
     } catch (error) {
         console.error('Fetch API Error:', error);
         throw error;
     }
 };
 
-// Login function that saves token to localStorage
+// --- AUTHENTICATION SERVICES ---
+
 export const loginUser = async (username, password) => {
     try {
         const response = await fetchApi('/login', 'POST', { username, password });
@@ -74,18 +72,15 @@ export const loginUser = async (username, password) => {
         if (response && (response.access_token || response.token)) {
             const token = response.access_token || response.token;
             
-            // 1. Create a consistent user object
             const userData = {
                 username: response.username,
                 token: token,
-                userId: response.user_id
+                userId: response.user_id,
+                role: response.role
             };
 
-            // 2. Save using the same key App.jsx uses
             localStorage.setItem('user', JSON.stringify(userData));
-            
-            // 3. Also save the raw token for fetchApi to use easily
-            localStorage.setItem('authToken', token); 
+            localStorage.setItem(AUTH_TOKEN_KEY, token); 
             
             return response;
         } else {
@@ -93,61 +88,47 @@ export const loginUser = async (username, password) => {
         }
     } catch (error) {
         localStorage.removeItem('user');
-        localStorage.removeItem('authToken');
+        localStorage.removeItem(AUTH_TOKEN_KEY);
         throw error; 
     }
 };
 
-// Logout function that removes token from localStorage
 export const logoutUser = () => {
+    localStorage.removeItem('user');
     localStorage.removeItem(AUTH_TOKEN_KEY);
-    console.log("logoutUser: Token removed.");
+    console.log("logoutUser: Session cleared.");
 };
 
-// Fetch camera list for CameraGrid component
-export const fetchCameraList = () => {
-    return fetchApi('/cameras', 'GET');
-}
+// --- USER MANAGEMENT SERVICES ---
 
-// Fetch daily summary data for DashboardPage
-export const fetchDailySummary = () => {
-    return fetchApi('/summary/daily', 'GET');
+export const fetchUsers = () => {
+    return fetchApi('/users', 'GET'); 
 };
 
 /**
- * Fetches historical event log data for the ReportsPage, applying a limit and date filters.
- * @param {number} limit - The maximum number of logs to return (20, 50, 100).
- * @param {string} startDate - Optional start date for filtering (format: YYYY-MM-DD).
- * @param {string} endDate - Optional end date for filtering (format: YYYY-MM-DD).
+ * Handles both creating a new user (POST) and updating an existing one (PUT).
  */
-export const fetchReportsData = (limit, startDate, endDate) => {
-    
-    // Start with the base query parameters for limit
-    const params = new URLSearchParams({
-        limit: limit,
-    });
-
-    // Add start_date parameter if startDate is provided (not an empty string)
-    if (startDate) {
-        params.append('start_date', startDate);
+export const saveUserApi = async (userData) => {
+    if (userData.id) {
+        // Update existing user
+        return fetchApi(`/users/${userData.id}`, 'PUT', userData);
+    } else {
+        // Create new user
+        return fetchApi('/users', 'POST', userData);
     }
-
-    // Add end_date parameter if endDate is provided (not an empty string)
-    if (endDate) {
-        params.append('end_date', endDate);
-    }
-
-    // Construct the final URL with all parameters
-    // The resulting URL will look like: /event_logs?limit=20&start_date=2025-01-01
-    return fetchApi(`/event_logs?${params.toString()}`, 'GET');
 };
 
-// Fetch user profile data
-export const fetchUserProfile = () => {
-    return fetchApi('/user/profile', 'GET');
+/**
+ * Fetches the dynamic list of roles from the database.
+ */
+export const fetchRolesApi = () => {
+    return fetchApi('/roles', 'GET');
 };
 
-// Change user password
+export const archiveUser = (userId) => {
+    return fetchApi(`/users/${userId}/archive`, 'PATCH', { is_active: false }); 
+};
+
 export const changePassword = (oldPassword, newPassword) => {
     return fetchApi('/users/change-password', 'POST', { 
         old_password: oldPassword, 
@@ -155,37 +136,24 @@ export const changePassword = (oldPassword, newPassword) => {
     });
 };
 
-// Archive (deactivate) a user
-export const archiveUser = (userId) => {
-    // backend route to set is_active=False
-    return fetchApi(`/users/${userId}/archive`, 'PATCH', { is_active: false }); 
+export const fetchUserProfile = () => {
+    return fetchApi('/user/profile', 'GET');
 };
 
-// // Alert System Handle Remote Silence
-// export const acknowledgeAlert = async (incidentId, token) => {
-//     try {
-//         const response = await fetch(`${API_BASE_URL}/api/acknowledge-alert`, {
-//             method: 'POST',
-//             headers: {
-//                 'Content-Type': 'application/json',
-//                 // Assuming your backend uses the token for authentication/authorization
-//                 'Authorization': `Bearer ${token}`, 
-//             },
-//             body: JSON.stringify({
-//                 incident_id: incidentId, // Optional, for logging purposes on the backend
-//             }),
-//         });
+// --- DASHBOARD & REPORTS SERVICES ---
 
-//         // Backend should return a status indicating if the alarm was active and silenced
-//         if (!response.ok) {
-//             throw new Error('Server response failed to acknowledge alert.');
-//         }
+export const fetchCameraList = () => {
+    return fetchApi('/cameras', 'GET');
+}
 
-//         const data = await response.json();
-//         return data.success; // The backend should send back { success: true/false }
+export const fetchDailySummary = () => {
+    return fetchApi('/summary/daily', 'GET');
+};
 
-//     } catch (error) {
-//         console.error('Error in acknowledgeAlert API:', error);
-//         return false;
-//     }
-// };
+export const fetchReportsData = (limit, startDate, endDate) => {
+    const params = new URLSearchParams({ limit });
+    if (startDate) params.append('start_date', startDate);
+    if (endDate) params.append('end_date', endDate);
+
+    return fetchApi(`/event_logs?${params.toString()}`, 'GET');
+};

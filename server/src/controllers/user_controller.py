@@ -101,6 +101,40 @@ async def change_password_logic(user_id, old_password, new_password):
     return {"status": "success", "message": "Password updated"}, 200
 
 async def create_user_logic(data):
+
+    from src.utils.auth import hash_password
+    try:
+        # 1. Map the role string (e.g., 'guard') to the Database ID
+        role_record = await db.role.find_unique(
+            where={'role_name': data['role']}
+        )
+
+        if not role_record:
+            return {"status": "error", "message": f"Role '{data['role']}' not found."}, 400
+
+        # 2. Use the imported hash_password function
+        hashed_pw = hash_password(data['password'])
+
+        # 3. Create the user in the database
+        new_user = await db.user.create(
+            data={
+                'firstname': data['firstname'],
+                'lastname': data['lastname'],
+                'username': data['username'],
+                'password': hashed_pw,
+                'role_id': role_record.id
+            }
+        )
+
+        return {
+            "status": "success", 
+            "message": "User created successfully",
+            "user_id": str(new_user.id)
+        }, 201
+
+    except Exception as e:
+        print(f"❌ Backend Error: {e}")
+        return {"status": "error", "message": str(e)}, 500
     try:
         # 1. Find the Role object by its name (e.g., 'caregiver')
         role_record = await db.role.find_unique(

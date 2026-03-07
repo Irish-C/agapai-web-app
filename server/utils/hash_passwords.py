@@ -1,15 +1,22 @@
-# hash_passwords.py
+# server/src/utils/auth.py
 import bcrypt
 
-# Get passwords to hash
-password_admin = b"w4makeithappen!"
-password_user = b"#defended4306" 
+def hash_password(password: str) -> str:
+    """
+    Hashes a plain-text password using bcrypt.
+    """
+    # Convert string to bytes
+    password_bytes = password.encode('utf-8')
+    # Generate salt and hash
+    hashed = bcrypt.hashpw(password_bytes, bcrypt.gensalt())
+    # Return as a decoded string for database storage
+    return hashed.decode('utf-8')
 
-# Hash the passwords
-hashed_admin = bcrypt.hashpw(password_admin, bcrypt.gensalt()).decode('utf-8')
-hashed_user = bcrypt.hashpw(password_user, bcrypt.gensalt()).decode('utf-8')
-
-print("Copy and run SQL commands to update the passwords in the database")
-print(f"UPDATE users SET password = '{hashed_admin}' WHERE username = 'reginedahan';")
-print(f"UPDATE users SET password = '{hashed_user}' WHERE username = 'kayecasem';")
-print("---------------------------------------------------------")
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    """
+    Verifies a plain-text password against a hashed one.
+    """
+    return bcrypt.checkpw(
+        plain_password.encode('utf-8'), 
+        hashed_password.encode('utf-8')
+    )
