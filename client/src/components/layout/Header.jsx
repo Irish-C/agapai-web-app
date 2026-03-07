@@ -1,18 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { FaUserCircle, FaSignOutAlt, FaTimes, FaCog , FaFile, FaBars, FaTh, FaQuestionCircle} from 'react-icons/fa';
+import { FaUserCircle, FaSignOutAlt, FaTimes, FaCog, FaFile, FaBars, FaTh, FaQuestionCircle } from 'react-icons/fa';
 import agapaiLogo from '../../assets/logo/agapai-logo.png';
 
 export default function Header({ user, logout }) {
     const [isMenuOpen, setIsMenuOpen] = useState(false);
-    const [hidden, setHidden] = useState(false); // track header visibility
+    const [hidden, setHidden] = useState(false);
+    const [scrolled, setScrolled] = useState(false); // New state for scroll background
     const [lastScrollY, setLastScrollY] = useState(0);
     const location = useLocation();
-    
-    // NEW STATE: Control the visibility of the logout confirmation modal
     const [showLogoutModal, setShowLogoutModal] = useState(false);
 
-    // Only render the header outside of the landing page
     const shouldRenderHeader = location.pathname !== '/' && location.pathname !== '/landing';
 
     const navItems = [
@@ -24,17 +22,19 @@ export default function Header({ user, logout }) {
     const toggleMenu = () => setIsMenuOpen(!isMenuOpen);
     const isActive = (path) => location.pathname === path;
 
-    // Scroll effect to hide/show header
     useEffect(() => {
         const handleScroll = () => {
             const currentScrollY = window.scrollY;
-            if (currentScrollY > lastScrollY && currentScrollY > 50) {
-                // scrolling down
+            
+            // Show/Hide logic
+            if (currentScrollY > lastScrollY && currentScrollY > 100) {
                 setHidden(true);
             } else {
-                // scrolling up
                 setHidden(false);
             }
+
+            // Glassmorphism trigger
+            setScrolled(currentScrollY > 20);
             setLastScrollY(currentScrollY);
         };
 
@@ -42,188 +42,156 @@ export default function Header({ user, logout }) {
         return () => window.removeEventListener('scroll', handleScroll);
     }, [lastScrollY]);
 
-    // Don't render header when on landing page
-    if (!shouldRenderHeader) {
-        return null;
-    }
+    if (!shouldRenderHeader) return null;
 
-    // Function executed upon confirming logout
     const handleConfirmLogout = () => {
-        setShowLogoutModal(false); // Close modal first
-        logout(); // Execute the actual logout function passed via props
-        setIsMenuOpen(false); // Close mobile menu if open
-    };
-
-    // Function to open the modal (used by both desktop and mobile buttons)
-    const openLogoutModal = () => {
-        setShowLogoutModal(true);
+        setShowLogoutModal(false);
+        logout();
+        setIsMenuOpen(false);
     };
 
     return (
         <header
-        className={`bg-gradient-to-b from-[#2d3092] to-[#015954] text-white shadow-lg sticky top-0 z-20 transition-transform duration-300 ${
-            hidden ? '-translate-y-full' : 'translate-y-0'
-        }`}
+            className={`sticky top-0 z-50 transition-all duration-500 ${
+                hidden ? '-translate-y-full' : 'translate-y-0'
+            } ${
+                scrolled 
+                ? 'bg-[#015954]/90 backdrop-blur-md border-b border-teal-700/50 py-2 shadow-xl' 
+                : 'bg-gradient-to-r from-[#2d3092] to-[#015954] py-4'
+            }`}
         >
-        <div className="container mx-auto px-4 sm:px-6 lg:px-8 flex justify-between items-center h-16">
-            {/* Logo and App Title */}
-            <Link
-            to="/dashboard"
-            className="flex items-center space-x-3 transition duration-300 hover:opacity-90"
-            >
-            <img
-                src={agapaiLogo}
-                alt="AGAPAI Logo"
-                className="h-12 w-auto rounded-full"
-                onError={(e) => {
-                e.target.onerror = null;
-                e.target.src = 'https://placehold.co/32x32/14b8a6/ffffff?text=A';
-                }}
-            />
-            <div className="flex flex-col leading-tight">
-                <span className="text-4xl font-bold text-[#c4fcff] tracking-wider">
-                AGAPAI
-                </span>
-                <span className="text-[0.75rem] italic text-gray-300 tracking-wide">
-                A Vision-Based Monitoring and Alert System for Fall and Inactivity in
-                Elderly Care Facility
-                </span>
-            </div>
-            </Link>
+            <div className="container mx-auto px-6 flex justify-between items-center transition-all">
+                {/* Logo and Brand */}
+                <Link to="/dashboard" className="flex items-center group">
+                    <div className="relative">
+                        <img
+                            src={agapaiLogo}
+                            alt="AGAPAI Logo"
+                            className="h-10 w-10 sm:h-12 sm:w-12 rounded-xl shadow-lg transition-transform group-hover:scale-110"
+                            onError={(e) => {
+                                e.target.src = 'https://placehold.co/100?text=A';
+                            }}
+                        />
+                        <div className="absolute inset-0 rounded-xl bg-teal-400 opacity-0 group-hover:opacity-20 transition-opacity"></div>
+                    </div>
+                    
+                    <div className="ml-4 flex flex-col justify-center">
+                        <h1 className="text-2xl font-black tracking-tighter text-white leading-none">
+                            AGAPAI<span className="text-teal-400">.</span>
+                        </h1>
+                        <p className="hidden lg:block text-[10px] uppercase font-bold tracking-[0.2em] text-teal-100/70 mt-1">
+                            Vision-Based Monitoring
+                        </p>
+                    </div>
+                </Link>
 
-
-                {/* Desktop Navigation Links */}
-                <nav className="hidden md:flex space-x-6">
+                {/* Desktop Nav */}
+                <nav className="hidden md:flex items-center bg-black/10 rounded-2xl p-1 border border-white/5">
                     {navItems.map((item) => (
                         <Link
                             key={item.name}
                             to={item.path}
-                            className={`flex items-center text-sm font-medium transition duration-150 ${
-                                isActive(item.path) ? 'text-teal-400' : 'hover:text-gray-400'
+                            className={`flex items-center px-5 py-2 text-xs font-bold uppercase tracking-widest rounded-xl transition-all ${
+                                isActive(item.path) 
+                                ? 'bg-white text-teal-900 shadow-lg' 
+                                : 'text-white hover:text-teal-200'
                             }`}
                         >
-                            <item.icon className="mr-1" />
+                            <item.icon className={`mr-2 ${isActive(item.path) ? 'text-teal-600' : ''}`} />
                             {item.name}
                         </Link>
                     ))}
                 </nav>
 
-                {/* User Info (Profile Link) and Logout */}
-                <div className="hidden md:flex items-center space-x-4">
-                    {/* Profile Link now points to /settings */}
+                {/* User Actions */}
+                <div className="hidden md:flex items-center space-x-3">
                     <Link 
                         to="/settings" 
-                        className="flex items-center space-x-2 p-2 rounded-full transition duration-150 hover:bg-gray-600 cursor-pointer"
+                        className="flex items-center space-x-3 px-4 py-2 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-all group"
                     >
-                        <FaUserCircle className="w-5 h-5 text-teal-400" />
-                        <span className="text-sm font-medium">{user?.username || 'User'}</span>
+                        <div className="w-8 h-8 rounded-lg bg-teal-500 flex items-center justify-center text-white font-bold shadow-inner">
+                            {user?.username?.charAt(0).toUpperCase() || 'U'}
+                        </div>
+                        <span className="text-sm font-semibold text-white">{user?.username || 'User'}</span>
                     </Link>
+
                     <button
-                        // MODIFIED: Open modal instead of logging out directly
-                        onClick={openLogoutModal}
-                        className="flex items-center px-3 py-1 text-sm font-medium bg-red-600 rounded-full hover:bg-red-700 transition duration-150 shadow-md"
+                        onClick={() => setShowLogoutModal(true)}
+                        className="p-3 text-white bg-red-500/20 hover:bg-red-500 border border-red-500/30 hover:border-red-500 rounded-xl transition-all shadow-lg active:scale-95"
+                        title="Logout"
                     >
-                        <FaSignOutAlt className="mr-1" />
-                        Logout
+                        <FaSignOutAlt />
                     </button>
                 </div>
 
-                {/* Mobile Menu Button */}
+                {/* Mobile Toggle */}
                 <button
                     onClick={toggleMenu}
-                    className="md:hidden p-2 rounded-lg hover:bg-gray-700 transition duration-150"
+                    className="md:hidden w-10 h-10 flex items-center justify-center rounded-xl bg-white/10 text-white"
                 >
-                    {isMenuOpen ? <FaTimes className="w-6 h-6" /> : <FaBars className="w-6 h-6" />}
+                    {isMenuOpen ? <FaTimes /> : <FaBars />}
                 </button>
             </div>
 
-            {/* Mobile Menu Dropdown */}
-            {isMenuOpen && (
-                <div className="md:hidden bg-gray-900 p-4 border-t border-gray-700">
-                    <nav className="flex flex-col space-y-2 mb-4">
-                        {navItems.map((item) => (
-                            <Link
-                                key={item.name}
-                                to={item.path}
-                                onClick={() => setIsMenuOpen(false)}
-                                className={`flex items-center px-3 py-2 text-base font-medium rounded-lg transition duration-150 ${
-                                    isActive(item.path)
-                                        ? 'bg-gray-700 text-teal-400'
-                                        : 'text-gray-200 hover:bg-gray-700 hover:text-teal-400'
-                                }`}
-                            >
-                                <item.icon className="mr-3 w-5 h-5" />
-                                {item.name}
-                            </Link>
-                        ))}
-                    </nav>
-                    <div className="pt-4 border-t border-gray-700 flex flex-col space-y-2">
-                        {/* Static user display */}
-                        <div className="flex items-center space-x-3 px-3 py-2 text-base">
-                            <FaUserCircle className="w-6 h-6 text-teal-400" />
-                            <span className="font-semibold">{user?.username || 'User'}</span>
-                        </div>
-                        
-                        {/* Profile link for mobile now points to /settings */}
+            {/* Mobile Nav Menu */}
+            <div className={`md:hidden overflow-hidden transition-all duration-300 ${isMenuOpen ? 'max-h-96 border-t border-white/10' : 'max-h-0'}`}>
+                <div className="bg-teal-900/95 backdrop-blur-xl p-6 space-y-4">
+                    {navItems.map((item) => (
                         <Link
-                            to="/settings"
+                            key={item.name}
+                            to={item.path}
                             onClick={() => setIsMenuOpen(false)}
-                            className="flex items-center justify-center w-full px-3 py-2 text-base font-medium bg-gray-700 rounded-lg hover:bg-gray-600 transition duration-150 shadow-md text-teal-400"
+                            className={`flex items-center p-4 rounded-xl text-sm font-bold uppercase tracking-widest ${
+                                isActive(item.path) ? 'bg-white text-teal-900' : 'text-white bg-white/5'
+                            }`}
                         >
-                            <FaUserCircle className="mr-2" />
-                            View Profile
+                            <item.icon className="mr-4 text-lg" />
+                            {item.name}
                         </Link>
-
-                        <button
-                            // MODIFIED: Open modal instead of logging out directly
-                            onClick={openLogoutModal}
-                            className="flex items-center justify-center w-full px-3 py-2 text-base font-medium bg-red-600 rounded-lg hover:bg-red-700 transition duration-150 shadow-md"
-                        >
-                            <FaSignOutAlt className="mr-2" />
+                    ))}
+                    <div className="pt-4 border-t border-white/10 flex items-center justify-between">
+                        <Link to="/settings" className="flex items-center text-white" onClick={() => setIsMenuOpen(false)}>
+                            <FaUserCircle className="text-2xl mr-3 text-teal-400" />
+                            <span className="font-bold">{user?.username}</span>
+                        </Link>
+                        <button onClick={() => setShowLogoutModal(true)} className="text-red-400 font-bold uppercase text-xs tracking-widest">
                             Logout
                         </button>
                     </div>
                 </div>
-            )}
+            </div>
 
-            {/* --------------------------- LOGOUT CONFIRMATION MODAL --------------------------- */}
+            {/* Modal Overlay */}
             {showLogoutModal && (
-                // CRITICAL FIX: Added pt-16 (padding-top 4rem) to push the modal content 
-                // below the fixed header (which is h-16) and re-center the content 
-                // in the remaining viewport space.
-                <div className="fixed inset-0 z-[100] flex items-center justify-center pt-16 p-4">
-                    <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm">
-                        <div className="p-6 border-b border-gray-200 flex justify-between items-center">
-                            <h4 className="text-xl font-bold text-gray-800 flex items-center">
-                                <FaQuestionCircle className="mr-3 text-red-500" /> Confirm Logout
-                            </h4>
-                            <button onClick={() => setShowLogoutModal(false)} className="text-gray-500 hover:text-gray-800">
-                                <FaTimes className="w-5 h-5" />
-                            </button>
-                        </div>
-                        <div className="p-6">
-                            <p className="text-gray-700 mb-6">
-                                Are you sure you want to log out of your account? You will need to sign in again to view the dashboard.
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+                    <div className="absolute inset-0 bg-teal-950/60 backdrop-blur-sm" onClick={() => setShowLogoutModal(false)}></div>
+                    <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden animate-in zoom-in duration-300">
+                        <div className="p-8 text-center">
+                            <div className="w-16 h-16 bg-red-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                                <FaSignOutAlt className="text-2xl text-red-500" />
+                            </div>
+                            <h4 className="text-2xl font-bold text-gray-900 mb-2">Confirm Logout</h4>
+                            <p className="text-gray-500 text-sm leading-relaxed mb-8">
+                                Are you sure you want to end your current session?
                             </p>
-                            <div className="flex justify-end space-x-3">
+                            <div className="grid grid-cols-2 gap-3">
                                 <button
                                     onClick={() => setShowLogoutModal(false)}
-                                    className="px-4 py-2 text-sm font-medium rounded-lg border border-gray-300 text-gray-700 bg-white hover:bg-gray-50 transition duration-150"
+                                    className="px-6 py-3 text-sm font-bold text-gray-400 bg-gray-50 rounded-2xl hover:bg-gray-100 transition-all"
                                 >
                                     Cancel
                                 </button>
                                 <button
                                     onClick={handleConfirmLogout}
-                                    className="px-4 py-2 text-sm font-medium rounded-lg text-white bg-red-600 hover:bg-red-700 transition duration-150"
+                                    className="px-6 py-3 text-sm font-bold text-white bg-red-500 rounded-2xl hover:bg-red-600 shadow-lg shadow-red-200 transition-all"
                                 >
-                                    <FaSignOutAlt className="mr-1 inline-block" /> Confirm Logout
+                                    Logout
                                 </button>
                             </div>
                         </div>
                     </div>
                 </div>
             )}
-            {/* --------------------------------------------------------------------------------- */}
         </header>
     );
 }
