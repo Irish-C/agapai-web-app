@@ -9,28 +9,53 @@ import { normalizeRole, displayRole } from '../../utils/roleUtils.js';
  * @param {object} userToEdit - The user object (if editing), or null (if adding).
  * @param {function} onSave - Function to call when saving the form (handles API call).
  * @param {function} onClose - Function to close the modal.
- * @param {Array} allRoles - List of available roles (e.g., ['Admin', 'User']).
  */
 export default function UserEditModal({ userToEdit, onSave, onClose }) {
-    
-    // Determine if we are editing or adding
     const isEditing = !!userToEdit;
     
-    // Initial form state based on whether we are editing an existing user or adding a new one
+    // 1. Add a specific state for the roles list fetched from DB
+    const [dbRoles, setDbRoles] = useState([]);
+    const [isLoadingRoles, setIsLoadingRoles] = useState(true);
+
     const [formData, setFormData] = useState({
         id: userToEdit?.id || null,
         firstname: userToEdit?.firstname || '',
         lastname: userToEdit?.lastname || '',
         username: userToEdit?.username || '',
-        role: normalizeRole(userToEdit?.role) || 'user', // Default to user
+        role: userToEdit?.role || '', 
         password: '',
-        confirmPassword: '',
-        // NOTE: Fetch available roles using a hardcoded list here.
-        availableRoles: ['admin', 'user']
+        confirmPassword: ''
     });
 
     const [message, setMessage] = useState('');
     const [isLoading, setIsLoading] = useState(false);
+
+    // 2. Fetch roles from the database on mount
+    useEffect(() => {
+        const fetchRoles = async () => {
+            try {
+                // Using standard fetch - ensure your backend has the /api/roles endpoint
+                const response = await fetch('/api/roles', {
+                    headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+                });
+                const result = await response.json();
+                
+                if (result.status === 'success') {
+                    setDbRoles(result.data);
+                    // If adding a new user and a role isn't selected, set default to the first available role
+                    if (!isEditing && !formData.role && result.data.length > 0) {
+                        setFormData(prev => ({ ...prev, role: result.data[0] }));
+                    }
+                }
+            } catch (err) {
+                console.error("Failed to fetch roles from DB:", err);
+                setMessage("Could not load roles from database.");
+            } finally {
+                setIsLoadingRoles(false);
+            }
+        };
+        fetchRoles();
+    }, [isEditing, formData.role]);
 
     const handleChange = (e) => {
         const { name, value } = e.target;
@@ -59,14 +84,11 @@ export default function UserEditModal({ userToEdit, onSave, onClose }) {
 
         setIsLoading(true);
         
-        // Pass the data up to the parent component (UserManager) to handle the API call
-        // We catch any errors thrown back from the API function (onSave)
         onSave(formData)
             .then(() => {
-                // If save was successful, parent handles closing the modal
+                // Success is handled by parent
             })
             .catch((err) => {
-                // Display error message from parent API call
                 setMessage(err.message || 'Error saving user data.');
             })
             .finally(() => {
@@ -124,19 +146,32 @@ export default function UserEditModal({ userToEdit, onSave, onClose }) {
                                     required disabled={isEditing || isLoading} />
                             </div>
 
-                            {/* Role Selection */}
+                            {/* Dynamic Role Selection from Database */}
                             <div className="md:col-span-1">
                                 <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="role">Access Role</label>
-                                <select id="role" name="role" value={formData.role} onChange={handleChange} 
-                                    className="w-full border-gray-300 rounded-lg pl-2 py-2" required disabled={isLoading}>
-                                    {formData.availableRoles.map((role) => (
-                                        <option key={role} value={role}>{displayRole(role)}</option>
-                                    ))}
+                                <select 
+                                    id="role" 
+                                    name="role" 
+                                    value={formData.role} 
+                                    onChange={handleChange} 
+                                    className="w-full border-gray-300 rounded-lg pl-2 py-2 bg-white" 
+                                    required 
+                                    disabled={isLoading || isLoadingRoles}
+                                >
+                                    {isLoadingRoles ? (
+                                        <option>Loading roles...</option>
+                                    ) : (
+                                        dbRoles.map((roleName) => (
+                                            <option key={roleName} value={roleName}>
+                                                {displayRole(roleName)}
+                                            </option>
+                                        ))
+                                    )}
                                 </select>
                             </div>
                         </div>
 
-                        {/* --- Password Fields (Only required when adding, or optional when editing) --- */}
+                        {/* Password Fields */}
                         <div className={`pt-4 border-t border-gray-100 grid grid-cols-1 md:grid-cols-2 gap-4 ${isEditing ? 'opacity-80' : ''}`}>
                             <div className="md:col-span-1">
                                 <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="password">

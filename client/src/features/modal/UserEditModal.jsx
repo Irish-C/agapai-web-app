@@ -6,34 +6,61 @@ import { normalizeRole, displayRole } from '../../utils/roleUtils.js';
 
 /**
  * Modal component for adding a new user or editing an existing user.
- * @param {object} userToEdit - The user object (if editing), or null (if adding).
- * @param {function} onSave - Function to call when saving the form (handles API call).
- * @param {function} onClose - Function to close the modal.
+ * Now dynamically fetches roles from the database.
  */
 export default function UserEditModal({ userToEdit, onSave, onClose }) {
     
     // Determine if we are editing or adding
     const isEditing = !!userToEdit;
     
-    // Define the roles available in the database (normalized to lowercase)
-    const LIMITED_ROLES = ['admin', 'user'];
+    // --- NEW DYNAMIC ROLE STATE ---
+    const [dbRoles, setDbRoles] = useState([]);
+    const [isLoadingRoles, setIsLoadingRoles] = useState(true);
 
-    // Initial form state based on whether we are editing an existing user or adding a new one
+    // Initial form state
     const [formData, setFormData] = useState({
         id: userToEdit?.id || null,
         firstname: userToEdit?.firstname || '',
         lastname: userToEdit?.lastname || '',
         username: userToEdit?.username || '',
-        // 🛑 FIX: Use 'user' as the default role for new users and normalize role values
-        role: normalizeRole(userToEdit?.role) || 'user', 
+        // Default to empty; will be set once roles are loaded if creating new
+        role: normalizeRole(userToEdit?.role) || '', 
         password: '',
-        confirmPassword: '',
-        // Use the limited role list
-        availableRoles: LIMITED_ROLES 
+        confirmPassword: ''
     });
 
     const [message, setMessage] = useState('');
     const [isLoading, setIsLoading] = useState(false);
+
+    // --- FETCH ROLES FROM DATABASE ON MOUNT ---
+    useEffect(() => {
+        const fetchRoles = async () => {
+            try {
+                setIsLoadingRoles(true);
+                // Ensure the URL matches your backend route
+                const response = await fetch('/api/roles', {
+                    headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+                });
+                const result = await response.json();
+                
+                if (result.status === 'success') {
+                    setDbRoles(result.data);
+                    
+                    // If adding a NEW user, default the selection to the first role found
+                    if (!isEditing && result.data.length > 0) {
+                        setFormData(prev => ({ ...prev, role: result.data[0] }));
+                    }
+                }
+            } catch (err) {
+                console.error("Failed to fetch roles from DB:", err);
+                setMessage("Could not load roles from database.");
+            } finally {
+                setIsLoadingRoles(false);
+            }
+        };
+
+        fetchRoles();
+    }, [isEditing]);
 
     const handleChange = (e) => {
         const { name, value } = e.target;
@@ -62,13 +89,11 @@ export default function UserEditModal({ userToEdit, onSave, onClose }) {
 
         setIsLoading(true);
         
-        // Pass the data up to the parent component (UserManager) to handle the API call
         onSave(formData)
             .then(() => {
-                // If save was successful, parent handles closing the modal
+                // Success logic handled by parent
             })
             .catch((err) => {
-                // Display error message from parent API call
                 setMessage(err.message || 'Error saving user data.');
             })
             .finally(() => {
@@ -108,50 +133,63 @@ export default function UserEditModal({ userToEdit, onSave, onClose }) {
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="firstname">First Name</label>
                                 <input type="text" id="firstname" name="firstname" value={formData.firstname} onChange={handleChange} 
-                                    className="w-full border-gray-300 rounded-lg pl-2 py-2" required disabled={isLoading} />
+                                    className="w-full border-gray-300 rounded-lg px-3 py-2 border focus:ring-2 focus:ring-teal-500 outline-none" required disabled={isLoading} />
                             </div>
 
                             {/* Last Name */}
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="lastname">Last Name</label>
                                 <input type="text" id="lastname" name="lastname" value={formData.lastname} onChange={handleChange} 
-                                    className="w-full border-gray-300 rounded-lg pl-2 py-2" required disabled={isLoading} />
+                                    className="w-full border-gray-300 rounded-lg px-3 py-2 border focus:ring-2 focus:ring-teal-500 outline-none" required disabled={isLoading} />
                             </div>
 
                             {/* Username (Locked if editing) */}
                             <div className="md:col-span-1">
                                 <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="username">Username</label>
                                 <input type="text" id="username" name="username" value={formData.username} onChange={handleChange} 
-                                    className={`w-full border-gray-300 rounded-lg pl-2 py-2 ${isEditing ? 'bg-gray-100' : ''}`} 
+                                    className={`w-full border-gray-300 rounded-lg px-3 py-2 border ${isEditing ? 'bg-gray-100' : 'focus:ring-2 focus:ring-teal-500 outline-none'}`} 
                                     required disabled={isEditing || isLoading} />
                             </div>
 
-                            {/* Role Selection */}
+                            {/* DYNAMIC ROLE SELECTION */}
                             <div className="md:col-span-1">
                                 <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="role">Access Role</label>
-                                <select id="role" name="role" value={formData.role} onChange={handleChange} 
-                                    className="w-full border-gray-300 rounded-lg pl-2 py-2" required disabled={isLoading}>
-                                    {formData.availableRoles.map((role) => (
-                                        <option key={role} value={role}>{displayRole(role)}</option>
-                                    ))}
+                                <select 
+                                    id="role" 
+                                    name="role" 
+                                    value={formData.role} 
+                                    onChange={handleChange} 
+                                    className="w-full border-gray-300 rounded-lg px-3 py-2 border bg-white focus:ring-2 focus:ring-teal-500 outline-none" 
+                                    required 
+                                    disabled={isLoading || isLoadingRoles}
+                                >
+                                    {isLoadingRoles ? (
+                                        <option>Loading roles...</option>
+                                    ) : (
+                                        dbRoles.map((roleName) => (
+                                            <option key={roleName} value={roleName}>
+                                                {displayRole(roleName)}
+                                            </option>
+                                        ))
+                                    )}
                                 </select>
                             </div>
                         </div>
 
-                        {/* --- Password Fields (Only required when adding, or optional when editing) --- */}
+                        {/* Password Fields */}
                         <div className={`pt-4 border-t border-gray-100 grid grid-cols-1 md:grid-cols-2 gap-4 ${isEditing ? 'opacity-80' : ''}`}>
                             <div className="md:col-span-1">
                                 <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="password">
                                     <FaLock className="inline mr-1 text-red-500" /> {isEditing ? 'New Password (Optional)' : 'Password'}
                                 </label>
                                 <input type="password" id="password" name="password" value={formData.password} onChange={handleChange} 
-                                    className="w-full border-gray-300 rounded-lg pl-2 py-2" 
+                                    className="w-full border-gray-300 rounded-lg px-3 py-2 border focus:ring-2 focus:ring-teal-500 outline-none" 
                                     required={!isEditing} disabled={isLoading} />
                             </div>
                             <div className="md:col-span-1">
                                 <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="confirmPassword">Confirm Password</label>
                                 <input type="password" id="confirmPassword" name="confirmPassword" value={formData.confirmPassword} onChange={handleChange} 
-                                    className="w-full border-gray-300 rounded-lg pl-2 py-2" 
+                                    className="w-full border-gray-300 rounded-lg px-3 py-2 border focus:ring-2 focus:ring-teal-500 outline-none" 
                                     required={!isEditing} disabled={isLoading} />
                             </div>
                         </div>

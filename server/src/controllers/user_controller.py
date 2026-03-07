@@ -1,6 +1,7 @@
 from database import db
 from werkzeug.security import check_password_hash, generate_password_hash
 from src.utils.role_utils import normalize_role
+from database import db
 
 async def login_logic(data):
     # Fetch user AND the associated role record
@@ -49,33 +50,30 @@ async def get_profile_logic(user_id):
         "username": user.username,
         "role": user.role.role_name if user.role else 'user'
     }, 200
-    
+
 async def update_user_logic(user_id, data):
     try:
-        update_data = {}
-        # Ensure indentation is exactly 8 spaces inside the 'if' blocks
-        if 'firstname' in data:
-            update_data['firstname'] = data['firstname']
-        if 'lastname' in data:
-            update_data['lastname'] = data['lastname']
-        if 'username' in data:
-            update_data['username'] = data['username']
+        update_data = {
+            'firstname': data['firstname'],
+            'lastname': data['lastname'],
+        }
 
-        if 'role' in data and isinstance(data['role'], str):
-            role_record = await db.role.find_unique(where={'role_name': normalize_role(data['role'])})
+        # If role is provided, map it to ID
+        if 'role' in data:
+            role_record = await db.role.find_unique(where={'role_name': data['role']})
             if role_record:
                 update_data['role_id'] = role_record.id
-        elif 'role_id' in data:
-            update_data['role_id'] = int(data['role_id'])
 
-        if not update_data:
-            return {"status": "error", "message": "No update fields provided."}, 400
+        # If a new password is provided, hash it
+        if data.get('password'):
+            update_data['password'] = hash_password(data['password'])
 
         await db.user.update(
             where={'id': int(user_id)},
             data=update_data
         )
-        return {"status": "success", "message": "User updated"}, 200
+
+        return {"status": "success", "message": "User updated successfully"}, 200
     except Exception as e:
         return {"status": "error", "message": str(e)}, 500
         
@@ -103,17 +101,35 @@ async def change_password_logic(user_id, old_password, new_password):
     return {"status": "success", "message": "Password updated"}, 200
 
 async def create_user_logic(data):
-    existing_user = await db.user.find_unique(where={'username': data['username']})
-    if existing_user:
-        return {"error": "Username already exists"}, 409
-    
-    hashed_pw = generate_password_hash(data['password'])
-    new_user = await db.user.create(
-        data={
-            'firstname': data.get('firstname'),
-            'lastname': data.get('lastname'),
-            'username': data['username'],
-            'password': hashed_pw,
-        }
-    )
-    return {"status": "success", "message": "User created"}, 201
+    try:
+        # 1. Find the Role object by its name (e.g., 'caregiver')
+        role_record = await db.role.find_unique(
+            where={'role_name': data['role']}
+        )
+
+        if not role_record:
+            return {"status": "error", "message": f"Role '{data['role']}' not found."}, 400
+
+        # 2. Hash the password before saving
+        hashed_pw = hash_password(data['password'])
+
+        # 3. Create the user using the found role_id
+        new_user = await db.user.create(
+            data={
+                'firstname': data['firstname'],
+                'lastname': data['lastname'],
+                'username': data['username'],
+                'password': hashed_pw,
+                'role_id': role_record.id # Linking via the ID from the DB
+            }
+        )
+
+        return {
+            "status": "success", 
+            "message": "User created successfully",
+            "user_id": str(new_user.id)
+        }, 201
+
+    except Exception as e:
+        print(f"Error creating user: {e}")
+        return {"status": "error", "message": str(e)}, 500

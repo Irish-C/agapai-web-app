@@ -1,5 +1,7 @@
 from fastapi import APIRouter, Request, Depends
 from fastapi.responses import JSONResponse
+from database import db
+from src.utils.auth import get_current_user_id
 
 from src.controllers.user_controller import (
     login_logic,
@@ -60,3 +62,37 @@ async def change_password(request: Request, user_id: str = Depends(get_current_u
     new_password = data.get('new_password')
     result, code = await change_password_logic(user_id, old_password, new_password)
     return JSONResponse(status_code=code, content=result)
+
+@router.get('/roles')
+async def get_roles():
+    try:
+        # Now 'db' is defined and can be used
+        roles = await db.role.find_many()
+        role_names = [r.role_name for r in roles]
+        
+        return {
+            "status": "success",
+            "data": role_names
+        }
+    except Exception as e:
+        print(f"Database Error: {e}")
+        return {
+            "status": "error",
+            "message": f"Failed to fetch roles: {str(e)}"
+        }, 500
+    try:
+        # Fetch all roles from the Role table
+        roles = await db.role.find_many()
+        
+        # Extract just the names into a list
+        role_names = [r.role_name for r in roles]
+        
+        return {
+            "status": "success",
+            "data": role_names
+        }
+    except Exception as e:
+        return {
+            "status": "error",
+            "message": f"Failed to fetch roles: {str(e)}"
+        }, 500
