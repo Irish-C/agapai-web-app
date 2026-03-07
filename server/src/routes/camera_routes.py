@@ -1,21 +1,21 @@
-from flask import Blueprint, request, jsonify
-from src.middleware.auth import token_required
+from fastapi import APIRouter, Depends
+from fastapi.responses import JSONResponse
+
 from src.controllers.camera_controller import (
-    get_cameras_logic, 
-    create_camera_logic, 
-    get_camera_logic
+    get_cameras_logic,
+    create_camera_logic,
+    get_camera_logic,
 )
+from src.utils.auth import get_current_user_id
 
-camera_routes = Blueprint('camera_routes', __name__)
+router = APIRouter()
 
-@camera_routes.route('/cameras', methods=['GET'])
-@token_required
-async def get_all_cameras():
+@router.get('/cameras')
+async def get_all_cameras(user_id: str = Depends(get_current_user_id)):
     data, code = await get_cameras_logic()
-    return jsonify({"status": "success", "cameras": data}), code
+    return JSONResponse(status_code=code, content={'status': 'success', 'cameras': data})
 
-@camera_routes.route('/cameras/<int:camera_id>', methods=['GET'])
-@token_required
-async def get_single_camera(camera_id):
+@router.get('/cameras/{camera_id}')
+async def get_single_camera(camera_id: int, user_id: str = Depends(get_current_user_id)):
     result, code = await get_camera_logic(camera_id)
-    return jsonify(result), code
+    return JSONResponse(status_code=code, content=result)

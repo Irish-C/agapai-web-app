@@ -1,125 +1,115 @@
-import asyncio
 import os
-import jwt
-from datetime import datetime, timezone, timedelta
-from functools import wraps
 from dotenv import load_dotenv
 
-from flask import Flask, request, send_from_directory, jsonify, g, make_response
-from flask.json.provider import DefaultJSONProvider
-from flask_cors import CORS
-from flask_socketio import SocketIO
-# Use Middleware to wrap for ASGI/Hypercorn
-from engineio.middleware import Middleware as ASGIMiddleware
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
+import socketio
 
 from database import db
 from seed_db import seed_database
+from src.routes.user_routes import router as user_router
+from src.routes.camera_routes import router as camera_router
+from src.routes.event_routes import router as event_router
+from src.routes.settings_routes import router as settings_router
+from src.routes.location_routes import router as location_router
 
-# 1. LOAD ENVIRONMENT
+# --- 1. LOAD ENVIRONMENT ---
 load_dotenv()
 SECRET_KEY = os.getenv('FLASK_SECRET_KEY', 'default_secret_key')
 
-# 2. APP INITIALIZATION
-app = Flask(__name__, static_folder='../client/dist', static_url_path='/')
-
-# Create a single Socket.IO instance and wrap it for ASGI.
-# Use the default async_mode (threading) so Socket.IO works under Hypercorn.
-# Avoid passing unsupported values like 'asgi' which Engine.IO does not recognize.
-socketio = SocketIO(
-    app,
-    cors_allowed_origins="*",
-    async_mode='threading',
+# --- 2. Socket.IO (ASGI) ---
+# Use python-socketio AsyncServer + ASGIApp so Hypercorn can serve HTTP + WS.
+socketio_server = socketio.AsyncServer(
+    async_mode='asgi',
+    cors_allowed_origins=['http://127.0.0.1:5173', 'http://localhost:5173'],
     logger=True,
-    engineio_logger=True
+    engineio_logger=True,
 )
 
-# Wrap the SocketIO instance with Engine.IO ASGI middleware.
-# This makes the Flask app + Socket.IO work when served by an ASGI server.
-asgi_app = ASGIMiddleware(socketio.server, app)
+# --- 3. FASTAPI app ---
+app = FastAPI()
 
-# --- 2. FLASK-CORS SETTINGS (HTTP API) ---
-CORS(app, resources={r"/api/*": {
-    "origins": ["http://127.0.0.1:5173", "http://localhost:5173"],
-    "methods": ["GET", "POST", "OPTIONS", "PATCH", "DELETE"],
-    "allow_headers": ["Content-Type", "Authorization"]
-}})
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=['http://127.0.0.1:5173', 'http://localhost:5173'],
+    allow_credentials=True,
+    allow_methods=['*'],
+    allow_headers=['*'],
+)
 
-# BigInt Support for Prisma
-class BigIntProvider(DefaultJSONProvider):
-    def default(self, obj):
-        if isinstance(obj, int):
-            return str(obj)
-        return super().default(obj)
+app.include_router(user_router, prefix='/api')
+app.include_router(camera_router, prefix='/api')
+app.include_router(event_router, prefix='/api')
+app.include_router(settings_router, prefix='/api')
+app.include_router(location_router, prefix='/api')
 
-app.json = BigIntProvider(app)
-
-# 4. AUTH HELPERS
-def create_token(user_id):
-    payload = {
-        'sub': str(user_id),
-        'iat': datetime.now(timezone.utc),
-        'exp': datetime.now(timezone.utc) + timedelta(hours=12)
-    }
-    return jwt.encode(payload, SECRET_KEY, algorithm='HS256')
-
-def token_required(f):
-    @wraps(f)
-    def decorated(*args, **kwargs):
-        auth_header = request.headers.get('Authorization', '')
-        if not auth_header.startswith('Bearer '):
-            return jsonify({'status': 'error', 'message': 'Token is missing.'}), 401
-        
-        token = auth_header.split(' ', 1)[1].strip()
-        try:
-            payload = jwt.decode(token, SECRET_KEY, algorithms=['HS256'])
-            g.user_id = payload.get('sub')
-        except jwt.ExpiredSignatureError:
-            return jsonify({'status': 'error', 'message': 'Token has expired.'}), 401
-        except Exception:
-            return jsonify({'status': 'error', 'message': 'Invalid token.'}), 401
-        return f(*args, **kwargs)
-    return decorated
-
-# 5. BLUEPRINTS
-from src.routes.user_routes import user_routes
-from src.routes.camera_routes import camera_routes
-from src.routes.event_routes import event_routes
-app.register_blueprint(user_routes, url_prefix='/api')
-app.register_blueprint(camera_routes, url_prefix='/api')
-app.register_blueprint(event_routes, url_prefix='/api')
-
-# 6. DB LIFECYCLE
-@app.before_request
-async def ensure_db_connected():
+# --- 4. DB lifecycle ---
+@app.on_event('startup')
+async def on_startup():
     if not db.is_connected():
         await db.connect()
 
-# 7. UTILITY ROUTES
-@app.route('/api/seed_db', methods=['POST'])
+@app.on_event('shutdown')
+async def on_shutdown():
+    if db.is_connected():
+        await db.disconnect()
+
+# --- 5. Utility routes ---
+@app.post('/api/seed_db')
 async def seed_db_route():
     try:
         await seed_database()
-        return jsonify({"status": "success", "message": "Database seeded"}), 200
+        return {'status': 'success', 'message': 'Database seeded'}
     except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
+        return JSONResponse(status_code=500, content={'status': 'error', 'message': str(e)})
 
-@app.route('/', defaults={'path': ''})
-@app.route('/<path:path>')
-def serve(path):
-    if path != "" and os.path.exists(os.path.join(app.static_folder, path)):
-        return send_from_directory(app.static_folder, path)
-    return send_from_directory(app.static_folder, 'index.html')
+# --- 6. Health / readiness endpoints ---
+@app.get('/health')
+async def health_check():
+    return {
+        'status': 'ok',
+        'database_connected': db.is_connected(),
+    }
+
+@app.get('/ready')
+async def readiness_check():
+    return {
+        'status': 'ready',
+        'database_connected': db.is_connected(),
+    }
+
+# --- 7. Static + SPA fallback ---
+_DIST_DIR = os.path.join(os.path.dirname(__file__), '../client/dist')
+
+if os.path.isdir(_DIST_DIR):
+    app.mount('/', StaticFiles(directory=_DIST_DIR, html=True), name='static')
+
+    @app.get('/{full_path:path}')
+    async def spa_fallback(full_path: str):
+        return FileResponse(os.path.join(_DIST_DIR, 'index.html'))
+else:
+    # In dev mode we expect the frontend to run on Vite (http://127.0.0.1:5173).
+    # These endpoints exist to verify the backend is running.
+    @app.get('/')
+    async def root_health_check():
+        return {'status': 'ok', 'message': 'Backend is running (no static build detected)'}
+
+# --- 7. Socket.IO events ---
+@socketio_server.event
+async def connect(sid, environ):
+    print('Socket.IO connect', sid)
+
+@socketio_server.event
+async def disconnect(sid):
+    print('Socket.IO disconnect', sid)
+
+# ASGI app entrypoint for Hypercorn / Uvicorn.
+asgi_app = socketio.ASGIApp(socketio_server, app)
 
 
 if __name__ == '__main__':
-    # Use this ONLY for 'python app.py'
-    async def run_dev():
-        if not db.is_connected():
-            await db.connect()
-        try:
-            socketio.run(app, host='127.0.0.1', port=5000, debug=True, use_reloader=False, allow_unsafe_werkzeug=True)
-        finally:
-            if db.is_connected():
-                await db.disconnect()
+    import uvicorn
 
-    asyncio.run(run_dev())
+    uvicorn.run('app:asgi_app', host='127.0.0.1', port=5000, reload=True)

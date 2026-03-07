@@ -1,23 +1,24 @@
 # --- Backend Framework ---
-flask
-flask-jwt-extended
-flask-socketio
-flask-cors
+fastapi
+uvicorn
 
 # --- Database (Prisma) ---
 prisma              # REPLACES flask-sqlalchemy
 psycopg2-binary     # Required for PostgreSQL communication
 
 # --- Real-time & Server ---
-gunicorn
+python-socketio
+python-engineio
 python-dotenv
 
-# --- AI & Vision (Pi Optimized) ---
+# --- AI & Vision ---
 ultralytics
 numpy
 Pillow
-picamera2           # Ensure you are on Raspberry Pi Bookworm OS
-RPi.GPIO
+
+# --- Realtime / WebSockets ---
+websockets
 
 # --- Security & Utils ---
 requests
+werkzeug

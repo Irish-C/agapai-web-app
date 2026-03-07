@@ -1,29 +1,27 @@
-from flask import Blueprint, request, jsonify
-from src.utils.auth import get_token_user_id
+from fastapi import APIRouter, Request, Depends
+from fastapi.responses import JSONResponse
+
+from src.utils.auth import get_current_user_id
 from src.controllers.event_controller import (
-    get_event_logs_logic, 
-    mark_viewed_logic, 
-    create_event_logic  # New logic function
+    get_event_logs_logic,
+    mark_viewed_logic,
+    create_event_logic,
 )
 
-event_routes = Blueprint('event_routes', __name__)
+router = APIRouter()
 
-@event_routes.route('/events', methods=['POST'])
-async def create_event():
-    """Route for AI/Cameras to post new detections"""
-    data = request.json
+@router.post('/events')
+async def create_event(request: Request):
+    data = await request.json()
     result, code = await create_event_logic(data)
-    return jsonify(result), code
+    return JSONResponse(status_code=code, content=result)
 
-@event_routes.route('/event_logs', methods=['GET'])
-async def get_event_logs():
-    result, code = await get_event_logs_logic(request.args)
-    return jsonify(result), code
+@router.get('/event_logs')
+async def get_event_logs(request: Request):
+    result, code = await get_event_logs_logic(dict(request.query_params))
+    return JSONResponse(status_code=code, content=result)
 
-@event_routes.route('/events/<int:log_id>/acknowledge', methods=['POST'])
-async def acknowledge_event(log_id):
-    user_id = get_token_user_id()
-    if not user_id:
-        return jsonify({'status': 'error', 'message': 'Unauthorized'}), 401
+@router.post('/events/{log_id}/acknowledge')
+async def acknowledge_event(log_id: int, user_id: str = Depends(get_current_user_id)):
     result, code = await mark_viewed_logic(log_id, user_id)
-    return jsonify(result), code
+    return JSONResponse(status_code=code, content=result)
