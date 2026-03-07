@@ -2,6 +2,8 @@
 import React, { useState, useEffect } from 'react';
 import { FaUser, FaSave, FaTimes, FaSpinner, FaLock } from 'react-icons/fa';
 
+import { normalizeRole, displayRole } from '../../utils/roleUtils.js';
+
 /**
  * Modal component for adding a new user or editing an existing user.
  * @param {object} userToEdit - The user object (if editing), or null (if adding).
@@ -13,8 +15,8 @@ export default function UserEditModal({ userToEdit, onSave, onClose }) {
     // Determine if we are editing or adding
     const isEditing = !!userToEdit;
     
-    // Define the roles available in the database
-    const LIMITED_ROLES = ['Admin', 'User'];
+    // Define the roles available in the database (normalized to lowercase)
+    const LIMITED_ROLES = ['admin', 'user'];
 
     // Initial form state based on whether we are editing an existing user or adding a new one
     const [formData, setFormData] = useState({
@@ -22,8 +24,8 @@ export default function UserEditModal({ userToEdit, onSave, onClose }) {
         firstname: userToEdit?.firstname || '',
         lastname: userToEdit?.lastname || '',
         username: userToEdit?.username || '',
-        // 🛑 FIX: Use 'User' as the default role for new users
-        role: userToEdit?.role || 'User', 
+        // 🛑 FIX: Use 'user' as the default role for new users and normalize role values
+        role: normalizeRole(userToEdit?.role) || 'user', 
         password: '',
         confirmPassword: '',
         // Use the limited role list
@@ -129,8 +131,8 @@ export default function UserEditModal({ userToEdit, onSave, onClose }) {
                                 <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="role">Access Role</label>
                                 <select id="role" name="role" value={formData.role} onChange={handleChange} 
                                     className="w-full border-gray-300 rounded-lg pl-2 py-2" required disabled={isLoading}>
-                                    {formData.availableRoles.map(role => (
-                                        <option key={role} value={role}>{role}</option>
+                                    {formData.availableRoles.map((role) => (
+                                        <option key={role} value={role}>{displayRole(role)}</option>
                                     ))}
                                 </select>
                             </div>

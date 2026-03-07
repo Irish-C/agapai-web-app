@@ -8,6 +8,9 @@ import agapai_Bg from './src/assets/bg/gray-bg.png';
 import { loginUser, fetchCameraList, logoutUser } from './src/services/apiService.js';
 import { socket } from './src/services/socket.js';
 
+// helpers
+import { normalizeRole } from './src/utils/roleUtils.js';
+
 // components
 import Header from './src/components/layout/Header.jsx';
 import Footer from './src/components/layout/Footer.jsx';
@@ -65,6 +68,10 @@ export default function App() {
             localStorage.setItem('authToken', parsed.token);
         }
 
+        // Normalize stored role values to lowercase (handles legacy stored data)
+        if (parsed) {
+            parsed.role = normalizeRole(parsed.role);
+        }
         return parsed;
     });
 
@@ -106,7 +113,7 @@ export default function App() {
             if (data.status === 'success' || data.token) {
                 const userData = {
                     username: data.username,
-                    role: data.role,
+                    role: normalizeRole(data.role),
                     userId: data.user_id,
                     token: data.access_token || data.token
                 };

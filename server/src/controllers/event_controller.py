@@ -1,15 +1,16 @@
 from database import db
 from datetime import datetime
 
-# 1. New Event Logic (For the POST /events route)
 async def create_event_logic(data):
     try:
-        new_event = await db.event.create(
+        # 1. Use 'eventlog' (lowercase of model name EventLog)
+        # 2. Use schema field names: cam_id and file_path
+        new_event = await db.eventlog.create(
             data={
-                'camera_id': int(data['camera_id']),
+                'cam_id': int(data['camera_id']),
                 'event_class_id': int(data['event_class_id']),
                 'timestamp': datetime.now(),
-                'snapshot_url': data.get('snapshot_url', '')
+                'file_path': data.get('snapshot_url', '')
             },
             include={
                 'camera': True,
@@ -17,25 +18,25 @@ async def create_event_logic(data):
             }
         )
 
-        from app import socketio 
+        # Use the socketio_server instance defined in app.py
+        from app import socketio_server 
         payload = {
             'id': str(new_event.id),
             'type': new_event.event_class.class_name,
             'location': new_event.camera.cam_name,
             'timestamp': new_event.timestamp.isoformat(),
-            'snapshot_url': new_event.snapshot_url
+            'snapshot_url': new_event.file_path
         }
-        socketio.emit('new_alert', payload)
+        # Emit alert to frontend
+        await socketio_server.emit('new_alert', payload)
 
         return {"status": "success", "data": payload}, 201
     except Exception as e:
         return {"status": "error", "message": str(e)}, 500
 
-# 2. THE MISSING FUNCTION: Get Event Logs Logic
 async def get_event_logs_logic(filters=None):
     try:
-        # Simple fetch; you can expand this with prisma filters later
-        logs = await db.event.find_many(
+        logs = await db.eventlog.find_many(
             order={'timestamp': 'desc'},
             include={'camera': True, 'event_class': True}
         )
@@ -43,12 +44,14 @@ async def get_event_logs_logic(filters=None):
     except Exception as e:
         return {"status": "error", "message": str(e)}, 500
 
-# 3. Mark Viewed/Acknowledge Logic
 async def mark_viewed_logic(log_id, user_id):
     try:
-        await db.event.update(
+        await db.eventlog.update(
             where={'id': int(log_id)},
-            data={'acknowledged_by': int(user_id), 'acknowledged_at': datetime.now()}
+            data={
+                'ack_by_user_id': int(user_id),
+                'event_status': 'acknowledged'
+            }
         )
         return {"status": "success", "message": "Event acknowledged"}, 200
     except Exception as e:

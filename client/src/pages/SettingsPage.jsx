@@ -2,13 +2,15 @@
 import React, { useState } from 'react';
 import { FaUserCog, FaCogs, FaBell, FaUsers, FaConnectdevelop} from 'react-icons/fa'; 
 
+import { normalizeRole } from '../utils/roleUtils.js';
+
 import AccountSettingsForm from '../features/form/AccountSettingsForm.jsx';
 import CameraNotificationSettings from '../features/camera/CameraNotificationSettings.jsx';
 import UserManager from '../features/manager/UserManager.jsx'; 
 import ManagementDashboard from "../features/manager/ManagementDashboard.jsx";
 
 export default function Settings({ user }) {
-    const isAdmin = user && user.role === 'Admin'; 
+    const isAdmin = normalizeRole(user?.role) === 'admin'; 
     
     const [activeSection, setActiveSection] = useState('my_account'); 
     const [locations, setLocations] = useState([]);
@@ -20,14 +22,14 @@ export default function Settings({ user }) {
     // 2. Define the navigation structure with roles
     const fullNavItems = [
         { id: 'my_account', name: 'My Account', icon: FaUserCog, role: 'all' },
-        { id: 'management', name: 'Device and Location', icon: FaConnectdevelop, role: 'Admin' }, 
+        { id: 'management', name: 'Device and Location', icon: FaConnectdevelop, role: 'admin' }, 
         { id: 'notification', name: 'Notifications', icon: FaBell, role: 'all' },
-        { id: 'user_management', name: 'User Management', icon: FaUsers, role: 'Admin' }, 
+        { id: 'user_management', name: 'User Management', icon: FaUsers, role: 'admin' }, 
     ];
     
     // 3. Filter the navigation items based on the user's role
     const navItems = fullNavItems.filter(item => {
-        return item.role === 'all' || (item.role === 'Admin' && isAdmin);
+        return item.role === 'all' || (item.role === 'admin' && isAdmin);
     });
 
     const renderActiveComponent = () => {

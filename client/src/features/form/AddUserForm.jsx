@@ -2,6 +2,8 @@
 import React, { useState, useEffect } from 'react';
 import { FaUser, FaSave, FaTimes, FaSpinner, FaLock } from 'react-icons/fa';
 
+import { normalizeRole, displayRole } from '../../utils/roleUtils.js';
+
 /**
  * Modal component for adding a new user or editing an existing user.
  * @param {object} userToEdit - The user object (if editing), or null (if adding).
@@ -20,11 +22,11 @@ export default function UserEditModal({ userToEdit, onSave, onClose }) {
         firstname: userToEdit?.firstname || '',
         lastname: userToEdit?.lastname || '',
         username: userToEdit?.username || '',
-        role: userToEdit?.role || 'User', // Default to User
+        role: normalizeRole(userToEdit?.role) || 'user', // Default to user
         password: '',
         confirmPassword: '',
         // NOTE: Fetch available roles using a hardcoded list here.
-        availableRoles: ['Admin', 'User']
+        availableRoles: ['admin', 'user']
     });
 
     const [message, setMessage] = useState('');
@@ -127,8 +129,8 @@ export default function UserEditModal({ userToEdit, onSave, onClose }) {
                                 <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="role">Access Role</label>
                                 <select id="role" name="role" value={formData.role} onChange={handleChange} 
                                     className="w-full border-gray-300 rounded-lg pl-2 py-2" required disabled={isLoading}>
-                                    {formData.availableRoles.map(role => (
-                                        <option key={role} value={role}>{role}</option>
+                                    {formData.availableRoles.map((role) => (
+                                        <option key={role} value={role}>{displayRole(role)}</option>
                                     ))}
                                 </select>
                             </div>

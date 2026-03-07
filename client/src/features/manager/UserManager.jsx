@@ -4,6 +4,8 @@ import { FaUserPlus, FaUsers, FaEdit, FaSpinner, FaArchive } from 'react-icons/f
 import UserEditModal from '../modal/UserEditModal.jsx'; 
 import { fetchUsers, fetchApi } from '../../services/apiService.js'; 
 
+import { normalizeRole, displayRole } from '../../utils/roleUtils.js';
+
 
 const archiveUser = (userId) => fetchApi(`/users/${userId}/archive`, 'PATCH', { is_active: false }); 
 
@@ -175,8 +177,8 @@ export default function UserManager({ user }) {
                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{u.firstname}</td> 
                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{u.lastname}</td> 
                                     <td className="px-6 py-4 whitespace-nowrap">
-                                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${u.role === 'Admin' ? 'bg-indigo-100 text-indigo-800' : 'bg-green-100 text-green-800'}`}>
-                                            {u.role}
+                                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${normalizeRole(u.role) === 'admin' ? 'bg-indigo-100 text-indigo-800' : 'bg-green-100 text-green-800'}`}>
+                                            {displayRole(u.role)}
                                         </span>
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">

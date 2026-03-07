@@ -3,6 +3,8 @@ import React, { useState, useEffect } from 'react';
 import { FaLock, FaKey, FaSave, FaSpinner, FaCheckCircle, FaExclamationCircle, FaUser } from 'react-icons/fa';
 import { fetchApi, fetchUserProfile, changePassword } from '../../services/apiService'; 
 
+import { normalizeRole, displayRole } from '../../utils/roleUtils.js';
+
 // Define default structure for loading state fallback
 const initialProfileState = { 
     firstname: 'Loading', 
@@ -17,7 +19,7 @@ export default function AccountSettingsForm({ user }) {
     const [profile, setProfile] = useState(() => ({
         ...initialProfileState,
         username: user?.username || initialProfileState.username,
-        role: user?.role || initialProfileState.role,
+        role: normalizeRole(user?.role) || initialProfileState.role,
     }));
     // Loading state for profile fetch
     const [isProfileLoading, setIsProfileLoading] = useState(true);
@@ -57,7 +59,7 @@ export default function AccountSettingsForm({ user }) {
                     firstname: data.firstname || 'N/A', 
                     lastname: data.lastname || 'User',
                     username: user.username, 
-                    role: user.role,
+                    role: normalizeRole(user.role) || normalizeRole(data.role) || initialProfileState.role,
                 });
 
             } catch (error) {
@@ -66,7 +68,7 @@ export default function AccountSettingsForm({ user }) {
                 // RECOVERY: Use guaranteed data from props and display generic error
                 setProfile({
                     username: user.username || 'N/A', 
-                    role: user.role || 'User',
+                    role: normalizeRole(user.role) || 'user',
                     firstname: user.firstname || 'N/A',
                     lastname: user.lastname || 'User',
                 });
@@ -152,9 +154,9 @@ const handleSubmit = async (e) => {
                         <div className="flex justify-between">
                             <span className="font-medium">Your Role:</span>
                             <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
-                                profile.role === 'Admin' ? 'bg-indigo-100 text-indigo-800' : 'bg-green-100 text-green-800'
+                                normalizeRole(profile.role) === 'admin' ? 'bg-indigo-100 text-indigo-800' : 'bg-green-100 text-green-800'
                             }`}>
-                                {profile.role}
+                                {displayRole(profile.role)}
                             </span>
                         </div>
                     </div>
