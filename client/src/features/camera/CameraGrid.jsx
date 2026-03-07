@@ -4,6 +4,7 @@ import VideoFeed from './VideoFeed.jsx';
 import TodayReport from '../dashboard/TodayReport.jsx';
 import { useCameraSocket } from '../../hooks/useCamera.js';
 import { FaPlug, FaSpinner, FaVideo } from 'react-icons/fa';
+import { fetchCameraList } from '../../services/apiService.js';
 
 export default function CameraGrid() {
     // Data from our simplified hook
@@ -25,18 +26,12 @@ export default function CameraGrid() {
             setIsLoading(true);
             setError(null);
             try {
-                // Fetch all cameras
-                const response = await fetch(`/api/cameras`); 
-                
-                if (!response.ok) {
-                    throw new Error(`Server error: ${response.status}`);
-                }
-                
-                const data = await response.json();
+                // Fetch all cameras (authenticated)
+                const data = await fetchCameraList();
 
-                if (data.status === 'success') {
-                    // Assuming data.cameras contains the location name and ID.
-                    setCameraList(data.cameras); 
+                // Assuming the backend returns { status: 'success', cameras: [...] }
+                if (data?.status === 'success' && Array.isArray(data.cameras)) {
+                    setCameraList(data.cameras);
                 } else {
                     setError('API did not return a valid camera list.');
                 }

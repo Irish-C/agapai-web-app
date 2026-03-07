@@ -11,11 +11,9 @@ export default function Header({ user, logout }) {
     
     // NEW STATE: Control the visibility of the logout confirmation modal
     const [showLogoutModal, setShowLogoutModal] = useState(false);
-    
-    // Hide header on landing/root page
-    if (location.pathname === '/' || location.pathname === '/landing') {
-        return null;
-    }
+
+    // Only render the header outside of the landing page
+    const shouldRenderHeader = location.pathname !== '/' && location.pathname !== '/landing';
 
     const navItems = [
         { name: 'Dashboard', path: '/dashboard', icon: FaTh },
@@ -43,6 +41,11 @@ export default function Header({ user, logout }) {
         window.addEventListener('scroll', handleScroll);
         return () => window.removeEventListener('scroll', handleScroll);
     }, [lastScrollY]);
+
+    // Don't render header when on landing page
+    if (!shouldRenderHeader) {
+        return null;
+    }
 
     // Function executed upon confirming logout
     const handleConfirmLogout = () => {

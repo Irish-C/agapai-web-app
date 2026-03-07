@@ -1,15 +1,16 @@
 // client/vite.config.js
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
-import tailwindcss from 'tailwindcss';
+import tailwindcss from '@tailwindcss/vite';
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   server: {
-    host: '0.0.0.0',
+    host: '127.0.0.1',
     port: 5173,
+    strictPort: true, // Fail if port 5173 is unavailable (prevents auto-switching to 5174/5273)
     proxy: {
-      // Directs standard API calls to Flask
+      // Directs standard API calls to FastAPI
       '/api': {
         target: 'http://127.0.0.1:5000', 
         changeOrigin: true,

@@ -4,7 +4,7 @@ import React from 'react';
 class GlobalErrorBoundary extends React.Component {
   constructor(props) {
     super(props);
-    this.state = { hasError: false, error: null };
+    this.state = { hasError: false, error: null, componentStack: null };
   }
 
   static getDerivedStateFromError(error) {
@@ -15,6 +15,7 @@ class GlobalErrorBoundary extends React.Component {
   componentDidCatch(error, errorInfo) {
     // You can log the error to an analytics service here
     console.error("Global Error Caught:", error, errorInfo);
+    this.setState({ componentStack: errorInfo?.componentStack || null });
   }
 
   handleReset = () => {
@@ -33,7 +34,17 @@ class GlobalErrorBoundary extends React.Component {
               The application encountered an unexpected error. Don't worry, your monitoring data is safe.
             </p>
             <div className="bg-gray-50 p-3 rounded mb-6 text-left overflow-auto max-h-32">
-               <code className="text-xs text-red-500">{this.state.error?.toString()}</code>
+               <code className="text-xs text-red-500 break-words">
+                 {this.state.error?.toString()}
+                 {this.state.componentStack && (
+                   <>
+                     <br />
+                     <span className="text-xs font-semibold">Component stack:</span>
+                     <br />
+                     <span className="text-xs whitespace-pre-wrap">{this.state.componentStack}</span>
+                   </>
+                 )}
+               </code>
             </div>
             <button
               onClick={this.handleReset}

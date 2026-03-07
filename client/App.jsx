@@ -58,7 +58,14 @@ export default function App() {
     // Authentication state
     const [user, setUser] = useState(() => {
         const storedUser = localStorage.getItem('user');
-        return storedUser ? JSON.parse(storedUser) : null;
+        const parsed = storedUser ? JSON.parse(storedUser) : null;
+
+        // Ensure auth token is available for API requests (in case localStorage was cleared separately)
+        if (parsed?.token && !localStorage.getItem('authToken')) {
+            localStorage.setItem('authToken', parsed.token);
+        }
+
+        return parsed;
     });
 
     const [cameras, setCameras] = useState([]);
