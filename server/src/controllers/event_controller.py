@@ -36,12 +36,58 @@ async def create_event_logic(data):
 
 async def get_event_logs_logic(filters=None):
     try:
+        # Get limit from filters, default to 50 if not provided
+        limit = int(filters.get('limit', 50)) if filters else 50
+        
         logs = await db.eventlog.find_many(
+            take=limit, # Use the limit here
             order={'timestamp': 'desc'},
             include={'camera': True, 'event_class': True}
         )
-        return {"status": "success", "data": logs}, 200
+        
+        # Convert BigInt and DateTime to strings for JSON
+        formatted_data = []
+        for log in logs:
+            formatted_data.append({
+                "id": str(log.id),
+                "type": log.event_class.class_name if log.event_class else "Unknown",
+                "location": log.camera.cam_name if log.camera else "Unknown",
+                "timestamp": log.timestamp.isoformat(),
+                "snapshot_url": log.file_path,
+                "status": log.event_status
+            })
+            
+        return {"status": "success", "report": formatted_data}, 200
     except Exception as e:
+        print(f"Error: {e}")
+        return {"status": "error", "message": str(e)}, 500
+
+async def get_viewed_event_logs_logic(filters=None):
+    try:
+        # Get limit from filters, default to 50 if not provided
+        limit = int(filters.get('limit', 50)) if filters else 50
+        
+        logs = await db.eventlog.find_many(
+            take=limit, # Use the limit here
+            order={'timestamp': 'desc'},
+            include={'camera': True, 'event_class': True}
+        )
+        
+        # Convert BigInt and DateTime to strings for JSON
+        formatted_data = []
+        for log in logs:
+            formatted_data.append({
+                "id": str(log.id),
+                "type": log.event_class.class_name if log.event_class else "Unknown",
+                "location": log.camera.cam_name if log.camera else "Unknown",
+                "timestamp": log.timestamp.isoformat(),
+                "snapshot_url": log.file_path,
+                "status": log.event_status
+            })
+            
+        return {"status": "success", "report": formatted_data}, 200
+    except Exception as e:
+        print(f"Error: {e}")
         return {"status": "error", "message": str(e)}, 500
 
 async def mark_viewed_logic(log_id, user_id):

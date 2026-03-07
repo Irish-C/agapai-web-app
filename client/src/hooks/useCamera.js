@@ -11,12 +11,10 @@ export const useCameraSocket = () => {
     const [incidents, setIncidents] = useState([]);
     const [isConnected, setIsConnected] = useState(false);
 
-    // This useEffect only handles the socket connection.
     useEffect(() => {
-        // Connect directly to the Flask server on port 5000.
-        const socket = io('http://localhost:5000', { 
-            path: '/socket.io', 
-            transports: ['websocket', 'polling'] 
+        const socket = io('http://127.0.0.1:5000', {
+        transports: ['websocket'],
+        path: '/socket.io'
         });
 
         socket.on('connect', () => {
