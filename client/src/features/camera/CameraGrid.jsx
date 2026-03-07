@@ -99,9 +99,9 @@ export default function CameraGrid() {
                     <VideoFeed
                         key={focusedCamera.id}
                         camId={focusedCamera.id}
-                        location={focusedCamera.location || focusedCamera.loc_name} // Use location or loc_name
-                        // FIX 1: Use the proxy URL based on the camera ID
-                        streamUrl={getStreamUrl(focusedCamera.id)} 
+                        location={focusedCamera.location_name || focusedCamera.location || focusedCamera.loc_name}
+                        // Prefer the configured camera stream URL; fall back to the local Pi proxy when missing.
+                        streamUrl={focusedCamera.stream_url || getStreamUrl(focusedCamera.id)}
                         frameData={cameraData[focusedCamera.id]}
                         isConnected={isConnected}
                         isFocused={true}
@@ -132,9 +132,9 @@ export default function CameraGrid() {
                                     >
                                         <VideoFeed
                                             camId={camera.id}
-                                            location={camera.location || camera.loc_name} // Handle both formats
-                                            // FIX 2: Use the proxy URL based on the camera ID
-                                            streamUrl={getStreamUrl(camera.id)}
+                                            location={camera.location_name || camera.location || camera.loc_name} // Handle both formats
+                                            // Prefer configured stream URL; fall back to the local Pi proxy if missing
+                                            streamUrl={camera.stream_url || getStreamUrl(camera.id)}
                                             frameData={cameraData[camera.id]}
                                             isConnected={isConnected}
                                             isFocused={false}

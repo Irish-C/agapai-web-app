@@ -60,14 +60,15 @@ export default function VideoFeed({
       </div>
     );
   } else {
-    // Case 5: We have data! Show the image from the base64 string (Mock Stream)
-    // The src is set using the base64-encoded frameData passed via SocketIO
-    content = (
-      <img 
-        src={streamUrl} 
-        alt={`${location} Feed`}
-        style={{width: "100%", height:"130%"}}
-        className="w-full h-full object-cover" // Ensure it covers the container
+    // Case 5: We have frame data from the socket stream
+    // Render it as an inline base64 JPEG image.
+    const base64Src = `data:image/jpeg;base64,${frameData}`;
+
+    content = (
+      <img 
+        src={base64Src} 
+        alt={`${location} Feed`}
+        style={{ width: "100%", height: "130%" }}
       />
     );
   }

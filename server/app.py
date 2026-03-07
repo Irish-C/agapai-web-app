@@ -1,25 +1,17 @@
 import asyncio
 import os
-import base64
-import threading
-from io import BytesIO
-from PIL import Image, ImageDraw
-from werkzeug.security import generate_password_hash
-from dotenv import load_dotenv
-
-# Flask & Extensions
-from flask import Flask, request, send_from_directory
-from flask_socketio import SocketIO
-from flask_cors import CORS
-from flask_jwt_extended import JWTManager
+import datetime
+import jwt
+from functools import wraps
+from werkzeug.security import generate_password_hash, check_password_hash
+from flask import Flask, request, send_from_directory, jsonify, g, make_response
 from flask.json.provider import DefaultJSONProvider
 
 # Database Instance
-from database import db 
-from prisma import Prisma
+from database import db
 
 # 1. Initialization
-load_dotenv()
+# NOTE: dotenv is not required; rely on system environment variables if present.
 app = Flask(__name__, static_folder='../client/dist', static_url_path='/')
 
 # Custom JSON Provider for BigInt support
@@ -31,75 +23,53 @@ class BigIntProvider(DefaultJSONProvider):
 
 app.json = BigIntProvider(app)
 
-# Security & CORS
-CORS(app, resources={
-    r"/api/*": {
-        "origins": [
-            "http://localhost:5173",
-            "http://127.0.0.1:5173",
-            "http://localhost:3000", 
-            "http://127.0.0.1:3000"
-        ],
-        "allow_headers": ["Content-Type", "Authorization"],
-        "methods": ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
+# Basic CORS handling (no flask-cors dependency required)
+@app.after_request
+def add_cors_headers(response):
+    response.headers['Access-Control-Allow-Origin'] = '*'
+    response.headers['Access-Control-Allow-Headers'] = 'Content-Type,Authorization'
+    response.headers['Access-Control-Allow-Methods'] = 'GET,POST,PUT,PATCH,DELETE,OPTIONS'
+    return response
+
+@app.route('/api/<path:path>', methods=['OPTIONS'])
+def handle_options(path):
+    return make_response('', 204)
+
+# JWT helpers (uses PyJWT which is available in this environment)
+SECRET_KEY = os.getenv('FLASK_SECRET_KEY', 'default_secret_key')
+
+def create_token(user_id):
+    payload = {
+        'sub': str(user_id),
+        'exp': datetime.datetime.utcnow() + datetime.timedelta(hours=12)
     }
-})
+    return jwt.encode(payload, SECRET_KEY, algorithm='HS256')
 
-app.config['SECRET_KEY'] = os.getenv('FLASK_SECRET_KEY', 'default_secret_key')
-app.config['JWT_SECRET_KEY'] = os.getenv('FLASK_SECRET_KEY', 'default_secret_key')
-jwt = JWTManager(app)
+def token_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        token = None
+        auth_header = request.headers.get('Authorization', '')
+        if auth_header.startswith('Bearer '):
+            token = auth_header.split(' ', 1)[1].strip()
 
-# --- Real-time Engine ---
-# By using 'threading', we stay compatible with standard asyncio.run() calls.
-socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading')
+        if not token:
+            return jsonify({'status': 'error', 'message': 'Token is missing.'}), 401
 
-# --- 2. ASYNC BACKGROUND TASK (Isolated Thread) ---
-MOCK_STREAM_THREAD = None
-background_db = Prisma() # Private Prisma client for the thread
-
-def generate_mock_frame(cam_name):
-    img = Image.new('RGB', (640, 480), color=(73, 109, 137))
-    d = ImageDraw.Draw(img)
-    d.text((10, 10), f"Camera: {cam_name}", fill=(255, 255, 0))
-    buffered = BytesIO()
-    img.save(buffered, format="JPEG")
-    return base64.b64encode(buffered.getvalue()).decode('utf-8')
-
-async def mock_stream_loop():
-    print("Background loop started...")
-    while True:
         try:
-            if not background_db.is_connected():
-                await background_db.connect()
-            
-            cameras = await background_db.camera.find_many()
-            if cameras:
-                for cam in cameras:
-                    frame_base64 = generate_mock_frame(cam.cam_name)
-                    socketio.emit('camera_frame', {
-                        'cam_id': str(cam.id),
-                        'frame': frame_base64
-                    })
-        except Exception as e:
-            print(f"Background Loop Error: {e}")
-        await asyncio.sleep(1)
+            payload = jwt.decode(token, SECRET_KEY, algorithms=['HS256'])
+            g.user_id = payload.get('sub')
+        except jwt.ExpiredSignatureError:
+            return jsonify({'status': 'error', 'message': 'Token has expired.'}), 401
+        except Exception:
+            return jsonify({'status': 'error', 'message': 'Invalid token.'}), 401
 
-def start_mock_stream_wrapper():
-    # Native asyncio loop for the background thread
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    try:
-        loop.run_until_complete(mock_stream_loop())
-    finally:
-        loop.close()
+        return f(*args, **kwargs)
+    return decorated
 
-@socketio.on('connect')
-def handle_connect(auth=None):
-    global MOCK_STREAM_THREAD
-    print(f'Client connected: {request.sid}')
-    if MOCK_STREAM_THREAD is None or not MOCK_STREAM_THREAD.is_alive():
-        MOCK_STREAM_THREAD = threading.Thread(target=start_mock_stream_wrapper, daemon=True)
-        MOCK_STREAM_THREAD.start()
+async def ensure_db_connected():
+    if not db.is_connected():
+        await db.connect()
 
 # --- 3. BLUEPRINTS ---
 from src.routes.user_routes import user_routes
@@ -146,5 +116,5 @@ def serve(path):
 
 # --- 5. LAUNCH ---
 if __name__ == '__main__':
-    # allow_unsafe_werkzeug=True is still needed when using the default Flask server with SocketIO
-    socketio.run(app, host='0.0.0.0', port=5000, debug=True, use_reloader=False, allow_unsafe_werkzeug=True)
+    # Run the Flask app; database connections are created per request when needed.
+    app.run(host='0.0.0.0', port=5000, debug=True)

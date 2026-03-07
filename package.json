@@ -5,7 +5,7 @@
   "type": "module",
     "scripts": {
   "dev-client": "vite",
-  "dev-server": "python server/app.py",
+  "dev-server": "./server/venv/bin/python server/app.py",
   "dev-all": "concurrently \"npm run dev-client\" \"npm run dev-server\"",
   "build": "vite build",
   "preview": "vite preview"

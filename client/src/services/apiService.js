@@ -99,7 +99,7 @@ export const logoutUser = () => {
 
 // Fetch camera list for CameraGrid component
 export const fetchCameraList = () => {
-    return fetchApi('/camera_status', 'GET');
+    return fetchApi('/cameras', 'GET');
 }
 
 // Fetch daily summary data for DashboardPage
