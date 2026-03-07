@@ -8,7 +8,7 @@ export default function ReportsPage() {
     const [logs, setLogs] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState(null);
-    const [limit, setLimit] = useState(20);
+    const [limit, setLimit] = useState(100); // Default to matching your screenshot
     const [startDate, setStartDate] = useState(''); 
     const [endDate, setEndDate] = useState('');
     
@@ -24,7 +24,7 @@ export default function ReportsPage() {
                 setError(null);
                 const response = await fetchReportsData(limit, startDate, endDate); 
                 
-                // DEFENSIVE CHECK: Handle different backend response structures
+                // Defensive check for backend response structure
                 const dataArray = response.report || response.data || [];
                 
                 if (response.status === 'success' || Array.isArray(dataArray)) {
@@ -42,9 +42,8 @@ export default function ReportsPage() {
         loadReportData(); 
     }, [limit, startDate, endDate]);
 
-    // --- UPDATED MULTI-FILTER LOGIC ---
+    // --- MULTI-FILTER LOGIC ---
     const filteredLogs = logs.filter(log => {
-        // Ensure values exist before calling toLowerCase()
         const classification = (log.event_class_name || log.type || '').toLowerCase();
         const location = (log.location || '').toLowerCase();
         const search = searchTerm.toLowerCase();
@@ -57,7 +56,7 @@ export default function ReportsPage() {
         return matchesSearch && matchesClass && matchesStatus;
     });
 
-    // Extract unique classifications for the dropdown
+    // Extract unique classifications for the dropdown dynamically
     const uniqueClasses = ['All', ...new Set(logs.map(log => log.event_class_name || log.type).filter(Boolean))];
 
     const resetFilters = () => {
@@ -92,12 +91,12 @@ export default function ReportsPage() {
                 <table className="min-w-full divide-y divide-gray-200 bg-white">
                     <thead className="bg-gray-50">
                         <tr>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Timestamp</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Classification</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Location</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ack. By</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">File</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Timestamp</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Classification</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Location</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Status</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Ack. By</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">File</th>
                         </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
@@ -149,8 +148,8 @@ export default function ReportsPage() {
         <div className="container mx-auto p-6 space-y-6">
             <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
                 <div className="flex items-center space-x-3">
-                    <FaFileAlt className="text-3xl text-teal-600" />
-                    <h1 className="text-3xl font-bold text-gray-800">Event Log History</h1>
+                    <FaFileAlt className="text-3xl text-teal-900" />
+                    <h1 className="text-3xl font-bold text-teal-900">Event Log History</h1>
                 </div>
                 
                 <div className="flex flex-wrap items-center gap-3">
@@ -160,7 +159,7 @@ export default function ReportsPage() {
                         <input
                             type="text"
                             placeholder="Search location..."
-                            className="pl-10 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-teal-500 outline-none w-full sm:w-64 text-sm"
+                            className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 outline-none w-full sm:w-64 text-sm bg-white bg-opacity-90"
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
                         />
@@ -168,24 +167,24 @@ export default function ReportsPage() {
                     {/* RESET BUTTON */}
                     <button 
                         onClick={resetFilters}
-                        className="flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 text-sm transition"
+                        className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 text-gray-600 rounded-lg hover:bg-gray-100 text-sm transition shadow-sm"
                     >
                         <FaTimes /> Reset
                     </button>
                 </div>
             </div>
 
-            {/* FILTER BAR */}
-            <div className="bg-white p-4 rounded-xl border border-gray-200 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 shadow-sm">
+            {/* FILTER BAR - Transparent version to remove the white background card */}
+            <div className="bg-transparent p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
                 <div>
                     <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Classification</label>
-                    <select value={filterClass} onChange={(e) => setFilterClass(e.target.value)} className="w-full p-2 border rounded-lg text-sm bg-gray-50">
+                    <select value={filterClass} onChange={(e) => setFilterClass(e.target.value)} className="w-full p-2 border border-gray-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-teal-500 outline-none">
                         {uniqueClasses.map(c => <option key={c} value={c}>{c}</option>)}
                     </select>
                 </div>
                 <div>
                     <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Status</label>
-                    <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="w-full p-2 border rounded-lg text-sm bg-gray-50">
+                    <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="w-full p-2 border border-gray-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-teal-500 outline-none">
                         <option value="All">All Statuses</option>
                         <option value="unacknowledged">Unacknowledged</option>
                         <option value="acknowledged">Acknowledged</option>
@@ -193,15 +192,15 @@ export default function ReportsPage() {
                 </div>
                 <div>
                     <label className="block text-xs font-bold text-gray-400 uppercase mb-1">From Date</label>
-                    <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-full p-2 border rounded-lg text-sm bg-gray-50" />
+                    <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-full p-2 border border-gray-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-teal-500 outline-none" />
                 </div>
                 <div>
                     <label className="block text-xs font-bold text-gray-400 uppercase mb-1">To Date</label>
-                    <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-full p-2 border rounded-lg text-sm bg-gray-50" />
+                    <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-full p-2 border border-gray-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-teal-500 outline-none" />
                 </div>
                 <div>
                     <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Limit</label>
-                    <select value={limit} onChange={(e) => setLimit(Number(e.target.value))} className="w-full p-2 border rounded-lg text-sm bg-gray-50">
+                    <select value={limit} onChange={(e) => setLimit(Number(e.target.value))} className="w-full p-2 border border-gray-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-teal-500 outline-none">
                         <option value={20}>Last 20</option>
                         <option value={50}>Last 50</option>
                         <option value={100}>Last 100</option>
