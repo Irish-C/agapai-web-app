@@ -1,8 +1,15 @@
-// src/socket.js
-import { io } from "socket.io-client";
+// client/src/services/socket.js
+import { io } from "socket.io-client"; // Standard ESM import
 
-// Connect to Flask backend
-export const socket = io("http://localhost:5000", {
-  transports: ["websocket"], // Force websocket (faster, avoids polling)
-  reconnection: true,        // Auto-reconnect if backend restarts
+const SOCKET_URL = "http://127.0.0.1:5000";
+
+export const socket = io(SOCKET_URL, {
+  transports: ["websocket"],
+  autoConnect: true,
+  reconnectionAttempts: 5,
 });
+
+// Adding a check to ensure 'io' exists before running
+if (typeof io === 'undefined') {
+    console.error("🚨 Socket.io client library failed to load!");
+}

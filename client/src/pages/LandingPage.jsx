@@ -134,12 +134,12 @@ import filter_bg from '../assets/bg/filter-bg.png';
                         AGAP<span className="text-teal-400">AI</span>
                 </span>
                 </h1>
-                <h2 className="text-1xl font-regular mb-4 tracking-tight text-center">
+                <h2 className="text-1xl font-regular mb-4 tracking-tight text-center pb-10">
                     <span className="block">Ka-AGAPAI sa Seguridad ng ating mga Lolo't Lola </span>
                 </h2>
-                <p className="text-1xl font-light italic mb-12 max-w-2xl z-50 mx-auto text-center">
+                {/* <p className="text-1xl font-light italic mb-12 max-w-2xl z-50 mx-auto text-center">
                     A Vision-Based Monitoring and Alert System for Fall and Inactivity in Elderly Care Facility
-                </p>
+                </p> */}
 
                 <div className="flex flex-col md:flex-row space-y-4 md:space-y-0 md:space-x-6 justify-center">
                     <Link 

@@ -3,20 +3,24 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
-    "scripts": {
-  "dev-client": "vite",
-  "dev-server": "./server/venv/bin/python server/app.py",
-  "dev-all": "concurrently \"npm run dev-client\" \"npm run dev-server\"",
-  "build": "vite build",
-  "preview": "vite preview"
+  "scripts": {
+    "dev-client": "vite",
+    "dev-server": "cd server && ./venv/bin/hypercorn app:asgi_app --bind 127.0.0.1:5000 --reload",
+    "dev-all": "concurrently \"npm run dev-client\" \"npm run dev-server\"",
+    "prisma:generate": "cd server && PATH=./venv/bin:$PATH ./venv/bin/prisma py generate",
+    "prisma:generate:node": "PATH=./server/venv/bin:$PATH npx prisma generate --schema=./server/prisma/schema.prisma",
+    "build": "vite build",
+    "preview": "vite preview"
   },
   "dependencies": {
+    "@prisma/client": "5.17.0",
     "axios": "^1.13.2",
+    "dotenv": "^17.3.1",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "react-icons": "^5.5.0",
     "react-router-dom": "^7.9.5",
-    "socket.io-client": "^4.8.1"
+    "socket.io-client": "^4.8.3"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.1.16",
@@ -32,7 +36,7 @@
     "eslint-plugin-react-hooks": "^7.0.1",
     "eslint-plugin-react-refresh": "^0.4.24",
     "postcss": "^8.5.6",
-    "prisma": "^7.3.0",
+    "prisma": "5.17.0",
     "tailwindcss": "^4.1.16",
     "vite": "^7.1.12"
   },

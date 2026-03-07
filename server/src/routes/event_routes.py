@@ -1,12 +1,22 @@
 from flask import Blueprint, request, jsonify
 from src.utils.auth import get_token_user_id
-from src.controllers.event_controller import get_event_logs_logic, mark_viewed_logic
+from src.controllers.event_controller import (
+    get_event_logs_logic, 
+    mark_viewed_logic, 
+    create_event_logic  # New logic function
+)
 
 event_routes = Blueprint('event_routes', __name__)
 
+@event_routes.route('/events', methods=['POST'])
+async def create_event():
+    """Route for AI/Cameras to post new detections"""
+    data = request.json
+    result, code = await create_event_logic(data)
+    return jsonify(result), code
+
 @event_routes.route('/event_logs', methods=['GET'])
 async def get_event_logs():
-    # Pass request.args for filtering
     result, code = await get_event_logs_logic(request.args)
     return jsonify(result), code
 

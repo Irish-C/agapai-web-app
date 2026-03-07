@@ -1,6 +1,6 @@
 // src/services/apiService.js
 
-const BASE_API_URL = 'http://localhost:5000/api';
+const BASE_API_URL = 'http://127.0.0.1:5000/api';
 const AUTH_TOKEN_KEY = 'authToken'; 
 
 
@@ -71,22 +71,29 @@ export const loginUser = async (username, password) => {
     try {
         const response = await fetchApi('/login', 'POST', { username, password });
 
-        // Check for token in response
-        if (response && (response.token || response.access_token)) {
-            const token = response.token || response.access_token;
-            console.log("loginUser: Login successful, saving token.");
+        if (response && (response.access_token || response.token)) {
+            const token = response.access_token || response.token;
             
-            // Ensure any previous token is cleared before setting the new one
-            localStorage.removeItem(AUTH_TOKEN_KEY); 
-            localStorage.setItem(AUTH_TOKEN_KEY, token);
+            // 1. Create a consistent user object
+            const userData = {
+                username: response.username,
+                token: token,
+                userId: response.user_id
+            };
+
+            // 2. Save using the same key App.jsx uses
+            localStorage.setItem('user', JSON.stringify(userData));
+            
+            // 3. Also save the raw token for fetchApi to use easily
+            localStorage.setItem('authToken', token); 
             
             return response;
         } else {
-            throw new Error(response.message || 'Login failed: No token received.');
+            throw new Error('Login failed: No token received.');
         }
     } catch (error) {
-        console.error("loginUser Error:", error);
-        localStorage.removeItem(AUTH_TOKEN_KEY); 
+        localStorage.removeItem('user');
+        localStorage.removeItem('authToken');
         throw error; 
     }
 };
