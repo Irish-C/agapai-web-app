@@ -6,13 +6,17 @@ from functools import wraps
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask import Flask, request, send_from_directory, jsonify, g, make_response
 from flask.json.provider import DefaultJSONProvider
+from flask_socketio import SocketIO
+from seed_db import seed_database
 
 # Database Instance
 from database import db
 
 # 1. Initialization
-# NOTE: dotenv is not required; rely on system environment variables if present.
 app = Flask(__name__, static_folder='../client/dist', static_url_path='/')
+
+# Initialize SocketIO AFTER 'app' is defined
+socketio = SocketIO(app, cors_allowed_origins="*")
 
 # Custom JSON Provider for BigInt support
 class BigIntProvider(DefaultJSONProvider):
@@ -23,7 +27,7 @@ class BigIntProvider(DefaultJSONProvider):
 
 app.json = BigIntProvider(app)
 
-# Basic CORS handling (no flask-cors dependency required)
+# Basic CORS handling
 @app.after_request
 def add_cors_headers(response):
     response.headers['Access-Control-Allow-Origin'] = '*'
@@ -35,7 +39,7 @@ def add_cors_headers(response):
 def handle_options(path):
     return make_response('', 204)
 
-# JWT helpers (uses PyJWT which is available in this environment)
+# JWT helpers
 SECRET_KEY = os.getenv('FLASK_SECRET_KEY', 'default_secret_key')
 
 def create_token(user_id):
@@ -67,9 +71,12 @@ def token_required(f):
         return f(*args, **kwargs)
     return decorated
 
-async def ensure_db_connected():
+@app.before_request
+def ensure_connection():
+    # Use asyncio.run because Flask routes are synchronous 
+    # but the prisma-python client is asynchronous
     if not db.is_connected():
-        await db.connect()
+        asyncio.run(db.connect())
 
 # --- 3. BLUEPRINTS ---
 from src.routes.user_routes import user_routes
@@ -83,29 +90,9 @@ app.register_blueprint(settings_routes, url_prefix='/api')
 app.register_blueprint(event_routes, url_prefix='/api')
 
 # --- 4. SEED ROUTE (Pure Async) ---
-@app.route('/api/seed_db')
+@app.route('/api/seed_db', methods=['GET', 'POST'])
 def seed_db():
-    # In 'threading' mode, asyncio.run() works perfectly without crashes!
-    return asyncio.run(run_seed())
-
-async def run_seed():
-    try:
-        if not db.is_connected():
-            await db.connect()
-            
-        user = await db.user.find_unique(where={'username': 'reginedahan'})
-        if not user:
-            await db.user.create(data={
-                'firstname': "Regine",
-                'lastname': "Dahan",
-                'username': "reginedahan",
-                'password': generate_password_hash("agapai321")
-            })
-            return "User created!"
-        return "Already seeded."
-    except Exception as e:
-        print(f"Seed Error: {e}")
-        return str(e), 500
+    return jsonify(asyncio.run(seed_database()))
 
 @app.route('/', defaults={'path': ''})
 @app.route('/<path:path>')
@@ -116,5 +103,5 @@ def serve(path):
 
 # --- 5. LAUNCH ---
 if __name__ == '__main__':
-    # Run the Flask app; database connections are created per request when needed.
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    # Use socketio.run instead of app.run to support WebSockets
+    socketio.run(app, host='0.0.0.0', port=5000, debug=True)

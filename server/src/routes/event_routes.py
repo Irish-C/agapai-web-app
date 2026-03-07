@@ -4,7 +4,7 @@ from src.controllers.event_controller import get_event_logs_logic, mark_viewed_l
 
 event_routes = Blueprint('event_routes', __name__)
 
-@event_routes.route('/events', methods=['GET'])
+@event_routes.route('/event_logs', methods=['GET'])
 async def get_event_logs():
     # Pass request.args for filtering
     result, code = await get_event_logs_logic(request.args)

@@ -50,26 +50,63 @@ Before you begin, ensure you have the following installed:
     cd client && npm install
     ```
 
-4. Environment Variables: Create a .env file in the root directory and add your database URL
-    ```env
-    DATABASE_URL="your_database_url_here"
+4. Environment Variables: Create a `.env` file in the root directory by copying the example.
+    ```bash
+    cp .env.example .env
     ```
 
-5. Database Migration: Run Prisma migrations to set up the database schema.
-   ```bash
-   npx prisma migrate dev --name init
-   npx prisma generate
-   ```
+5. Database Setup (Prisma)
+   - Run the helper script to create the database, user, and ensure correct table ownership.
+     ```bash
+     bash server/scripts/setup_dev_db.sh
+     ```
+   - Apply Prisma migrations and generate the client.
+     ```bash
+     cd server
+     npx prisma migrate reset --force
+     npx prisma generate
+     ```
 
 
 # Development Setup
-The project uses concurrently to run both the Express server and the Vite frontend with a single command.
-```bash
-npm run start
-```
-- API Server: Running on http://localhost:3000
-- Vite Client: Running on http://localhost:5173 (Proxied to API)
+The project uses concurrently to run both the backend server and the Vite frontend with a single command.
 
+```bash
+npm run dev-all
+```
+
+- Backend server: http://localhost:5000
+- Frontend (Vite): http://localhost:5173
+
+> If you prefer running each service separately, use:
+>
+> ```bash
+> npm run dev-server
+> npm run dev-client
+> ```
+
+
+# Troubleshooting (common Prisma / Postgres issues)
+
+### “terminating connection due to administrator command” (E57P01)
+This happens when `setup_dev_db.sh` terminates existing connections before dropping/recreating the database. It is **expected** and safe.
+
+If you see it while running `npm run dev-all`, stop the dev server, rerun the setup script, then restart the dev server.
+
+### Prisma errors about shadow DB or ownership (P3014 / P3016)
+These usually mean:
+- Your DB user does not have permission to create databases (needed for Prisma shadow DB), or
+- Your DB user is not the owner of the tables (so Prisma can’t drop them).
+
+✅ Fix: run the helper script before running migrations.
+
+```bash
+bash server/scripts/setup_dev_db.sh
+cd server
+npx prisma migrate reset --force
+```
+
+If you still hit ownership errors, make sure the server is not running while you reset the DB.
 
 
 # Contribution
