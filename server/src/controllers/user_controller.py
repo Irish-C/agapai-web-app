@@ -53,21 +53,31 @@ async def get_profile_logic(user_id):
 
 async def update_user_logic(user_id, data):
     try:
+        # 1. Start with the basic fields
         update_data = {
-            'firstname': data['firstname'],
-            'lastname': data['lastname'],
+            'firstname': data.get('firstname'),
+            'lastname': data.get('lastname'),
         }
 
-        # If role is provided, map it to ID
+        # 2. THE FIX: Handle the Role Update
         if 'role' in data:
-            role_record = await db.role.find_unique(where={'role_name': data['role']})
+            # Find the ID of the role name sent by the frontend (e.g., 'caregiver')
+            role_record = await db.role.find_unique(
+                where={'role_name': data['role']}
+            )
+            
             if role_record:
+                # Update the foreign key 'role_id', NOT a column named 'role'
                 update_data['role_id'] = role_record.id
+            else:
+                return {"status": "error", "message": "Selected role does not exist."}, 400
 
-        # If a new password is provided, hash it
+        # 3. Handle password if provided
         if data.get('password'):
+            from src.utils.auth import hash_password
             update_data['password'] = hash_password(data['password'])
 
+        # 4. Execute the update
         await db.user.update(
             where={'id': int(user_id)},
             data=update_data
@@ -75,6 +85,7 @@ async def update_user_logic(user_id, data):
 
         return {"status": "success", "message": "User updated successfully"}, 200
     except Exception as e:
+        print(f"Update Error: {e}")
         return {"status": "error", "message": str(e)}, 500
         
 async def archive_user_logic(user_id):
