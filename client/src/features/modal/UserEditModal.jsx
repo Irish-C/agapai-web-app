@@ -4,6 +4,7 @@ import { FaUser, FaSave, FaTimes, FaSpinner, FaLock } from 'react-icons/fa';
 
 import { normalizeRole, displayRole } from '../../utils/roleUtils.js';
 
+
 /**
  * Modal component for adding a new user or editing an existing user.
  * Now dynamically fetches roles from the database.
@@ -23,8 +24,8 @@ export default function UserEditModal({ userToEdit, onSave, onClose }) {
         firstname: userToEdit?.firstname || '',
         lastname: userToEdit?.lastname || '',
         username: userToEdit?.username || '',
-        // Default to empty; will be set once roles are loaded if creating new
-        role: normalizeRole(userToEdit?.role) || '', 
+        // Default to empty for Add User
+        role: isEditing ? normalizeRole(userToEdit?.role) || '' : '',
         password: '',
         confirmPassword: ''
     });
@@ -45,11 +46,7 @@ export default function UserEditModal({ userToEdit, onSave, onClose }) {
                 
                 if (result.status === 'success') {
                     setDbRoles(result.data);
-                    
-                    // If adding a NEW user, default the selection to the first role found
-                    if (!isEditing && result.data.length > 0) {
-                        setFormData(prev => ({ ...prev, role: result.data[0] }));
-                    }
+                    // Do NOT auto-select a role for Add User; keep empty
                 }
             } catch (err) {
                 console.error("Failed to fetch roles from DB:", err);
@@ -155,14 +152,15 @@ export default function UserEditModal({ userToEdit, onSave, onClose }) {
                             <div className="md:col-span-1">
                                 <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="role">Access Role</label>
                                 <select 
-                                    id="role" 
-                                    name="role" 
-                                    value={formData.role} 
-                                    onChange={handleChange} 
-                                    className="w-full border-gray-300 rounded-lg px-3 py-2 border bg-white focus:ring-2 focus:ring-teal-500 outline-none" 
-                                    required 
+                                    id="role"
+                                    name="role"
+                                    value={formData.role}
+                                    onChange={handleChange}
+                                    className="w-full border-gray-300 rounded-lg px-3 py-2 border bg-white focus:ring-2 focus:ring-teal-500 outline-none"
+                                    required
                                     disabled={isLoading || isLoadingRoles}
                                 >
+                                    <option value="">Select role...</option>
                                     {isLoadingRoles ? (
                                         <option>Loading roles...</option>
                                     ) : (

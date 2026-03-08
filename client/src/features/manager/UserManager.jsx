@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { FaUserPlus, FaUsers, FaEdit, FaSpinner, FaArchive } from 'react-icons/fa';
 import UserEditModal from '../modal/UserEditModal.jsx'; 
-import { fetchUsers, fetchApi } from '../../services/apiService.js'; 
+import { fetchUsers, fetchApi, fetchRolesApi } from '../../services/apiService.js'; 
 
 import { normalizeRole, displayRole } from '../../utils/roleUtils.js';
 
@@ -20,7 +20,12 @@ const saveUserApi = (formData) => {
 // -----------------------------------------------------------
 
 export default function UserManager({ user }) {
+        const [searchTerm, setSearchTerm] = useState('');
     const [users, setUsers] = useState([]);
+    const [sortField, setSortField] = useState('username');
+    const [sortOrder, setSortOrder] = useState('asc'); // 'asc' or 'desc'
+    const [roleFilter, setRoleFilter] = useState('all');
+    const [roles, setRoles] = useState([]); // fetched from DB
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState(null);
     
@@ -54,8 +59,49 @@ export default function UserManager({ user }) {
     // --- EFFECT: Fetch Users on Mount ---
     useEffect(() => {
         loadUsers();
-    }, [user]); 
+    }, [user]);
 
+    // Fetch roles from DB on mount
+    useEffect(() => {
+        const fetchRoles = async () => {
+            try {
+                const result = await fetchRolesApi();
+                // Handle backend response: { status: 'success', data: [...] }
+                if (result && Array.isArray(result.data)) {
+                    setRoles(result.data.map(r => normalizeRole(r)));
+                } else if (Array.isArray(result)) {
+                    setRoles(result.map(r => normalizeRole(r.role_name || r.role || r.name)));
+                } else {
+                    setRoles([]);
+                }
+            } catch (err) {
+                setRoles([]);
+            }
+        };
+        fetchRoles();
+    }, []);
+
+    // --- SORT & FILTER LOGIC ---
+    const sortedFilteredUsers = users
+        .filter(u => roleFilter === 'all' || normalizeRole(u.role) === roleFilter)
+        .filter(u => {
+            const term = searchTerm.trim().toLowerCase();
+            if (!term) return true;
+            return (
+                (u.username && u.username.toLowerCase().includes(term)) ||
+                (u.firstname && u.firstname.toLowerCase().includes(term)) ||
+                (u.lastname && u.lastname.toLowerCase().includes(term))
+            );
+        })
+        .sort((a, b) => {
+            let valA = a[sortField] || '';
+            let valB = b[sortField] || '';
+            valA = typeof valA === 'string' ? valA.toLowerCase() : valA;
+            valB = typeof valB === 'string' ? valB.toLowerCase() : valB;
+            if (valA < valB) return sortOrder === 'asc' ? -1 : 1;
+            if (valA > valB) return sortOrder === 'asc' ? 1 : -1;
+            return 0;
+        });
 
     // --- ARCHIVE HANDLERS (Replaced Delete) ---
     const handleArchiveClick = (userItem) => {
@@ -123,11 +169,36 @@ export default function UserManager({ user }) {
 
     return (
         <div className="space-y-6">
+            <div className="flex flex-wrap items-center gap-4 mb-4">
+                <div className="flex items-center gap-2">
+                    <span className="font-medium">Search:</span>
+                    <input
+                        type="text"
+                        value={searchTerm}
+                        onChange={e => setSearchTerm(e.target.value)}
+                        placeholder="Search by name or username"
+                        className="border rounded px-2 py-1"
+                        style={{ minWidth: '220px' }}
+                    />
+                </div>
+                <div className="flex items-center gap-2">
+                    <span className="font-medium">Filter by Role:</span>
+                    <select
+                        value={roleFilter}
+                        onChange={e => setRoleFilter(e.target.value)}
+                        className="border rounded px-2 py-1"
+                    >
+                        <option value="all">All</option>
+                        {roles.map(role => (
+                            <option key={role} value={role}>{displayRole(role)}</option>
+                        ))}
+                    </select>
+                </div>
+            </div>
             <div className="flex justify-between items-center mb-4">
                 <h3 className="text-xl font-semibold flex items-center">
                     <FaUsers className="mr-2" /> Current System Users
                 </h3>
-                
                 <button 
                     onClick={handleAddUser}
                     className="flex items-center bg-teal-600 hover:bg-teal-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-150"
@@ -156,22 +227,58 @@ export default function UserManager({ user }) {
                     <table className="min-w-full divide-y divide-gray-200">
                         <thead className="bg-gray-50">
                             <tr>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Username</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">First Name</th> 
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Last Name</th> 
+                                <th
+                                    className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider cursor-pointer select-none ${sortField === 'username' ? 'text-teal-700' : 'text-gray-500'}`}
+                                    onClick={() => {
+                                        setSortField('username');
+                                        setSortOrder(sortField === 'username' && sortOrder === 'asc' ? 'desc' : 'asc');
+                                    }}
+                                >
+                                    Username
+                                    <span className="ml-1 inline-flex flex-col items-center" style={{ verticalAlign: 'middle' }}>
+                                        <span style={{ color: sortField === 'username' && sortOrder === 'asc' ? '#0d9488' : '#aaa', fontSize: '1em', lineHeight: '1em' }}>▲</span>
+                                        <span style={{ color: sortField === 'username' && sortOrder === 'desc' ? '#0d9488' : '#aaa', fontSize: '1em', lineHeight: '1em' }}>▼</span>
+                                    </span>
+                                </th>
+                                <th
+                                    className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider cursor-pointer select-none ${sortField === 'firstname' ? 'text-teal-700' : 'text-gray-500'}`}
+                                    onClick={() => {
+                                        setSortField('firstname');
+                                        setSortOrder(sortField === 'firstname' && sortOrder === 'asc' ? 'desc' : 'asc');
+                                    }}
+                                >
+                                    First Name
+                                    <span className="ml-1 inline-flex flex-col items-center" style={{ verticalAlign: 'middle' }}>
+                                        <span style={{ color: sortField === 'firstname' && sortOrder === 'asc' ? '#0d9488' : '#aaa', fontSize: '1em', lineHeight: '1em' }}>▲</span>
+                                        <span style={{ color: sortField === 'firstname' && sortOrder === 'desc' ? '#0d9488' : '#aaa', fontSize: '1em', lineHeight: '1em' }}>▼</span>
+                                    </span>
+                                </th>
+                                <th
+                                    className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider cursor-pointer select-none ${sortField === 'lastname' ? 'text-teal-700' : 'text-gray-500'}`}
+                                    onClick={() => {
+                                        setSortField('lastname');
+                                        setSortOrder(sortField === 'lastname' && sortOrder === 'asc' ? 'desc' : 'asc');
+                                    }}
+                                >
+                                    Last Name
+                                    <span className="ml-1 inline-flex flex-col items-center" style={{ verticalAlign: 'middle' }}>
+                                        <span style={{ color: sortField === 'lastname' && sortOrder === 'asc' ? '#0d9488' : '#aaa', fontSize: '1em', lineHeight: '1em' }}>▲</span>
+                                        <span style={{ color: sortField === 'lastname' && sortOrder === 'desc' ? '#0d9488' : '#aaa', fontSize: '1em', lineHeight: '1em' }}>▼</span>
+                                    </span>
+                                </th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Role</th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                             </tr>
                         </thead>
                         <tbody className="bg-white divide-y divide-gray-200">
-                            {users.length === 0 && (
+                            {sortedFilteredUsers.length === 0 && (
                                 <tr>
                                     <td colSpan="5" className="px-6 py-4 text-center text-sm text-gray-500">
                                         No users found. Try adding a new user.
                                     </td>
                                 </tr>
                             )}
-                            {users.map((u) => (
+                            {sortedFilteredUsers.map((u) => (
                                 <tr key={u.id}>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{u.username}</td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{u.firstname}</td> 
