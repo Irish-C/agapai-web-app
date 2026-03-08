@@ -94,9 +94,12 @@ export default function Settings({ user }) {
 
                     {/* Active Content Area */}
                     <div className="w-full lg:w-3/4">
-                        <h2 className="text-2xl font-bold text-gray-900 mb-3"> 
-                            {navItems.find(item => item.id === activeSection)?.name || 'Settings'}
-                        </h2>
+                        <div className="mb-3">
+                            <h2 className="text-2xl font-bold text-gray-900"> 
+                                {navItems.find(item => item.id === activeSection)?.name || 'Settings'}
+                            </h2>
+                            <div className="h-2 w-full rounded mb-4 mt-2 shadow-sm bg-gradient-to-r from-teal-500 via-teal-300 to-slate-200" />
+                        </div>
                         {renderActiveComponent()}
                     </div>
                 </div>
