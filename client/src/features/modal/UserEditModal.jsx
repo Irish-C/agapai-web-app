@@ -112,13 +112,13 @@ export default function UserEditModal({ userToEdit, onSave, onClose }) {
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 backdrop-blur-sm bg-black/10">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xl transform transition-all border border-violet-200">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xl transform transition-all border border-gray-200">
                 {/* Header */}
-                <div className="px-8 py-6 border-b border-violet-100 flex justify-between items-center bg-gradient-to-r from-teal-50 via-violet-50 to-white rounded-t-2xl">
-                    <h3 className="text-2xl font-semibold text-violet-800 flex items-center tracking-tight">
+                <div className="px-8 py-6 border-b border-gray-100 flex justify-between items-center bg-gray-50 rounded-t-2xl">
+                    <h3 className="text-2xl font-semibold text-gray-800 flex items-center tracking-tight">
                         <FaUser className="mr-3 text-teal-600" /> {title}
                     </h3>
-                    <button onClick={onClose} className="text-violet-400 hover:text-teal-600 transition-colors p-1 rounded-full focus:outline-none focus:ring-2 focus:ring-teal-300">
+                    <button onClick={onClose} className="text-gray-400 hover:text-teal-600 transition-colors p-1 rounded-full focus:outline-none focus:ring-2 focus:ring-teal-300">
                         <FaTimes size={22} />
                     </button>
                 </div>
@@ -136,17 +136,17 @@ export default function UserEditModal({ userToEdit, onSave, onClose }) {
                                 <div>
                                     <label className="block text-xs font-medium text-gray-600 mb-1" htmlFor="firstname">First Name</label>
                                     <input type="text" id="firstname" name="firstname" value={formData.firstname} onChange={handleChange}
-                                        className="w-full border-b-2 border-violet-200 focus:border-teal-500 bg-transparent px-2 py-2 rounded-t-md text-base outline-none transition" required disabled={isLoading} />
+                                        className="w-full border-b-2 border-gray-300 focus:border-gray-500 bg-transparent px-2 py-2 rounded-t-md text-base outline-none transition" required disabled={isLoading} />
                                 </div>
                                 <div>
                                     <label className="block text-xs font-medium text-gray-600 mb-1" htmlFor="middle_name">Middle Name</label>
                                     <input type="text" id="middle_name" name="middle_name" value={formData.middle_name} onChange={handleChange}
-                                        className="w-full border-b-2 border-violet-200 focus:border-teal-500 bg-transparent px-2 py-2 rounded-t-md text-base outline-none transition" disabled={isLoading} />
+                                        className="w-full border-b-2 border-gray-300 focus:border-gray-500 bg-transparent px-2 py-2 rounded-t-md text-base outline-none transition" disabled={isLoading} />
                                 </div>
                                 <div>
                                     <label className="block text-xs font-medium text-gray-600 mb-1" htmlFor="lastname">Last Name</label>
                                     <input type="text" id="lastname" name="lastname" value={formData.lastname} onChange={handleChange}
-                                        className="w-full border-b-2 border-violet-200 focus:border-teal-500 bg-transparent px-2 py-2 rounded-t-md text-base outline-none transition" required disabled={isLoading} />
+                                        className="w-full border-b-2 border-gray-300 focus:border-gray-500 bg-transparent px-2 py-2 rounded-t-md text-base outline-none transition" required disabled={isLoading} />
                                 </div>
                             </div>
                         </div>
@@ -157,17 +157,17 @@ export default function UserEditModal({ userToEdit, onSave, onClose }) {
                                 <div>
                                     <label className="block text-xs font-medium text-gray-600 mb-1" htmlFor="email">Email Address</label>
                                     <input type="email" id="email" name="email" value={formData.email} onChange={handleChange}
-                                        className="w-full border-b-2 border-teal-200 focus:border-violet-500 bg-transparent px-2 py-2 rounded-t-md text-base outline-none transition" required disabled={isLoading} />
+                                        className="w-full border-b-2 border-gray-300 focus:border-gray-500 bg-transparent px-2 py-2 rounded-t-md text-base outline-none transition" required disabled={isLoading} />
                                 </div>
                                 <div>
                                     <label className="block text-xs font-medium text-gray-600 mb-1" htmlFor="birthdate">Birthdate</label>
                                     <input type="date" id="birthdate" name="birthdate" value={formData.birthdate} onChange={handleChange}
-                                        className="w-full border-b-2 border-teal-200 focus:border-violet-500 bg-transparent px-2 py-2 rounded-t-md text-base outline-none transition" required disabled={isLoading} />
+                                        className="w-full border-b-2 border-gray-300 focus:border-gray-500 bg-transparent px-2 py-2 rounded-t-md text-base outline-none transition" required disabled={isLoading} />
                                 </div>
                                 <div>
                                     <label className="block text-xs font-medium text-gray-600 mb-1" htmlFor="username">Username</label>
                                     <input type="text" id="username" name="username" value={formData.username} onChange={handleChange}
-                                        className={`w-full border-b-2 border-violet-200 focus:border-teal-500 bg-transparent px-2 py-2 rounded-t-md text-base outline-none transition ${isEditing ? 'bg-gray-100' : ''}`}
+                                        className={`w-full border-b-2 border-gray-300 focus:border-gray-500 bg-transparent px-2 py-2 rounded-t-md text-base outline-none transition ${isEditing ? 'bg-gray-100' : ''}`}
                                         required disabled={isEditing || isLoading} />
                                 </div>
                                 <div>
@@ -177,7 +177,7 @@ export default function UserEditModal({ userToEdit, onSave, onClose }) {
                                         name="role"
                                         value={formData.role}
                                         onChange={handleChange}
-                                        className="w-full border-b-2 border-teal-200 focus:border-violet-500 bg-transparent px-2 py-2 rounded-t-md text-base outline-none transition"
+                                        className="w-full border-b-2 border-gray-300 focus:border-gray-500 bg-transparent px-2 py-2 rounded-t-md text-base outline-none transition"
                                         required
                                         disabled={isLoading || isLoadingRoles}
                                     >
@@ -204,20 +204,20 @@ export default function UserEditModal({ userToEdit, onSave, onClose }) {
                                         <FaLock className="inline mr-1 text-red-500" /> {isEditing ? 'New Password (Optional)' : 'Password'}
                                     </label>
                                     <input type="password" id="password" name="password" value={formData.password} onChange={handleChange}
-                                        className="w-full border-b-2 border-violet-200 focus:border-teal-500 bg-transparent px-2 py-2 rounded-t-md text-base outline-none transition"
+                                        className="w-full border-b-2 border-gray-300 focus:border-gray-500 bg-transparent px-2 py-2 rounded-t-md text-base outline-none transition"
                                         required={!isEditing} disabled={isLoading} />
                                 </div>
                                 <div>
                                     <label className="block text-xs font-medium text-gray-600 mb-1" htmlFor="confirmPassword">Confirm Password</label>
                                     <input type="password" id="confirmPassword" name="confirmPassword" value={formData.confirmPassword} onChange={handleChange}
-                                        className="w-full border-b-2 border-teal-200 focus:border-violet-500 bg-transparent px-2 py-2 rounded-t-md text-base outline-none transition"
+                                        className="w-full border-b-2 border-gray-300 focus:border-gray-500 bg-transparent px-2 py-2 rounded-t-md text-base outline-none transition"
                                         required={!isEditing} disabled={isLoading} />
                                 </div>
                             </div>
                         </div>
                     </div>
                     {/* Footer / Action Buttons */}
-                    <div className="px-8 py-5 flex justify-end gap-4 border-t border-violet-100 bg-gradient-to-r from-teal-50 via-violet-50 to-white rounded-b-2xl">
+                    <div className="px-8 py-5 flex justify-end gap-4 border-t border-gray-100 bg-gray-50 rounded-b-2xl">
                         <button type="button" onClick={onClose} disabled={isLoading}
                             className="px-5 py-2 text-sm font-medium rounded shadow-sm border border-teal-300 text-teal-700 bg-white hover:bg-teal-50 focus:outline-none focus:ring-2 focus:ring-violet-300 transition">
                             Cancel
