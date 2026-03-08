@@ -8,7 +8,7 @@ export default function LandingPage() {
     const [isContactPanelOpen, setIsContactPanelOpen] = useState(false);
 
     return (
-        <div className="h-screen w-full flex flex-col bg-[#0f172a] text-slate-200 font-sans selection:bg-teal-500/30 overflow-hidden relative">
+        <div className="h-screen w-full flex flex-col bg-[#0f172a] text-slate-200 font-sans selection:bg-teal-400/30 overflow-hidden relative">
             
             {/* BACKGROUND LAYER */}
             <div 
@@ -22,13 +22,11 @@ export default function LandingPage() {
             <div className="fixed inset-0 bg-gradient-to-b from-slate-950/80 via-slate-900/50 to-slate-950 z-0"></div>
 
             {/* --- SLIDE OVER CONTACT PANEL --- */}
-            {/* Overlay */}
             <div 
                 className={`fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-[60] transition-opacity duration-300 ${isContactPanelOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
                 onClick={() => setIsContactPanelOpen(false)}
             />
             
-            {/* Panel */}
             <aside className={`fixed top-0 right-0 h-full w-full max-w-md bg-slate-900 border-l border-white/10 z-[70] shadow-2xl transform transition-transform duration-500 ease-in-out ${isContactPanelOpen ? 'translate-x-0' : 'translate-x-full'}`}>
                 <div className="p-8 flex flex-col h-full">
                     <div className="flex justify-between items-center mb-8">
@@ -44,17 +42,17 @@ export default function LandingPage() {
                     <form className="space-y-6">
                         <div>
                             <label className="block text-sm font-medium text-slate-400 mb-2">Full Name</label>
-                            <input type="text" className="w-full bg-slate-800 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-teal-500/50 transition-colors" placeholder="John Doe" />
+                            <input type="text" className="w-full bg-slate-800 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-teal-300/50 transition-colors" placeholder="John Doe" />
                         </div>
                         <div>
                             <label className="block text-sm font-medium text-slate-400 mb-2">Email Address</label>
-                            <input type="email" className="w-full bg-slate-800 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-teal-500/50 transition-colors" placeholder="john@example.com" />
+                            <input type="email" className="w-full bg-slate-800 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-teal-300/50 transition-colors" placeholder="john@example.com" />
                         </div>
                         <div>
                             <label className="block text-sm font-medium text-slate-400 mb-2">Message</label>
-                            <textarea rows="4" className="w-full bg-slate-800 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-teal-500/50 transition-colors" placeholder="How can we help you?"></textarea>
+                            <textarea rows="4" className="w-full bg-slate-800 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-teal-300/50 transition-colors" placeholder="How can we help you?"></textarea>
                         </div>
-                        <button type="submit" className="w-full py-4 bg-teal-500 hover:bg-teal-400 text-slate-950 font-bold rounded-xl transition-all shadow-lg shadow-teal-500/20">
+                        <button type="submit" className="w-full py-4 bg-teal-500 hover:bg-teal-300 text-slate-950 font-bold rounded-xl transition-all shadow-lg shadow-teal-500/20">
                             Send Message
                         </button>
                     </form>
@@ -62,7 +60,7 @@ export default function LandingPage() {
                     <div className="mt-auto pt-8 border-t border-white/5">
                         <p className="text-sm text-slate-500 text-center">
                             Or email us directly at <br />
-                            <span className="text-teal-400">support@agapai.ai</span>
+                            <span className="text-violet-400 font-medium">support@agapai.ai</span>
                         </p>
                     </div>
                 </div>
@@ -71,15 +69,15 @@ export default function LandingPage() {
             {/* --- NAVIGATION --- */}
             <nav className="relative z-50 w-full max-w-7xl mx-auto flex justify-between items-center px-6 py-6 shrink-0">
                 <div className="flex items-center gap-3">
-                    <img src={agapaiLogo} alt="Logo" className="w-9 h-9 rounded-xl shadow-lg shadow-teal-500/20" />
+                    <img src={agapaiLogo} alt="Logo" className="w-9 h-9 rounded-xl shadow-lg shadow-teal-400/20" />
                     <span className="text-xl font-bold tracking-tight text-white uppercase">
                         AGAP<span className="text-teal-400">AI</span>
                     </span>
                 </div>
                 
                 <div className="hidden md:flex items-center gap-8 text-sm font-medium text-slate-400">
-                    <a href="#features" className="hover:text-teal-400 transition-colors">Features</a>
-                    <a href="#about" className="hover:text-teal-400 transition-colors">About</a>
+                    <a href="#features" className="hover:text-teal-300 transition-colors">Features</a>
+                    <a href="#about" className="hover:text-violet-400 transition-colors">About</a>
                     <button 
                         onClick={() => setIsContactPanelOpen(true)}
                         className="px-5 py-2 rounded-full bg-white/5 border border-white/10 hover:bg-white/10 transition-all text-white"
@@ -95,17 +93,17 @@ export default function LandingPage() {
                     
                     {/* Left: Content */}
                     <div className="flex flex-col justify-center space-y-6">
-                        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-teal-500/10 border border-teal-500/20 w-fit">
+                        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-violet-500/10 border border-violet-500/20 w-fit">
                             <span className="relative flex h-2 w-2">
-                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-teal-400 opacity-75"></span>
-                                <span className="relative inline-flex rounded-full h-2 w-2 bg-teal-500"></span>
+                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-violet-400 opacity-75"></span>
+                                <span className="relative inline-flex rounded-full h-2 w-2 bg-violet-500"></span>
                             </span>
-                            <span className="text-[10px] font-bold uppercase tracking-widest text-teal-400">Next-Gen Elderly Care</span>
+                            <span className="text-[10px] font-bold uppercase tracking-widest text-violet-400">Next-Gen Elderly Care</span>
                         </div>
 
                         <h1 className="text-5xl md:text-6xl xl:text-7xl font-extrabold text-white leading-[1.1] tracking-tight">
                             Vision-based <br />
-                            <span className="text-transparent bg-clip-text bg-gradient-to-r from-teal-300 to-emerald-500">
+                            <span className="text-transparent bg-clip-text bg-gradient-to-r from-teal-300 via-teal-100 to-violet-400">
                                 Monitoring
                             </span>
                         </h1>
@@ -115,14 +113,14 @@ export default function LandingPage() {
                                 Ka-AGAPAI sa Seguridad ng ating mga Lolo't Lola
                             </p>
                             <p className="text-base md:text-lg text-slate-400 leading-relaxed max-w-lg">
-                                An intelligent vision-based system providing everyday monitoring for falls and inactivity, ensuring our <span className="text-slate-200 font-semibold italic">loved ones</span> are never alone.
+                                An intelligent vision-based system providing everyday monitoring for falls and inactivity, ensuring our <span className="text-violet-300 font-semibold italic">loved ones</span> are never alone.
                             </p>
                         </div>
 
                         <div className="flex flex-col sm:flex-row gap-4 pt-2">
                             <Link 
                                 to="/login" 
-                                className="px-8 py-4 bg-teal-500 hover:bg-teal-400 text-slate-950 font-bold rounded-xl transition-all flex items-center justify-center gap-2 shadow-lg shadow-teal-500/20 group">
+                                className="px-8 py-4 bg-teal-600 hover:bg-teal-300 text-white hover:text-slate-950 font-bold rounded-xl transition-all duration-300 flex items-center justify-center gap-2 shadow-lg shadow-teal-500/10 group">
                                 Get Started
                                 <FaChevronRight className="text-sm group-hover:translate-x-1 transition-transform" />
                             </Link>
@@ -134,11 +132,11 @@ export default function LandingPage() {
 
                     {/* Right: Feature "Bento" Grid */}
                     <div className="relative hidden lg:block">
-                        <div className="absolute -inset-4 bg-teal-500/20 blur-3xl rounded-full"></div>
+                        <div className="absolute -inset-4 bg-violet-500/10 blur-3xl rounded-full"></div>
                         <div className="relative grid gap-4">
-                            <div className="p-6 bg-slate-900/50 backdrop-blur-xl border border-white/10 rounded-2xl hover:border-teal-500/50 transition-colors shadow-2xl group">
+                            <div className="p-6 bg-slate-900/50 backdrop-blur-xl border border-white/10 rounded-2xl hover:border-teal-300/50 transition-colors shadow-2xl group">
                                 <div className="flex items-start gap-4">
-                                    <div className="p-3 bg-teal-500/10 rounded-lg text-teal-400 group-hover:bg-teal-500 group-hover:text-slate-950 transition-all">
+                                    <div className="p-3 bg-teal-500/10 rounded-lg text-teal-400 group-hover:bg-teal-300 group-hover:text-slate-950 transition-all">
                                         <FaVideo size={20} />
                                     </div>
                                     <div>
@@ -150,9 +148,9 @@ export default function LandingPage() {
                                 </div>
                             </div>
 
-                            <div className="p-6 bg-slate-900/50 backdrop-blur-xl border border-white/10 rounded-2xl hover:border-teal-500/50 transition-colors shadow-2xl group ml-8">
+                            <div className="p-6 bg-slate-900/50 backdrop-blur-xl border border-white/10 rounded-2xl hover:border-violet-400/50 transition-colors shadow-2xl group ml-8">
                                 <div className="flex items-start gap-4">
-                                    <div className="p-3 bg-teal-500/10 rounded-lg text-teal-400 group-hover:bg-teal-500 group-hover:text-slate-950 transition-all">
+                                    <div className="p-3 bg-violet-500/10 rounded-lg text-violet-400 group-hover:bg-violet-400 group-hover:text-white transition-all">
                                         <FaChartLine size={20} />
                                     </div>
                                     <div>
@@ -178,7 +176,7 @@ export default function LandingPage() {
                     <div className="flex items-center gap-6">
                         <span className="text-[10px] font-bold text-slate-600 uppercase tracking-[0.2em]">PUP Engineering</span>
                         <div className="h-4 w-[1px] bg-slate-800"></div>
-                        <span className="text-[10px] font-bold text-teal-500/70 uppercase tracking-[0.2em]">Thesis Project</span>
+                        <span className="text-[10px] font-bold text-violet-400/80 uppercase tracking-[0.2em]">Thesis Project</span>
                     </div>
                 </div>
             </footer>
