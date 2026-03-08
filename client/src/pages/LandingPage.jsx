@@ -1,144 +1,187 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { FaSignInAlt, FaVideo, FaChartLine, FaEnvelope, FaTimes, FaCircle } from 'react-icons/fa'; 
+import { FaSignInAlt, FaVideo, FaChartLine, FaEnvelope, FaShieldAlt, FaChevronRight, FaTimes } from 'react-icons/fa'; 
 import agapaiLogo from '../assets/logo/agapai-logo.png';
 import filter_bg from '../assets/bg/filter-bg.png';
 
 export default function LandingPage() {
     const [isContactPanelOpen, setIsContactPanelOpen] = useState(false);
 
-    const toggleContactPanel = () => setIsContactPanelOpen(!isContactPanelOpen);
-
     return (
-        <div 
-            className="h-screen w-full flex flex-col items-center relative overflow-hidden font-sans selection:bg-teal-500/30"
-            style={{
-                backgroundImage: `url(${filter_bg})`,
-                backgroundSize: 'cover',
-                backgroundPosition: 'center',
-            }}
-        >
-            {/* ATMOSPHERIC OVERLAY */}
-            <div className="absolute inset-0 bg-slate-900/20 backdrop-blur-[1.5px] z-0"></div>
-            <div className="absolute inset-0 bg-gradient-to-tr from-[#2d3092]/30 via-transparent to-[#015954]/30 z-0"></div>
+        <div className="h-screen w-full flex flex-col bg-[#0f172a] text-slate-200 font-sans selection:bg-teal-500/30 overflow-hidden relative">
+            
+            {/* BACKGROUND LAYER */}
+            <div 
+                className="fixed inset-0 z-0 opacity-40"
+                style={{
+                    backgroundImage: `url(${filter_bg})`,
+                    backgroundSize: 'cover',
+                    backgroundPosition: 'center',
+                }}
+            />
+            <div className="fixed inset-0 bg-gradient-to-b from-slate-950/80 via-slate-900/50 to-slate-950 z-0"></div>
 
-            {/* --- TOP NAV --- */}
-            <header className="relative w-full max-w-7xl flex justify-between items-center px-10 py-8 z-50">
-                <div className="flex items-center gap-4 group cursor-default">
-                    <img src={agapaiLogo} alt="Logo" className="w-10 h-10 rounded-full border border-white/30 shadow-2xl transition-transform group-hover:scale-110" />
-                    <span className="text-white font-black tracking-tighter text-2xl uppercase">AGAPAI<span className="text-teal-400">.</span></span>
+            {/* --- SLIDE OVER CONTACT PANEL --- */}
+            {/* Overlay */}
+            <div 
+                className={`fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-[60] transition-opacity duration-300 ${isContactPanelOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+                onClick={() => setIsContactPanelOpen(false)}
+            />
+            
+            {/* Panel */}
+            <aside className={`fixed top-0 right-0 h-full w-full max-w-md bg-slate-900 border-l border-white/10 z-[70] shadow-2xl transform transition-transform duration-500 ease-in-out ${isContactPanelOpen ? 'translate-x-0' : 'translate-x-full'}`}>
+                <div className="p-8 flex flex-col h-full">
+                    <div className="flex justify-between items-center mb-8">
+                        <h2 className="text-2xl font-bold text-white">Contact Support</h2>
+                        <button 
+                            onClick={() => setIsContactPanelOpen(false)}
+                            className="p-2 hover:bg-white/5 rounded-lg text-slate-400 hover:text-white transition-colors"
+                        >
+                            <FaTimes size={24} />
+                        </button>
+                    </div>
+
+                    <form className="space-y-6">
+                        <div>
+                            <label className="block text-sm font-medium text-slate-400 mb-2">Full Name</label>
+                            <input type="text" className="w-full bg-slate-800 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-teal-500/50 transition-colors" placeholder="John Doe" />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-slate-400 mb-2">Email Address</label>
+                            <input type="email" className="w-full bg-slate-800 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-teal-500/50 transition-colors" placeholder="john@example.com" />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-slate-400 mb-2">Message</label>
+                            <textarea rows="4" className="w-full bg-slate-800 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-teal-500/50 transition-colors" placeholder="How can we help you?"></textarea>
+                        </div>
+                        <button type="submit" className="w-full py-4 bg-teal-500 hover:bg-teal-400 text-slate-950 font-bold rounded-xl transition-all shadow-lg shadow-teal-500/20">
+                            Send Message
+                        </button>
+                    </form>
+
+                    <div className="mt-auto pt-8 border-t border-white/5">
+                        <p className="text-sm text-slate-500 text-center">
+                            Or email us directly at <br />
+                            <span className="text-teal-400">support@agapai.ai</span>
+                        </p>
+                    </div>
+                </div>
+            </aside>
+
+            {/* --- NAVIGATION --- */}
+            <nav className="relative z-50 w-full max-w-7xl mx-auto flex justify-between items-center px-6 py-6 shrink-0">
+                <div className="flex items-center gap-3">
+                    <img src={agapaiLogo} alt="Logo" className="w-9 h-9 rounded-xl shadow-lg shadow-teal-500/20" />
+                    <span className="text-xl font-bold tracking-tight text-white uppercase">
+                        AGAP<span className="text-teal-400">AI</span>
+                    </span>
                 </div>
                 
-                <button 
-                    onClick={toggleContactPanel}
-                    className="group flex items-center px-6 py-2.5 text-[10px] font-black tracking-[0.3em] text-white uppercase bg-white/5 backdrop-blur-2xl border border-white/10 rounded-full hover:bg-teal-500 transition-all shadow-2xl"
-                >
-                    <FaEnvelope className="mr-3 text-xs" />
-                    Connect
-                </button>
-            </header>
+                <div className="hidden md:flex items-center gap-8 text-sm font-medium text-slate-400">
+                    <a href="#features" className="hover:text-teal-400 transition-colors">Features</a>
+                    <a href="#about" className="hover:text-teal-400 transition-colors">About</a>
+                    <button 
+                        onClick={() => setIsContactPanelOpen(true)}
+                        className="px-5 py-2 rounded-full bg-white/5 border border-white/10 hover:bg-white/10 transition-all text-white"
+                    >
+                        Contact Support
+                    </button>
+                </div>
+            </nav>
 
-            {/* --- MAIN STAGE --- */}
-            <main className="relative z-10 w-full max-w-7xl flex-grow flex items-center px-10">
-                <div className="grid grid-cols-12 gap-12 w-full items-center">
+            {/* --- HERO SECTION --- */}
+            <main className="relative z-10 flex-1 flex items-center min-h-0 overflow-hidden">
+                <div className="max-w-7xl mx-auto px-6 grid grid-cols-1 lg:grid-cols-2 gap-16 w-full">
                     
-                    {/* LEFT CONTENT: Identity */}
-                    <div className="col-span-12 lg:col-span-7 flex flex-col items-center lg:items-start text-center lg:text-left">
-                        <div className="inline-flex items-center gap-2 px-3 py-1 mb-6 rounded-full bg-teal-400/10 border border-teal-400/20 backdrop-blur-md">
-                            <FaCircle className="text-[6px] text-teal-400 animate-pulse" />
-                            <span className="text-[9px] font-black uppercase tracking-[0.3em] text-teal-300">System Active</span>
+                    {/* Left: Content */}
+                    <div className="flex flex-col justify-center space-y-6">
+                        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-teal-500/10 border border-teal-500/20 w-fit">
+                            <span className="relative flex h-2 w-2">
+                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-teal-400 opacity-75"></span>
+                                <span className="relative inline-flex rounded-full h-2 w-2 bg-teal-500"></span>
+                            </span>
+                            <span className="text-[10px] font-bold uppercase tracking-widest text-teal-400">Next-Gen Elderly Care</span>
                         </div>
 
-                        <h1 className="text-8xl md:text-[9.5rem] font-black tracking-tighter leading-[0.8] mb-6">
-                            <span className="block text-[#c4fcff] drop-shadow-2xl">AGAP<span className="text-teal-400">AI</span></span>
+                        <h1 className="text-5xl md:text-6xl xl:text-7xl font-extrabold text-white leading-[1.1] tracking-tight">
+                            Vision-based <br />
+                            <span className="text-transparent bg-clip-text bg-gradient-to-r from-teal-300 to-emerald-500">
+                                Monitoring
+                            </span>
                         </h1>
                         
-                        <div className="max-w-lg space-y-8">
-                            <div>
-                                <h2 className="text-xl md:text-2xl font-bold text-white leading-snug mb-2">
-                                    Ka-AGAPAI sa Seguridad ng ating mga <span className="text-teal-400">Lolo't Lola</span>
-                                </h2>
-                                <p className="text-sm md:text-base text-gray-200 font-medium italic opacity-90 leading-relaxed">
-                                    A Vision-Based Monitoring and Alert System for Fall and Inactivity in Elderly Care Facility
-                                </p>
-                            </div>
+                        <div className="space-y-4">
+                            <p className="text-lg md:text-xl text-slate-400 leading-relaxed max-w-lg">
+                                Ka-AGAPAI sa Seguridad ng ating mga Lolo't Lola
+                            </p>
+                            <p className="text-base md:text-lg text-slate-400 leading-relaxed max-w-lg">
+                                An intelligent vision-based system providing everyday monitoring for falls and inactivity, ensuring our <span className="text-slate-200 font-semibold italic">loved ones</span> are never alone.
+                            </p>
+                        </div>
 
+                        <div className="flex flex-col sm:flex-row gap-4 pt-2">
                             <Link 
                                 to="/login" 
-                                className="inline-flex items-center justify-center px-14 py-5 bg-[#c4fcff] text-teal-900 text-xs font-black uppercase tracking-[0.3em] rounded-full transition-all duration-300 hover:bg-white hover:shadow-[0_0_50px_rgba(196,252,255,0.4)] hover:-translate-y-1 active:scale-95"
-                            >
-                                <FaSignInAlt className="mr-3 text-lg" />
+                                className="px-8 py-4 bg-teal-500 hover:bg-teal-400 text-slate-950 font-bold rounded-xl transition-all flex items-center justify-center gap-2 shadow-lg shadow-teal-500/20 group">
                                 Get Started
+                                <FaChevronRight className="text-sm group-hover:translate-x-1 transition-transform" />
                             </Link>
+                            <button className="px-8 py-4 bg-slate-800 hover:bg-slate-700 text-white font-bold rounded-xl transition-all border border-slate-700">
+                                View Live Demo
+                            </button>
                         </div>
                     </div>
 
-                    {/* RIGHT CONTENT: Fixed-Width Overlapping Cards */}
-                    <div className="hidden lg:col-span-5 lg:flex flex-col gap-6 relative items-end">
-                        <div className="absolute -inset-20 bg-teal-500/10 rounded-full blur-[100px] z-0 pointer-events-none"></div>
-
-                        {/* Card 1: Vision Monitoring */}
-                        <div className="relative group p-8 bg-gradient-to-br from-white/10 to-transparent backdrop-blur-2xl border border-white/10 rounded-[2.5rem] shadow-2xl transition-all hover:bg-white/15 hover:-translate-x-3 w-[400px]">
-                            <div className="flex gap-6">
-                                <div className="w-14 h-14 bg-teal-400 text-teal-950 rounded-2xl flex items-center justify-center shadow-lg shrink-0">
-                                    <FaVideo size={24} />
-                                </div>
-                                <div className="flex-1">
-                                    <h3 className="text-sm font-black text-teal-300 uppercase tracking-widest mb-2">Sentinel Vision</h3>
-                                    <p className="text-gray-200 text-sm leading-relaxed font-medium">
-                                        The system watches for falls or long periods of inactivity and alerts the staff immediately through a live stream.
-                                    </p>
+                    {/* Right: Feature "Bento" Grid */}
+                    <div className="relative hidden lg:block">
+                        <div className="absolute -inset-4 bg-teal-500/20 blur-3xl rounded-full"></div>
+                        <div className="relative grid gap-4">
+                            <div className="p-6 bg-slate-900/50 backdrop-blur-xl border border-white/10 rounded-2xl hover:border-teal-500/50 transition-colors shadow-2xl group">
+                                <div className="flex items-start gap-4">
+                                    <div className="p-3 bg-teal-500/10 rounded-lg text-teal-400 group-hover:bg-teal-500 group-hover:text-slate-950 transition-all">
+                                        <FaVideo size={20} />
+                                    </div>
+                                    <div>
+                                        <h3 className="text-lg font-bold text-white mb-1">Sentinel Vision</h3>
+                                        <p className="text-sm text-slate-400 leading-relaxed">
+                                            Real-time fall detection using advanced pose estimation. Instant alerts delivered to caregivers.
+                                        </p>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
 
-                        {/* Card 2: Reporting (Same width as above) */}
-                        <div className="relative group p-8 bg-gradient-to-br from-white/10 to-transparent backdrop-blur-2xl border border-white/10 rounded-[2.5rem] shadow-2xl transition-all hover:bg-white/15 hover:-translate-x-3 w-[400px] mr-12">
-                            <div className="flex gap-6">
-                                <div className="w-14 h-14 bg-teal-400 text-teal-950 rounded-2xl flex items-center justify-center shadow-lg shrink-0">
-                                    <FaChartLine size={24} />
-                                </div>
-                                <div className="flex-1">
-                                    <h3 className="text-sm font-black text-teal-300 uppercase tracking-widest mb-2">Audit Intelligence</h3>
-                                    <p className="text-gray-200 text-sm leading-relaxed font-medium">
-                                        Keep track of everything that happens with clear logs and history to help the facility improve how they care for everyone.
-                                    </p>
+                            <div className="p-6 bg-slate-900/50 backdrop-blur-xl border border-white/10 rounded-2xl hover:border-teal-500/50 transition-colors shadow-2xl group ml-8">
+                                <div className="flex items-start gap-4">
+                                    <div className="p-3 bg-teal-500/10 rounded-lg text-teal-400 group-hover:bg-teal-500 group-hover:text-slate-950 transition-all">
+                                        <FaChartLine size={20} />
+                                    </div>
+                                    <div>
+                                        <h3 className="text-lg font-bold text-white mb-1">Audit Intelligence</h3>
+                                        <p className="text-sm text-slate-400 leading-relaxed">
+                                            Comprehensive incident logs and activity heatmaps to optimize facility staffing and safety.
+                                        </p>
+                                    </div>
                                 </div>
                             </div>
                         </div>
                     </div>
+
                 </div>
             </main>
 
             {/* --- FOOTER --- */}
-            <footer className="relative w-full px-10 py-6 flex justify-between items-center z-50">
-                <span className="text-[10px] font-black text-white/30 uppercase tracking-[0.4em]">&copy; 2026 AGAPAI SYSTEMS</span>
-                <div className="flex gap-6 text-[10px] font-black text-white/30 uppercase tracking-[0.4em]">
-                    <span>PUP Engineering</span>
-                    <span className="text-teal-400/50">Thesis Project</span>
+            <footer className="relative z-10 border-t border-white/5 bg-slate-950/50 backdrop-blur-md shrink-0">
+                <div className="max-w-7xl mx-auto px-6 py-6 flex flex-col md:flex-row justify-between items-center gap-4">
+                    <p className="text-xs font-medium text-slate-500 tracking-wider">
+                        &copy; 2026 AGAPAI SYSTEMS. ALL RIGHTS RESERVED.
+                    </p>
+                    <div className="flex items-center gap-6">
+                        <span className="text-[10px] font-bold text-slate-600 uppercase tracking-[0.2em]">PUP Engineering</span>
+                        <div className="h-4 w-[1px] bg-slate-800"></div>
+                        <span className="text-[10px] font-bold text-teal-500/70 uppercase tracking-[0.2em]">Thesis Project</span>
+                    </div>
                 </div>
             </footer>
-
-            {/* --- CONTACT PANEL --- */}
-            <div className={`fixed inset-0 z-[100] transition-all duration-500 ${isContactPanelOpen ? 'opacity-100 visible' : 'opacity-0 invisible'}`}>
-                <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={toggleContactPanel}></div>
-                <div className={`absolute top-0 right-0 h-full w-full max-w-[340px] bg-slate-900/95 backdrop-blur-3xl border-l border-white/5 p-12 flex flex-col transform transition-transform duration-500 ease-in-out ${isContactPanelOpen ? 'translate-x-0' : 'translate-x-full'}`}>
-                    <div className="flex justify-between items-center mb-16">
-                        <h3 className="text-2xl font-black text-white tracking-tighter uppercase">Connect<span className="text-teal-400">.</span></h3>
-                        <button onClick={toggleContactPanel} className="w-10 h-10 flex items-center justify-center rounded-full bg-white/5 text-white/40 hover:text-white transition-all"><FaTimes /></button>
-                    </div>
-                    <div className="space-y-12">
-                        <div>
-                            <label className="text-[10px] font-black text-teal-400 uppercase tracking-widest mb-3 block">Email Inquiry</label>
-                            <a href="mailto:w4makeithappen@gmail.com" className="text-base font-bold text-white hover:text-teal-400 transition-colors break-words">w4makeithappen@gmail.com</a>
-                        </div>
-                        <div>
-                            <label className="text-[10px] font-black text-teal-400 uppercase tracking-widest mb-3 block">Emergency Line</label>
-                            <a href="tel:+639506343472" className="text-base font-bold text-white hover:text-teal-400 transition-colors">+63 950 634 3472</a>
-                        </div>
-                    </div>
-                </div>
-            </div>
         </div>
     );
 }
