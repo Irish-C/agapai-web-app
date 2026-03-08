@@ -56,7 +56,10 @@ async def update_user_logic(user_id, data):
         # 1. Start with the basic fields
         update_data = {
             'firstname': data.get('firstname'),
+            'middle_name': data.get('middle_name'),
             'lastname': data.get('lastname'),
+            'birthdate': data.get('birthdate'),
+            'email': data.get('email'),
         }
 
         # 2. THE FIX: Handle the Role Update
@@ -130,7 +133,10 @@ async def create_user_logic(data):
         new_user = await db.user.create(
             data={
                 'firstname': data['firstname'],
+                'middle_name': data.get('middle_name'),
                 'lastname': data['lastname'],
+                'birthdate': data.get('birthdate'),
+                'email': data.get('email'),
                 'username': data['username'],
                 'password': hashed_pw,
                 'role_id': role_record.id

@@ -20,7 +20,10 @@ export default function UserEditModal({ userToEdit, onSave, onClose }) {
     const [formData, setFormData] = useState({
         id: userToEdit?.id || null,
         firstname: userToEdit?.firstname || '',
+        middle_name: userToEdit?.middle_name || '',
         lastname: userToEdit?.lastname || '',
+        birthdate: userToEdit?.birthdate ? userToEdit.birthdate.slice(0, 10) : '',
+        email: userToEdit?.email || '',
         username: userToEdit?.username || '',
         role: userToEdit?.role || '', 
         password: '',
@@ -67,8 +70,8 @@ export default function UserEditModal({ userToEdit, onSave, onClose }) {
         setMessage('');
         
         // Frontend Validation
-        if (!formData.firstname || !formData.lastname || !formData.username || !formData.role) {
-            setMessage('Please fill in all user details.');
+        if (!formData.firstname || !formData.lastname || !formData.username || !formData.role || !formData.birthdate || !formData.email) {
+            setMessage('Please fill in all required user details.');
             return;
         }
 
@@ -130,14 +133,30 @@ export default function UserEditModal({ userToEdit, onSave, onClose }) {
                                 <input type="text" id="firstname" name="firstname" value={formData.firstname} onChange={handleChange} 
                                     className="w-full border-gray-300 rounded-lg pl-2 py-2" required disabled={isLoading} />
                             </div>
-
+                            {/* Middle Name (optional) */}
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="middle_name">Middle Name (optional)</label>
+                                <input type="text" id="middle_name" name="middle_name" value={formData.middle_name} onChange={handleChange} 
+                                    className="w-full border-gray-300 rounded-lg pl-2 py-2" disabled={isLoading} />
+                            </div>
                             {/* Last Name */}
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="lastname">Last Name</label>
                                 <input type="text" id="lastname" name="lastname" value={formData.lastname} onChange={handleChange} 
                                     className="w-full border-gray-300 rounded-lg pl-2 py-2" required disabled={isLoading} />
                             </div>
-
+                            {/* Email */}
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="email">Email Address</label>
+                                <input type="email" id="email" name="email" value={formData.email} onChange={handleChange} 
+                                    className="w-full border-gray-300 rounded-lg pl-2 py-2" required disabled={isLoading} />
+                            </div>
+                            {/* Birthdate */}
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="birthdate">Birthdate</label>
+                                <input type="date" id="birthdate" name="birthdate" value={formData.birthdate} onChange={handleChange} 
+                                    className="w-full border-gray-300 rounded-lg pl-2 py-2" required disabled={isLoading} />
+                            </div>
                             {/* Username (Locked if editing) */}
                             <div className="md:col-span-1">
                                 <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="username">Username</label>
@@ -145,7 +164,6 @@ export default function UserEditModal({ userToEdit, onSave, onClose }) {
                                     className={`w-full border-gray-300 rounded-lg pl-2 py-2 ${isEditing ? 'bg-gray-100' : ''}`} 
                                     required disabled={isEditing || isLoading} />
                             </div>
-
                             {/* Dynamic Role Selection from Database */}
                             <div className="md:col-span-1">
                                 <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="role">Access Role</label>
