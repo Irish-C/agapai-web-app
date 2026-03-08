@@ -93,6 +93,7 @@ export default function UserEditModal({ userToEdit, onSave, onClose }) {
         const formDataToSend = {
             ...formData,
             birthdate: formData.birthdate ? new Date(formData.birthdate).toISOString() : '',
+            middle_name: formData.middle_name !== undefined ? formData.middle_name : '',
         };
 
         onSave(formDataToSend)

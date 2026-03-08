@@ -145,7 +145,8 @@ export default function UserManager({ user }) {
 
     // Handles opening the modal for Editing an existing user (Triggered by table button)
     const handleEditUser = (userItem) => {
-        setUserToEdit(userItem);
+        // Ensure middle_name is always present (even if empty)
+        setUserToEdit({ ...userItem, middle_name: userItem.middle_name || '' });
         setIsEditModalOpen(true);
     };
 

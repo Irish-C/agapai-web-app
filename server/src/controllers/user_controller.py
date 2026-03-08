@@ -29,6 +29,7 @@ async def list_users_logic():
         result.append({
             'id': str(user.id),
             'firstname': user.firstname,
+            'middle_name': user.middle_name,
             'lastname': user.lastname,
             'username': user.username,
             'role': normalize_role(user.role.role_name) if user.role else None,
