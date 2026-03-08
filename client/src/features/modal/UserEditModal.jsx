@@ -112,119 +112,118 @@ export default function UserEditModal({ userToEdit, onSave, onClose }) {
 
     return (
         <div className="fixed inset-0 bg-black bg-opacity-60 z-50 flex items-center justify-center p-4">
-            <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg transform transition-all">
-                
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xl transform transition-all border border-gray-200">
                 {/* Header */}
-                <div className="p-5 border-b border-gray-200 flex justify-between items-center">
-                    <h3 className="text-xl font-bold text-gray-800 flex items-center">
-                        <FaUser className="mr-3 text-teal-600" /> {title}
+                <div className="px-8 py-6 border-b border-gray-100 flex justify-between items-center bg-gray-50 rounded-t-2xl">
+                    <h3 className="text-2xl font-semibold text-gray-800 flex items-center tracking-tight">
+                        <FaUser className="mr-3 text-blue-600" /> {title}
                     </h3>
-                    <button onClick={onClose} className="text-gray-400 hover:text-gray-700">
-                        <FaTimes size={20} />
+                    <button onClick={onClose} className="text-gray-400 hover:text-blue-600 transition-colors p-1 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-300">
+                        <FaTimes size={22} />
                     </button>
                 </div>
-
-                {/* Body */}
                 <form onSubmit={handleFormSubmit}>
-                    <div className="p-5 space-y-4">
-
+                    <div className="px-8 py-7 space-y-8">
                         {message && (
-                            <div className="p-3 bg-red-100 text-red-700 border border-red-300 rounded-lg text-sm">
+                            <div className="p-3 bg-red-50 text-red-700 border border-red-200 rounded-lg text-sm">
                                 {message}
                             </div>
                         )}
-
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            {/* First Name */}
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="firstname">First Name</label>
-                                <input type="text" id="firstname" name="firstname" value={formData.firstname} onChange={handleChange} 
-                                    className="w-full border-gray-300 rounded-lg px-3 py-2 border focus:ring-2 focus:ring-teal-500 outline-none" required disabled={isLoading} />
-                            </div>
-                            {/* Middle Name (optional) */}
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="middle_name">Middle Name (optional)</label>
-                                <input type="text" id="middle_name" name="middle_name" value={formData.middle_name} onChange={handleChange} 
-                                    className="w-full border-gray-300 rounded-lg px-3 py-2 border focus:ring-2 focus:ring-teal-500 outline-none" disabled={isLoading} />
-                            </div>
-                            {/* Last Name */}
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="lastname">Last Name</label>
-                                <input type="text" id="lastname" name="lastname" value={formData.lastname} onChange={handleChange} 
-                                    className="w-full border-gray-300 rounded-lg px-3 py-2 border focus:ring-2 focus:ring-teal-500 outline-none" required disabled={isLoading} />
-                            </div>
-                            {/* Email */}
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="email">Email Address</label>
-                                <input type="email" id="email" name="email" value={formData.email} onChange={handleChange} 
-                                    className="w-full border-gray-300 rounded-lg px-3 py-2 border focus:ring-2 focus:ring-teal-500 outline-none" required disabled={isLoading} />
-                            </div>
-                            {/* Birthdate */}
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="birthdate">Birthdate</label>
-                                <input type="date" id="birthdate" name="birthdate" value={formData.birthdate} onChange={handleChange} 
-                                    className="w-full border-gray-300 rounded-lg px-3 py-2 border focus:ring-2 focus:ring-teal-500 outline-none" required disabled={isLoading} />
-                            </div>
-                            {/* Username (Locked if editing) */}
-                            <div className="md:col-span-1">
-                                <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="username">Username</label>
-                                <input type="text" id="username" name="username" value={formData.username} onChange={handleChange} 
-                                    className={`w-full border-gray-300 rounded-lg px-3 py-2 border ${isEditing ? 'bg-gray-100' : 'focus:ring-2 focus:ring-teal-500 outline-none'}`} 
-                                    required disabled={isEditing || isLoading} />
-                            </div>
-                            {/* DYNAMIC ROLE SELECTION */}
-                            <div className="md:col-span-1">
-                                <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="role">Access Role</label>
-                                <select 
-                                    id="role"
-                                    name="role"
-                                    value={formData.role}
-                                    onChange={handleChange}
-                                    className="w-full border-gray-300 rounded-lg px-3 py-2 border bg-white focus:ring-2 focus:ring-teal-500 outline-none"
-                                    required
-                                    disabled={isLoading || isLoadingRoles}
-                                >
-                                    <option value="">Select role...</option>
-                                    {isLoadingRoles ? (
-                                        <option>Loading roles...</option>
-                                    ) : (
-                                        dbRoles.map((roleName) => (
-                                            <option key={roleName} value={roleName}>
-                                                {displayRole(roleName)}
-                                            </option>
-                                        ))
-                                    )}
-                                </select>
+                        {/* Personal Info Section */}
+                        <div>
+                            <div className="text-xs font-semibold text-blue-700 mb-2 uppercase tracking-wider">Personal Information</div>
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-600 mb-1" htmlFor="firstname">First Name</label>
+                                    <input type="text" id="firstname" name="firstname" value={formData.firstname} onChange={handleChange}
+                                        className="w-full border-b-2 border-gray-200 focus:border-blue-500 bg-transparent px-2 py-2 rounded-t-md text-base outline-none transition" required disabled={isLoading} />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-600 mb-1" htmlFor="middle_name">Middle Name</label>
+                                    <input type="text" id="middle_name" name="middle_name" value={formData.middle_name} onChange={handleChange}
+                                        className="w-full border-b-2 border-gray-200 focus:border-blue-500 bg-transparent px-2 py-2 rounded-t-md text-base outline-none transition" disabled={isLoading} />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-600 mb-1" htmlFor="lastname">Last Name</label>
+                                    <input type="text" id="lastname" name="lastname" value={formData.lastname} onChange={handleChange}
+                                        className="w-full border-b-2 border-gray-200 focus:border-blue-500 bg-transparent px-2 py-2 rounded-t-md text-base outline-none transition" required disabled={isLoading} />
+                                </div>
                             </div>
                         </div>
-
-                        {/* Password Fields */}
-                        <div className={`pt-4 border-t border-gray-100 grid grid-cols-1 md:grid-cols-2 gap-4 ${isEditing ? 'opacity-80' : ''}`}>
-                            <div className="md:col-span-1">
-                                <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="password">
-                                    <FaLock className="inline mr-1 text-red-500" /> {isEditing ? 'New Password (Optional)' : 'Password'}
-                                </label>
-                                <input type="password" id="password" name="password" value={formData.password} onChange={handleChange} 
-                                    className="w-full border-gray-300 rounded-lg px-3 py-2 border focus:ring-2 focus:ring-teal-500 outline-none" 
-                                    required={!isEditing} disabled={isLoading} />
+                        {/* Account Info Section */}
+                        <div>
+                            <div className="text-xs font-semibold text-blue-700 mb-2 uppercase tracking-wider">Account Details</div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-600 mb-1" htmlFor="email">Email Address</label>
+                                    <input type="email" id="email" name="email" value={formData.email} onChange={handleChange}
+                                        className="w-full border-b-2 border-gray-200 focus:border-blue-500 bg-transparent px-2 py-2 rounded-t-md text-base outline-none transition" required disabled={isLoading} />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-600 mb-1" htmlFor="birthdate">Birthdate</label>
+                                    <input type="date" id="birthdate" name="birthdate" value={formData.birthdate} onChange={handleChange}
+                                        className="w-full border-b-2 border-gray-200 focus:border-blue-500 bg-transparent px-2 py-2 rounded-t-md text-base outline-none transition" required disabled={isLoading} />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-600 mb-1" htmlFor="username">Username</label>
+                                    <input type="text" id="username" name="username" value={formData.username} onChange={handleChange}
+                                        className={`w-full border-b-2 border-gray-200 focus:border-blue-500 bg-transparent px-2 py-2 rounded-t-md text-base outline-none transition ${isEditing ? 'bg-gray-100' : ''}`}
+                                        required disabled={isEditing || isLoading} />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-600 mb-1" htmlFor="role">Access Role</label>
+                                    <select
+                                        id="role"
+                                        name="role"
+                                        value={formData.role}
+                                        onChange={handleChange}
+                                        className="w-full border-b-2 border-gray-200 focus:border-blue-500 bg-transparent px-2 py-2 rounded-t-md text-base outline-none transition"
+                                        required
+                                        disabled={isLoading || isLoadingRoles}
+                                    >
+                                        <option value="">Select role...</option>
+                                        {isLoadingRoles ? (
+                                            <option>Loading roles...</option>
+                                        ) : (
+                                            dbRoles.map((roleName) => (
+                                                <option key={roleName} value={roleName}>
+                                                    {displayRole(roleName)}
+                                                </option>
+                                            ))
+                                        )}
+                                    </select>
+                                </div>
                             </div>
-                            <div className="md:col-span-1">
-                                <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="confirmPassword">Confirm Password</label>
-                                <input type="password" id="confirmPassword" name="confirmPassword" value={formData.confirmPassword} onChange={handleChange} 
-                                    className="w-full border-gray-300 rounded-lg px-3 py-2 border focus:ring-2 focus:ring-teal-500 outline-none" 
-                                    required={!isEditing} disabled={isLoading} />
+                        </div>
+                        {/* Password Section */}
+                        <div>
+                            <div className="text-xs font-semibold text-blue-700 mb-2 uppercase tracking-wider">Password</div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-600 mb-1" htmlFor="password">
+                                        <FaLock className="inline mr-1 text-red-500" /> {isEditing ? 'New Password (Optional)' : 'Password'}
+                                    </label>
+                                    <input type="password" id="password" name="password" value={formData.password} onChange={handleChange}
+                                        className="w-full border-b-2 border-gray-200 focus:border-blue-500 bg-transparent px-2 py-2 rounded-t-md text-base outline-none transition"
+                                        required={!isEditing} disabled={isLoading} />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-600 mb-1" htmlFor="confirmPassword">Confirm Password</label>
+                                    <input type="password" id="confirmPassword" name="confirmPassword" value={formData.confirmPassword} onChange={handleChange}
+                                        className="w-full border-b-2 border-gray-200 focus:border-blue-500 bg-transparent px-2 py-2 rounded-t-md text-base outline-none transition"
+                                        required={!isEditing} disabled={isLoading} />
+                                </div>
                             </div>
                         </div>
                     </div>
-
                     {/* Footer / Action Buttons */}
-                    <div className="p-5 flex justify-end gap-3 border-t border-gray-200">
+                    <div className="px-8 py-5 flex justify-end gap-4 border-t border-gray-100 bg-gray-50 rounded-b-2xl">
                         <button type="button" onClick={onClose} disabled={isLoading}
-                            className="px-4 py-2 text-sm font-medium rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 transition">
+                            className="px-5 py-2 text-sm font-medium rounded shadow-sm border border-gray-300 text-gray-700 bg-white hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-300 transition">
                             Cancel
                         </button>
                         <button type="submit" disabled={isLoading}
-                            className="px-4 py-2 text-sm font-medium rounded-lg text-white bg-teal-600 hover:bg-teal-700 flex items-center transition">
+                            className="px-5 py-2 text-sm font-medium rounded shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-300 flex items-center transition">
                             {isLoading ? <FaSpinner className="animate-spin mr-2" /> : <FaSave className="mr-2" />}
                             {primaryButtonText}
                         </button>
