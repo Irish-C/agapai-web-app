@@ -70,7 +70,7 @@ export default function UserEditModal({ userToEdit, onSave, onClose }) {
     const handleFormSubmit = async (e) => {
         e.preventDefault();
         setMessage('');
-        
+
         // Frontend Validation
         if (!formData.firstname || !formData.lastname || !formData.username || !formData.role || !formData.birthdate || !formData.email) {
             setMessage('Please fill in all required user details.');
@@ -81,15 +81,21 @@ export default function UserEditModal({ userToEdit, onSave, onClose }) {
             setMessage('New user must have a password of at least 8 characters.');
             return;
         }
-        
+
         if (formData.password !== formData.confirmPassword) {
             setMessage('Passwords do not match.');
             return;
         }
 
         setIsLoading(true);
-        
-        onSave(formData)
+
+        // Convert birthdate to ISO-8601 string for backend
+        const formDataToSend = {
+            ...formData,
+            birthdate: formData.birthdate ? new Date(formData.birthdate).toISOString() : '',
+        };
+
+        onSave(formDataToSend)
             .then(() => {
                 // Success logic handled by parent
             })

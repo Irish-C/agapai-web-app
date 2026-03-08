@@ -21,8 +21,8 @@ model User {
   firstname         String     @db.VarChar(100)
   middle_name       String?    @db.VarChar(100)
   lastname          String     @db.VarChar(100)
-  birthdate         DateTime?
-  email             String?    @unique @db.VarChar(255)
+  birthdate         DateTime
+  email             String     @unique @db.VarChar(255)
   username          String     @unique @db.VarChar(50)
   password          String     @db.VarChar(255)
   role_id           BigInt?

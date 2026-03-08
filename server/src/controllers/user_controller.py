@@ -32,6 +32,8 @@ async def list_users_logic():
             'lastname': user.lastname,
             'username': user.username,
             'role': normalize_role(user.role.role_name) if user.role else None,
+            'email': user.email,
+            'birthdate': user.birthdate.isoformat() if user.birthdate else None,
             'email_notifications': user.email_notifications,
             'alert_threshold': user.alert_threshold,
         })
