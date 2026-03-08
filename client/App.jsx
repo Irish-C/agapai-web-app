@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
+import { AuthContext } from './src/components/AuthContext.jsx';
 import { Routes, Route, Navigate } from 'react-router-dom';
 
 //image
@@ -58,22 +59,8 @@ const GlobalAlertModal = ({ alert, onClose }) => {
 };
 
 export default function App() {
-    // Authentication state
-    const [user, setUser] = useState(() => {
-        const storedUser = localStorage.getItem('user');
-        const parsed = storedUser ? JSON.parse(storedUser) : null;
-
-        // Ensure auth token is available for API requests (in case localStorage was cleared separately)
-        if (parsed?.token && !localStorage.getItem('authToken')) {
-            localStorage.setItem('authToken', parsed.token);
-        }
-
-        // Normalize stored role values to lowercase (handles legacy stored data)
-        if (parsed) {
-            parsed.role = normalizeRole(parsed.role);
-        }
-        return parsed;
-    });
+    // Use AuthContext for authentication state
+    const { user, token, login, logout } = useContext(AuthContext);
 
     const [cameras, setCameras] = useState([]);
     const [currentAlert, setCurrentAlert] = useState(null);
@@ -107,32 +94,9 @@ export default function App() {
     }, []);
 
     // --- API LOGIC ---
-    const login = async (username, password) => {
-        try {
-            const data = await loginUser(username, password);
-            if (data.status === 'success' || data.token) {
-                const userData = {
-                    username: data.username,
-                    role: normalizeRole(data.role),
-                    userId: data.user_id,
-                    token: data.access_token || data.token
-                };
-                setUser(userData);
-                localStorage.setItem('user', JSON.stringify(userData));
-                return { success: true };
-            }
-            return { success: false, message: data.message || 'Login failed.' };
-        } catch (error) {
-            console.error('Login API error:', error);
-            return { success: false, message: 'Server connection error.' };
-        }
-    };
+    // Remove login function, use AuthContext.login instead
 
-    const logout = () => {
-        logoutUser();
-        setUser(null);
-        localStorage.removeItem('user');
-    };
+    // Remove logout function, use AuthContext.logout instead
 
     const loadCameras = async () => {
         if (!user) return;

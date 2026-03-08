@@ -3,7 +3,8 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { BrowserRouter as Router } from 'react-router-dom';
 import App from './App.jsx';
-import GlobalErrorBoundary from './src/components/GlobalErrorBoundary'
+import GlobalErrorBoundary from './src/components/GlobalErrorBoundary';
+import { AuthProvider } from './src/components/AuthContext.jsx';
 
 // Absolute path for global CSS
 import "./src/index.css";
@@ -14,9 +15,11 @@ import "./src/index.css";
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <GlobalErrorBoundary>
-      <Router>
-        <App />
-      </Router>
+      <AuthProvider>
+        <Router>
+          <App />
+        </Router>
+      </AuthProvider>
     </GlobalErrorBoundary>
   </React.StrictMode>
 );

@@ -12,7 +12,7 @@ export default function LandingPage() {
             
             {/* BACKGROUND LAYER */}
             <div 
-                className="fixed inset-0 z-0 opacity-40"
+                className="fixed inset-0 z-0 opacity-100"
                 style={{
                     backgroundImage: `url(${filter_bg})`,
                     backgroundSize: 'cover',
