@@ -109,8 +109,8 @@ export default function LandingPage() {
                         </h1>
                         
                         <div className="space-y-4">
-                            <p className="text-lg md:text-xl text-slate-400 leading-relaxed max-w-lg">
-                                Ka-AGAPAI sa Seguridad ng ating mga Lolo't Lola
+                            <p className="text-lg md:text-xl text-slate-400 text-white leading-relaxed max-w-lg">
+                                Ka-AGAPAI sa Seguridad ng ating mga <span className="text-violet-300 font-semibold italic"></span>Lolo't Lola
                             </p>
                             <p className="text-base md:text-lg text-slate-400 leading-relaxed max-w-lg">
                                 An intelligent vision-based system providing everyday monitoring for falls and inactivity, ensuring our <span className="text-violet-300 font-semibold italic">loved ones</span> are never alone.
@@ -140,9 +140,9 @@ export default function LandingPage() {
                                         <FaVideo size={20} />
                                     </div>
                                     <div>
-                                        <h3 className="text-lg font-bold text-white mb-1">Sentinel Vision</h3>
+                                        <h3 className="text-lg font-bold text-white mb-1">Real-time Monitoring</h3>
                                         <p className="text-sm text-slate-400 leading-relaxed">
-                                            Real-time fall detection using advanced pose estimation. Instant alerts delivered to caregivers.
+                                            The system watches for falls or long periods of inactivity and alerts the staff immediately.
                                         </p>
                                     </div>
                                 </div>
@@ -154,9 +154,9 @@ export default function LandingPage() {
                                         <FaChartLine size={20} />
                                     </div>
                                     <div>
-                                        <h3 className="text-lg font-bold text-white mb-1">Audit Intelligence</h3>
+                                        <h3 className="text-lg font-bold text-white mb-1">Efficient Reporting</h3>
                                         <p className="text-sm text-slate-400 leading-relaxed">
-                                            Comprehensive incident logs and activity heatmaps to optimize facility staffing and safety.
+                                            Keep track of everything with clear logs and history to help the facility improve care.
                                         </p>
                                     </div>
                                 </div>
