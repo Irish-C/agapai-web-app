@@ -1,9 +1,9 @@
 // src/components/AccountSettingsForm.jsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
     FaLock, FaKey, FaSave, FaSpinner, FaCheckCircle, 
     FaExclamationCircle, FaUser, FaEnvelope, FaIdBadge, 
-    FaCalendarAlt, FaEye, FaEyeSlash 
+    FaCalendarAlt, FaEye, FaEyeSlash, FaCheck 
 } from 'react-icons/fa';
 import { fetchUserProfile, changePassword } from '../../services/apiService'; 
 import { normalizeRole, displayRole } from '../../utils/roleUtils.js';
@@ -14,6 +14,7 @@ const initialProfileState = {
 };
 
 export default function AccountSettingsForm({ user }) {
+    // --- State Management ---
     const [profile, setProfile] = useState(() => ({
         ...initialProfileState,
         username: user?.username || 'Loading...',
@@ -27,6 +28,7 @@ export default function AccountSettingsForm({ user }) {
     const [isLoading, setIsLoading] = useState(false);
     const [message, setMessage] = useState(null); 
 
+    // --- Profile Fetching ---
     useEffect(() => {
         if (!user?.userId) {
             setIsProfileLoading(false);
@@ -54,24 +56,21 @@ export default function AccountSettingsForm({ user }) {
         loadProfile();
     }, [user]);
 
+    // --- Form Logic ---
+    const isMatching = newPassword && confirmPassword && newPassword === confirmPassword;
+    const isFormValid = oldPassword && newPassword.length >= 8 && isMatching;
+
     const handleSubmit = async (e) => {
         e.preventDefault();
         setMessage(null);
         
-        if (newPassword.length < 8) {
-            setMessage({ type: 'error', text: 'Password must be at least 8 characters.' });
-            return;
-        }
-        if (newPassword !== confirmPassword) {
-            setMessage({ type: 'error', text: 'Passwords do not match.' });
-            return;
-        }
+        if (!isFormValid) return;
 
         setIsLoading(true);
         try {
             const result = await changePassword(oldPassword, newPassword);
             if (result.status === 'success') {
-                setMessage({ type: 'success', text: "Success! Please log in again with your new password." });
+                setMessage({ type: 'success', text: "Password updated! Please log in again." });
                 setOldPassword(''); setNewPassword(''); setConfirmPassword('');
             }
         } catch (error) {
@@ -81,31 +80,29 @@ export default function AccountSettingsForm({ user }) {
         }
     };
 
-    const isFormValid = oldPassword && newPassword && confirmPassword && newPassword === confirmPassword;
-
     return (
-        <div className="max-w-6xl mx-auto p-4 lg:p-8">
+        <div className="max-w-6xl mx-auto p-4 lg:p-8 animate-in fade-in duration-500">
             <div className="flex flex-col lg:flex-row gap-8">
                 
                 {/* --- SIDEBAR: PROFILE INFO --- */}
                 <div className="w-full lg:w-1/3 space-y-6">
                     <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
                         <div className="h-24 bg-gradient-to-r from-indigo-500 to-teal-500"></div>
-                        <div className="px-6 pb-6">
-                            <div className="relative -mt-12 mb-4 text-center">
-                                <div className="h-24 w-24 bg-white p-1 rounded-full shadow-md inline-block">
+                        <div className="px-6 pb-6 text-center">
+                            <div className="relative -mt-12 mb-4 inline-block">
+                                <div className="h-24 w-24 bg-white p-1 rounded-full shadow-md">
                                     <div className="h-full w-full bg-gray-100 rounded-full flex items-center justify-center text-gray-400">
                                         <FaUser size={40} />
                                     </div>
                                 </div>
                             </div>
 
-                            <div className="text-center mb-6">
+                            <div className="mb-6">
                                 <h2 className="text-xl font-bold text-gray-800">
-                                    {isProfileLoading ? '...' : `${profile.firstname} ${profile.lastname}`}
+                                    {isProfileLoading ? 'Loading...' : `${profile.firstname} ${profile.lastname}`}
                                 </h2>
-                                <p className="text-sm text-gray-500">@{profile.username}</p>
-                                <div className="mt-2">
+                                <p className="text-sm text-gray-500 italic">@{profile.username}</p>
+                                <div className="mt-3">
                                     <span className={`inline-block px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${
                                         normalizeRole(profile.role) === 'admin' 
                                             ? 'bg-indigo-100 text-indigo-700' 
@@ -116,7 +113,7 @@ export default function AccountSettingsForm({ user }) {
                                 </div>
                             </div>
 
-                            <div className="space-y-4 border-t pt-6">
+                            <div className="space-y-4 border-t pt-6 text-left">
                                 <ProfileItem icon={<FaEnvelope className="text-gray-400" />} label="Email Address" value={profile.email} />
                                 <ProfileItem icon={<FaIdBadge className="text-gray-400" />} label="Full Name" value={`${profile.firstname} ${profile.middle_name} ${profile.lastname}`} />
                                 <ProfileItem icon={<FaCalendarAlt className="text-gray-400" />} label="Birthday" value={profile.birthdate ? new Date(profile.birthdate).toLocaleDateString() : 'Not Set'} />
@@ -125,16 +122,16 @@ export default function AccountSettingsForm({ user }) {
                     </div>
                 </div>
 
-                {/* --- MAIN CONTENT: CHANGE PASSWORD --- */}
+                {/* --- MAIN CONTENT: SECURITY --- */}
                 <div className="w-full lg:w-2/3">
-                    <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-200">
+                    <div className="bg-white p-6 lg:p-8 rounded-2xl shadow-sm border border-gray-200">
                         <div className="mb-8">
                             <h2 className="text-2xl font-bold text-gray-800">Security Settings</h2>
-                            <p className="text-gray-500 mt-1">Update your password to keep your account secure.</p>
+                            <p className="text-gray-500 mt-1">Change your password to keep your account safe.</p>
                         </div>
 
                         {message && (
-                            <div className={`mb-6 p-4 rounded-xl flex items-start gap-3 border ${
+                            <div className={`mb-6 p-4 rounded-xl flex items-start gap-3 border transition-all ${
                                 message.type === 'success' ? 'bg-green-50 border-green-200 text-green-800' : 'bg-red-50 border-red-200 text-red-800'
                             }`}>
                                 {message.type === 'success' ? <FaCheckCircle className="mt-1" /> : <FaExclamationCircle className="mt-1" />}
@@ -151,6 +148,7 @@ export default function AccountSettingsForm({ user }) {
                                     onChange={(e) => setOldPassword(e.target.value)}
                                     icon={<FaKey />}
                                     disabled={isLoading}
+                                    placeholder="••••••••"
                                 />
                             </div>
                             
@@ -161,30 +159,33 @@ export default function AccountSettingsForm({ user }) {
                                 onChange={(e) => setNewPassword(e.target.value)}
                                 icon={<FaLock />}
                                 disabled={isLoading}
-                                helper="Min. 8 characters"
+                                showStrength={true}
+                                placeholder="Min. 8 characters"
                             />
 
                             <PasswordField 
-                                label="Confirm New Password" 
+                                label="Confirm Password" 
                                 id="confirmPassword"
                                 value={confirmPassword}
                                 onChange={(e) => setConfirmPassword(e.target.value)}
                                 icon={<FaLock />}
                                 disabled={isLoading}
+                                isMatching={isMatching}
+                                placeholder="Repeat new password"
                             />
 
                             <div className="md:col-span-2 pt-4">
                                 <button
                                     type="submit"
                                     disabled={isLoading || !isFormValid}
-                                    className={`w-full md:w-max px-8 py-3 rounded-xl font-bold text-white transition-all shadow-lg flex items-center justify-center gap-2 ${
+                                    className={`w-full md:w-max px-10 py-3.5 rounded-xl font-bold text-white transition-all shadow-lg flex items-center justify-center gap-3 ${
                                         isLoading || !isFormValid 
                                             ? 'bg-gray-300 cursor-not-allowed shadow-none' 
-                                            : 'bg-teal-600 hover:bg-teal-700 hover:-translate-y-0.5 active:translate-y-0'
+                                            : 'bg-teal-600 hover:bg-teal-700 hover:-translate-y-0.5 active:translate-y-0 shadow-teal-600/20'
                                     }`}
                                 >
                                     {isLoading ? <FaSpinner className="animate-spin" /> : <FaSave />}
-                                    {isLoading ? 'Processing...' : 'Update Password'}
+                                    {isLoading ? 'Updating...' : 'Save New Password'}
                                 </button>
                             </div>
                         </form>
@@ -195,32 +196,71 @@ export default function AccountSettingsForm({ user }) {
     );
 }
 
-// --- Specialized Password Field with Toggle ---
-function PasswordField({ label, icon, helper, ...props }) {
+// --- Specialized Components ---
+
+function PasswordField({ label, icon, value, showStrength, isMatching, ...props }) {
     const [showPassword, setShowPassword] = useState(false);
+
+    const strength = useMemo(() => {
+        if (!showStrength || !value) return null;
+        let score = 0;
+        if (value.length >= 8) score++;
+        if (/[A-Z]/.test(value) && /[a-z]/.test(value)) score++;
+        if (/[0-9]/.test(value)) score++;
+        if (/[^A-Za-z0-9]/.test(value)) score++;
+
+        const levels = [
+            { label: 'Weak', color: 'bg-red-400', width: '25%' },
+            { label: 'Fair', color: 'bg-orange-400', width: '50%' },
+            { label: 'Good', color: 'bg-blue-400', width: '75%' },
+            { label: 'Strong', color: 'bg-green-500', width: '100%' },
+        ];
+        return score > 0 ? levels[score - 1] : { label: 'Too short', color: 'bg-gray-200', width: '10%' };
+    }, [value, showStrength]);
 
     return (
         <div className="space-y-2">
-            <label className="text-sm font-bold text-gray-700 flex items-center gap-2" htmlFor={props.id}>
-                <span className="text-teal-600">{icon}</span>
-                {label}
-            </label>
+            <div className="flex justify-between items-center">
+                <label className="text-sm font-bold text-gray-700 flex items-center gap-2" htmlFor={props.id}>
+                    <span className="text-teal-600">{icon}</span>
+                    {label}
+                </label>
+                {isMatching && (
+                    <span className="text-green-600 text-[10px] font-bold uppercase flex items-center gap-1">
+                        <FaCheck /> Matches
+                    </span>
+                )}
+            </div>
+            
             <div className="relative group">
                 <input
                     {...props}
+                    value={value}
                     type={showPassword ? "text" : "password"}
-                    className="w-full pl-4 pr-12 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 outline-none transition-all placeholder:text-gray-400 disabled:opacity-50"
+                    className="w-full pl-4 pr-12 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 outline-none transition-all placeholder:text-gray-300"
                 />
                 <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
                     className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-teal-600 transition-colors focus:outline-none"
-                    aria-label={showPassword ? "Hide password" : "Show password"}
                 >
                     {showPassword ? <FaEyeSlash size={18} /> : <FaEye size={18} />}
                 </button>
             </div>
-            {helper && <p className="text-xs text-gray-400">{helper}</p>}
+
+            {showStrength && value.length > 0 && (
+                <div className="mt-2">
+                    <div className="h-1.5 w-full bg-gray-100 rounded-full overflow-hidden">
+                        <div 
+                            className={`h-full transition-all duration-500 ${strength.color}`}
+                            style={{ width: strength.width }}
+                        />
+                    </div>
+                    <p className="text-[10px] font-bold text-gray-400 uppercase mt-1 tracking-tighter">
+                        Strength: <span className="text-gray-600">{strength.label}</span>
+                    </p>
+                </div>
+            )}
         </div>
     );
 }
@@ -228,10 +268,10 @@ function PasswordField({ label, icon, helper, ...props }) {
 function ProfileItem({ icon, label, value }) {
     return (
         <div className="flex items-start gap-3">
-            <div className="mt-1">{icon}</div>
-            <div>
-                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">{label}</p>
-                <p className="text-sm text-gray-700 font-medium break-all leading-tight">{value || 'N/A'}</p>
+            <div className="mt-1 text-sm">{icon}</div>
+            <div className="overflow-hidden">
+                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest leading-none mb-1">{label}</p>
+                <p className="text-sm text-gray-700 font-semibold truncate">{value || 'Not Provided'}</p>
             </div>
         </div>
     );
