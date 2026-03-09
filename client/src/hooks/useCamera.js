@@ -1,6 +1,6 @@
 // src/hooks/useCamera.js
-import { useState, useEffect, useCallback } from 'react';
-import io from 'socket.io-client';
+import { useState, useEffect } from 'react';
+import { socket } from '../services/socket.js';
 
 /**
  * WebSocket hook to handle connecting to the Flask-SocketIO server 
@@ -12,42 +12,37 @@ export const useCameraSocket = () => {
     const [isConnected, setIsConnected] = useState(false);
 
     useEffect(() => {
-        const socket = io('http://127.0.0.1:5000', {
-        transports: ['websocket'],
-        path: '/socket.io'
-        });
-
-        socket.on('connect', () => {
-            console.log('SocketIO: Connected to Flask server');
+        const handleConnect = () => {
+            console.log('SocketIO: Connected to server');
             setIsConnected(true);
-        });
-
-        socket.on('disconnect', () => {
-            console.log('SocketIO: Disconnected from Flask server');
+        };
+        const handleDisconnect = () => {
+            console.log('SocketIO: Disconnected from server');
             setIsConnected(false);
-        });
+        };
 
-        // 1. Video Frame Stream
-        socket.on('camera_frame', (data) => {
+        const handleFrame = (data) => {
             setCameraData(prev => ({
                 ...prev,
                 [data.cam_id]: data.frame
             }));
-        });
+        };
 
-        // 2. Incident Alert Stream
-        socket.on('incident_alert', (alert) => {
+        const handleIncident = (alert) => {
             console.warn('INCIDENT ALERT RECEIVED:', alert);
             setIncidents(prev => [alert, ...prev].slice(0, 10)); // Prepend and cap list
-        });
+        };
 
-        socket.on('connect_error', (err) => {
-            console.error('SocketIO Connection Error:', err);
-        });
+        socket.on('connect', handleConnect);
+        socket.on('disconnect', handleDisconnect);
+        socket.on('camera_frame', handleFrame);
+        socket.on('incident_alert', handleIncident);
 
         return () => {
-            console.log('SocketIO: Cleaning up socket connection...');
-            socket.disconnect();
+            socket.off('connect', handleConnect);
+            socket.off('disconnect', handleDisconnect);
+            socket.off('camera_frame', handleFrame);
+            socket.off('incident_alert', handleIncident);
         };
     }, []); // Empty dependency array = runs once on mount
 
