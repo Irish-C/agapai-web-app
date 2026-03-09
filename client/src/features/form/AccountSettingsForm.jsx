@@ -1,30 +1,25 @@
 // src/components/AccountSettingsForm.jsx
 import React, { useState, useEffect } from 'react';
-import { FaLock, FaKey, FaSave, FaSpinner, FaCheckCircle, FaExclamationCircle, FaUser } from 'react-icons/fa';
-import { fetchApi, fetchUserProfile, changePassword } from '../../services/apiService'; 
-
+import { 
+    FaLock, FaKey, FaSave, FaSpinner, FaCheckCircle, 
+    FaExclamationCircle, FaUser, FaEnvelope, FaIdBadge, 
+    FaCalendarAlt, FaEye, FaEyeSlash 
+} from 'react-icons/fa';
+import { fetchUserProfile, changePassword } from '../../services/apiService'; 
 import { normalizeRole, displayRole } from '../../utils/roleUtils.js';
 
-// Define default structure for loading state fallback
 const initialProfileState = { 
-    firstname: 'Loading', 
-    middle_name: '', 
-    lastname: '...', 
-    username: 'Loading ...', 
-    email: 'Loading ...', 
-    birthdate: null,
-    role: 'Loading ...' 
+    firstname: '', middle_name: '', lastname: '', 
+    username: '', email: '', birthdate: null, role: '' 
 };
 
-// Component for Account Settings Form
 export default function AccountSettingsForm({ user }) {
-    // Profile state
     const [profile, setProfile] = useState(() => ({
         ...initialProfileState,
-        username: user?.username || initialProfileState.username,
-        role: normalizeRole(user?.role) || initialProfileState.role,
+        username: user?.username || 'Loading...',
+        role: normalizeRole(user?.role) || 'User',
     }));
-    // Loading state for profile fetch
+    
     const [isProfileLoading, setIsProfileLoading] = useState(true);
     const [oldPassword, setOldPassword] = useState('');
     const [newPassword, setNewPassword] = useState('');
@@ -32,52 +27,25 @@ export default function AccountSettingsForm({ user }) {
     const [isLoading, setIsLoading] = useState(false);
     const [message, setMessage] = useState(null); 
 
-
-    // --- Effect to Fetch User Profile Details on Mount ---
     useEffect(() => {
-        // Guard clause (only execute if user object has the necessary ID)
-        if (!user || !user.userId) {
+        if (!user?.userId) {
             setIsProfileLoading(false);
             return;
         }
 
-        // Async function to load profile data
         const loadProfile = async () => {
             setIsProfileLoading(true);
-            let data = null; // Declare data outside try/catch for scope stability
-
             try {
-                // FIX 1: Revert to using the secure JWT-based endpoint (no userId argument)
-                data = await fetchUserProfile();
-                
-                if (!data || typeof data.username === 'undefined') {
-                    throw new Error('API returned empty or invalid profile structure.');
+                const data = await fetchUserProfile();
+                if (data) {
+                    setProfile({
+                        ...data,
+                        role: normalizeRole(user.role) || normalizeRole(data.role),
+                    });
                 }
-                
-                // SUCCESS PATH
-                setProfile({
-                ...user, 
-                ...data, 
-                firstname: data.firstname || 'N/A', 
-                middle_name: data.middle_name || '',
-                lastname: data.lastname || 'User',
-                username: user.username, 
-                email: data.email || 'N/A',
-                birthdate: data.birthdate || null,
-                role: normalizeRole(user.role) || normalizeRole(data.role) || initialProfileState.role,
-            });
-
             } catch (error) {
-                console.error("PROFILE LOAD CRASH/FAIL:", error.message);
-                
-                // RECOVERY: Use guaranteed data from props and display generic error
-                setProfile({
-                    username: user.username || 'N/A', 
-                    role: normalizeRole(user.role) || 'user',
-                    firstname: user.firstname || 'N/A',
-                    lastname: user.lastname || 'User',
-                });
-                setMessage({ type: 'error', text: 'Failed to load user data. Please relogin.' });
+                console.error("Profile Load Error:", error);
+                setMessage({ type: 'error', text: 'Failed to sync profile data.' });
             } finally {
                 setIsProfileLoading(false);
             }
@@ -86,201 +54,184 @@ export default function AccountSettingsForm({ user }) {
         loadProfile();
     }, [user]);
 
-const handleSubmit = async (e) => {
+    const handleSubmit = async (e) => {
         e.preventDefault();
         setMessage(null);
         
-        // 1. Frontend validation
         if (newPassword.length < 8) {
-            setMessage({ type: 'error', text: 'New password must be at least 8 characters long.' });
+            setMessage({ type: 'error', text: 'Password must be at least 8 characters.' });
             return;
         }
         if (newPassword !== confirmPassword) {
-            setMessage({ type: 'error', text: 'New password and confirmation password do not match.' });
+            setMessage({ type: 'error', text: 'Passwords do not match.' });
             return;
         }
 
         setIsLoading(true);
-
         try {
-            // 2. Call the REAL backend API service
             const result = await changePassword(oldPassword, newPassword);
-
             if (result.status === 'success') {
-                setMessage({ type: 'success', text: result.message + " Please log in again with your new password." });
-                setOldPassword('');
-                setNewPassword('');
-                setConfirmPassword('');
-            } else {
-                setMessage({ type: 'error', text: result.message || 'Password update failed.' });
+                setMessage({ type: 'success', text: "Success! Please log in again with your new password." });
+                setOldPassword(''); setNewPassword(''); setConfirmPassword('');
             }
-
         } catch (error) {
-            console.error("Password submission error:", error);
-            
-            // Use the error.message thrown by fetchApi (which contains the server's reason)
-            const errorText = error.message.includes("Invalid current password") 
-                ? "The current password you provided is incorrect." // Specific user-friendly override
-                : error.message || 'An unknown network error occurred.';
-                
-            setMessage({ type: 'error', text: errorText });
+            setMessage({ type: 'error', text: error.message || 'Update failed.' });
         } finally {
             setIsLoading(false);
         }
     };
-    // Form validation state
-    const isFormValid = oldPassword && newPassword && confirmPassword && newPassword === confirmPassword && !isProfileLoading;
+
+    const isFormValid = oldPassword && newPassword && confirmPassword && newPassword === confirmPassword;
 
     return (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            
-            {/* --------------------------------- 1. PROFILE INFORMATION --------------------------------- */}
-            <div className="bg-white p-6 rounded-xl shadow-md border border-gray-100">
-                <h2 className="text-xl font-semibold text-gray-800 flex items-center mb-4 border-b pb-2">
-                    <FaUser className="mr-2 text-indigo-500" />
-                    User Profile
-                </h2>
+        <div className="max-w-6xl mx-auto p-4 lg:p-8">
+            <div className="flex flex-col lg:flex-row gap-8">
                 
-                {isProfileLoading ? (
-                    <div className="text-center py-4 text-gray-500 flex items-center justify-center">
-                         <FaSpinner className="animate-spin mr-2" /> Loading profile details...
+                {/* --- SIDEBAR: PROFILE INFO --- */}
+                <div className="w-full lg:w-1/3 space-y-6">
+                    <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+                        <div className="h-24 bg-gradient-to-r from-indigo-500 to-teal-500"></div>
+                        <div className="px-6 pb-6">
+                            <div className="relative -mt-12 mb-4 text-center">
+                                <div className="h-24 w-24 bg-white p-1 rounded-full shadow-md inline-block">
+                                    <div className="h-full w-full bg-gray-100 rounded-full flex items-center justify-center text-gray-400">
+                                        <FaUser size={40} />
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="text-center mb-6">
+                                <h2 className="text-xl font-bold text-gray-800">
+                                    {isProfileLoading ? '...' : `${profile.firstname} ${profile.lastname}`}
+                                </h2>
+                                <p className="text-sm text-gray-500">@{profile.username}</p>
+                                <div className="mt-2">
+                                    <span className={`inline-block px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${
+                                        normalizeRole(profile.role) === 'admin' 
+                                            ? 'bg-indigo-100 text-indigo-700' 
+                                            : 'bg-teal-100 text-teal-700'
+                                    }`}>
+                                        {displayRole(profile.role)}
+                                    </span>
+                                </div>
+                            </div>
+
+                            <div className="space-y-4 border-t pt-6">
+                                <ProfileItem icon={<FaEnvelope className="text-gray-400" />} label="Email Address" value={profile.email} />
+                                <ProfileItem icon={<FaIdBadge className="text-gray-400" />} label="Full Name" value={`${profile.firstname} ${profile.middle_name} ${profile.lastname}`} />
+                                <ProfileItem icon={<FaCalendarAlt className="text-gray-400" />} label="Birthday" value={profile.birthdate ? new Date(profile.birthdate).toLocaleDateString() : 'Not Set'} />
+                            </div>
+                        </div>
                     </div>
-                ) : (
-                    <div className="space-y-2 text-sm text-gray-700">
-                        {/* Displaying Full Name */}
-                        <div className="flex justify-between">
-                            <span className="font-medium">Full Name:</span>
-                            <span>{profile.firstname} {profile.middle_name} {profile.lastname}</span> 
+                </div>
+
+                {/* --- MAIN CONTENT: CHANGE PASSWORD --- */}
+                <div className="w-full lg:w-2/3">
+                    <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-200">
+                        <div className="mb-8">
+                            <h2 className="text-2xl font-bold text-gray-800">Security Settings</h2>
+                            <p className="text-gray-500 mt-1">Update your password to keep your account secure.</p>
                         </div>
-                        <div className="flex justify-between">
-                            <span className="font-medium">Username:</span>
-                            <span>{profile.username}</span>
-                        </div>
-                        <div className="flex justify-between">
-                            <span className="font-medium">Your Role:</span>
-                            <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
-                                normalizeRole(profile.role) === 'admin' ? 'bg-indigo-100 text-indigo-800' : 'bg-green-100 text-green-800'
+
+                        {message && (
+                            <div className={`mb-6 p-4 rounded-xl flex items-start gap-3 border ${
+                                message.type === 'success' ? 'bg-green-50 border-green-200 text-green-800' : 'bg-red-50 border-red-200 text-red-800'
                             }`}>
-                                {displayRole(profile.role)}
-                            </span>
-                        </div>
-                        <div className="flex justify-between">
-                            <span className="font-medium">Email:</span>
-                            <span>{profile.email}</span>
-                        </div>
-                        <div className="flex justify-between">
-                            <span className="font-medium">Date of Birth:</span>
-                            <span>{profile.birthdate ? new Date(profile.birthdate).toLocaleDateString() : 'N/A'}</span>
-                        </div>
-                    </div>
-                )}
-            </div>
-
-            {/* --------------------------------- 2. CHANGE PASSWORD FORM --------------------------------- */}
-            <div className="bg-white p-6 rounded-xl shadow-md border border-gray-100">
-                <h2 className="text-xl font-semibold text-gray-800 flex items-center mb-4 border-b pb-2">
-                    <FaLock className="mr-2 text-red-500" />
-                    Change Password
-                </h2>
-                <p className="text-sm text-gray-500 mb-6">
-                    For security, you must provide your current password to set a new one.
-                </p>
-
-                {/* Status Message Display */}
-                {message && (
-                    <div 
-                        className={`mb-4 p-3 rounded-lg flex items-center text-sm ${
-                            message.type === 'success' 
-                                ? 'bg-green-100 text-green-700 border border-green-300' 
-                                : 'bg-red-100 text-red-700 border border-red-300'
-                        }`}
-                    >
-                        {message.type === 'success' ? <FaCheckCircle className="mr-2" /> : <FaExclamationCircle className="mr-2" />}
-                        {message.text}
-                    </div>
-                )}
-
-                <form onSubmit={handleSubmit} className="space-y-4">
-                    
-                    {/* 1. OLD PASSWORD FIELD */}
-                    <div>
-                        <label className="block text-gray-700 text-sm font-medium mb-2" htmlFor="oldPassword">
-                            <FaKey className="inline mr-1 text-teal-600" />
-                            Current Password
-                        </label>
-                        <input
-                            type="password"
-                            id="oldPassword"
-                            value={oldPassword}
-                            onChange={(e) => setOldPassword(e.target.value)}
-                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-teal-500 focus:border-teal-500 transition duration-150"
-                            placeholder="Enter old password"
-                            required
-                            disabled={isLoading}
-                        />
-                    </div>
-                    
-                    {/* 2. NEW PASSWORD FIELD */}
-                    <div>
-                        <label className="block text-gray-700 text-sm font-medium mb-2" htmlFor="newPassword">
-                            <FaLock className="inline mr-1 text-teal-600" />
-                            New Password (min 8 characters)
-                        </label>
-                        <input
-                            type="password"
-                            id="newPassword"
-                            value={newPassword}
-                            onChange={(e) => setNewPassword(e.target.value)}
-                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-teal-500 focus:border-teal-500 transition duration-150"
-                            placeholder="Enter new password"
-                            minLength={8}
-                            required
-                            disabled={isLoading}
-                        />
-                    </div>
-
-                    {/* 3. CONFIRM NEW PASSWORD FIELD */}
-                    <div>
-                        <label className="block text-gray-700 text-sm font-medium mb-2" htmlFor="confirmPassword">
-                            <FaLock className="inline mr-1 text-teal-600" />
-                            Confirm New Password
-                        </label>
-                        <input
-                            type="password"
-                            id="confirmPassword"
-                            value={confirmPassword}
-                            onChange={(e) => setConfirmPassword(e.target.value)}
-                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-teal-500 focus:border-teal-500 transition duration-150"
-                            placeholder="Confirm new password"
-                            minLength={8}
-                            required
-                            disabled={isLoading}
-                        />
-                    </div>
-
-                    {/* Submission Button */}
-                    <button
-                        type="submit"
-                        disabled={isLoading || !isFormValid}
-                        className={`w-full flex items-center justify-center py-2.5 px-4 rounded-lg font-semibold text-white transition duration-300 shadow-md ${
-                            isLoading || !isFormValid 
-                                ? 'bg-gray-400 cursor-not-allowed' 
-                                : 'bg-teal-600 hover:bg-teal-700'
-                        }`}
-                    >
-                        {isLoading ? (
-                            <>
-                                <FaSpinner className="animate-spin mr-2" />
-                                Updating...
-                            </>
-                        ) : (
-                            <>
-                                <FaSave className="mr-2" />
-                                Save New Password
-                            </>
+                                {message.type === 'success' ? <FaCheckCircle className="mt-1" /> : <FaExclamationCircle className="mt-1" />}
+                                <span className="text-sm font-medium">{message.text}</span>
+                            </div>
                         )}
-                    </button>
-                </form>
+
+                        <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div className="md:col-span-2">
+                                <PasswordField 
+                                    label="Current Password" 
+                                    id="oldPassword"
+                                    value={oldPassword}
+                                    onChange={(e) => setOldPassword(e.target.value)}
+                                    icon={<FaKey />}
+                                    disabled={isLoading}
+                                />
+                            </div>
+                            
+                            <PasswordField 
+                                label="New Password" 
+                                id="newPassword"
+                                value={newPassword}
+                                onChange={(e) => setNewPassword(e.target.value)}
+                                icon={<FaLock />}
+                                disabled={isLoading}
+                                helper="Min. 8 characters"
+                            />
+
+                            <PasswordField 
+                                label="Confirm New Password" 
+                                id="confirmPassword"
+                                value={confirmPassword}
+                                onChange={(e) => setConfirmPassword(e.target.value)}
+                                icon={<FaLock />}
+                                disabled={isLoading}
+                            />
+
+                            <div className="md:col-span-2 pt-4">
+                                <button
+                                    type="submit"
+                                    disabled={isLoading || !isFormValid}
+                                    className={`w-full md:w-max px-8 py-3 rounded-xl font-bold text-white transition-all shadow-lg flex items-center justify-center gap-2 ${
+                                        isLoading || !isFormValid 
+                                            ? 'bg-gray-300 cursor-not-allowed shadow-none' 
+                                            : 'bg-teal-600 hover:bg-teal-700 hover:-translate-y-0.5 active:translate-y-0'
+                                    }`}
+                                >
+                                    {isLoading ? <FaSpinner className="animate-spin" /> : <FaSave />}
+                                    {isLoading ? 'Processing...' : 'Update Password'}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+// --- Specialized Password Field with Toggle ---
+function PasswordField({ label, icon, helper, ...props }) {
+    const [showPassword, setShowPassword] = useState(false);
+
+    return (
+        <div className="space-y-2">
+            <label className="text-sm font-bold text-gray-700 flex items-center gap-2" htmlFor={props.id}>
+                <span className="text-teal-600">{icon}</span>
+                {label}
+            </label>
+            <div className="relative group">
+                <input
+                    {...props}
+                    type={showPassword ? "text" : "password"}
+                    className="w-full pl-4 pr-12 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 outline-none transition-all placeholder:text-gray-400 disabled:opacity-50"
+                />
+                <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-teal-600 transition-colors focus:outline-none"
+                    aria-label={showPassword ? "Hide password" : "Show password"}
+                >
+                    {showPassword ? <FaEyeSlash size={18} /> : <FaEye size={18} />}
+                </button>
+            </div>
+            {helper && <p className="text-xs text-gray-400">{helper}</p>}
+        </div>
+    );
+}
+
+function ProfileItem({ icon, label, value }) {
+    return (
+        <div className="flex items-start gap-3">
+            <div className="mt-1">{icon}</div>
+            <div>
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">{label}</p>
+                <p className="text-sm text-gray-700 font-medium break-all leading-tight">{value || 'N/A'}</p>
             </div>
         </div>
     );
