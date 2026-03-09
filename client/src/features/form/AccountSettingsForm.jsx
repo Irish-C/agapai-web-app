@@ -14,6 +14,7 @@ const initialProfileState = {
 };
 
 export default function AccountSettingsForm({ user }) {
+    // --- State Management ---
     const [profile, setProfile] = useState(() => ({
         ...initialProfileState,
         username: user?.username || 'Loading...',
@@ -26,7 +27,9 @@ export default function AccountSettingsForm({ user }) {
     const [confirmPassword, setConfirmPassword] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [message, setMessage] = useState(null); 
+    const [countdown, setCountdown] = useState(null);
 
+    // --- Profile Fetching ---
     useEffect(() => {
         if (!user?.userId) {
             setIsProfileLoading(false);
@@ -54,13 +57,13 @@ export default function AccountSettingsForm({ user }) {
         loadProfile();
     }, [user]);
 
+    // --- Validation Logic ---
     const isMatching = newPassword && confirmPassword && newPassword === confirmPassword;
-    
-    // Updated validation: 8+ chars, a number, and a special char
     const hasNumber = /[0-9]/.test(newPassword);
     const hasSpecial = /[^A-Za-z0-9]/.test(newPassword);
     const isFormValid = oldPassword && newPassword.length >= 8 && hasNumber && hasSpecial && isMatching;
 
+    // --- Submit & Redirect Logic ---
     const handleSubmit = async (e) => {
         e.preventDefault();
         setMessage(null);
@@ -70,8 +73,27 @@ export default function AccountSettingsForm({ user }) {
         try {
             const result = await changePassword(oldPassword, newPassword);
             if (result.status === 'success') {
-                setMessage({ type: 'success', text: "Password updated! Please log in again." });
-                setOldPassword(''); setNewPassword(''); setConfirmPassword('');
+                setMessage({ type: 'success', text: "Password changed! Logging out in..." });
+                
+                // Clear inputs
+                setOldPassword('');
+                setNewPassword('');
+                setConfirmPassword('');
+
+                // Start 3-second countdown
+                let timer = 3;
+                setCountdown(timer);
+                
+                const interval = setInterval(() => {
+                    timer -= 1;
+                    setCountdown(timer);
+                    if (timer <= 0) {
+                        clearInterval(interval);
+                        // TRIGGER LOGOUT
+                        localStorage.removeItem('token'); // Adjust based on your auth storage
+                        window.location.href = '/login'; 
+                    }
+                }, 1000);
             }
         } catch (error) {
             setMessage({ type: 'error', text: error.message || 'Update failed.' });
@@ -81,13 +103,13 @@ export default function AccountSettingsForm({ user }) {
     };
 
     return (
-        <div className="max-w-6xl mx-auto p-4 lg:p-8">
+        <div className="max-w-6xl mx-auto p-4 lg:p-8 animate-in fade-in duration-500">
             <div className="flex flex-col lg:flex-row gap-8">
                 
                 {/* --- SIDEBAR: PROFILE INFO --- */}
                 <div className="w-full lg:w-1/3 space-y-6">
                     <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
-                        <div className="h-24 bg-gradient-to-r from-indigo-500 to-teal-500"></div>
+                        <div className="h-24 bg-gradient-to-r from-indigo-600 to-teal-500"></div>
                         <div className="px-6 pb-6 text-center">
                             <div className="relative -mt-12 mb-4 inline-block">
                                 <div className="h-24 w-24 bg-white p-1 rounded-full shadow-md">
@@ -99,7 +121,7 @@ export default function AccountSettingsForm({ user }) {
 
                             <div className="mb-6">
                                 <h2 className="text-xl font-bold text-gray-800">
-                                    {isProfileLoading ? 'Loading...' : `${profile.firstname} ${profile.lastname}`}
+                                    {isProfileLoading ? '...' : `${profile.firstname} ${profile.lastname}`}
                                 </h2>
                                 <p className="text-sm text-gray-500 italic">@{profile.username}</p>
                                 <div className="mt-3">
@@ -125,16 +147,60 @@ export default function AccountSettingsForm({ user }) {
                     <div className="bg-white p-6 lg:p-8 rounded-2xl shadow-sm border border-gray-200">
                         <div className="mb-8">
                             <h2 className="text-2xl font-bold text-gray-800">Security Settings</h2>
-                            <p className="text-gray-500 mt-1">Update your password to keep your account secure.</p>
+                            <p className="text-gray-500 mt-1">Keep your account safe by using a strong password.</p>
                         </div>
 
                         {message && (
-                            <div className={`mb-6 p-4 rounded-xl flex items-start gap-3 border ${
-                                message.type === 'success' ? 'bg-green-50 border-green-200 text-green-800' : 'bg-red-50 border-red-200 text-red-800'
-                            }`}>
-                                {message.type === 'success' ? <FaCheckCircle className="mt-1" /> : <FaExclamationCircle className="mt-1" />}
-                                <span className="text-sm font-medium">{message.text}</span>
-                            </div>
+    <div className={`mb-6 p-4 rounded-xl flex items-center justify-between border shadow-sm transition-all duration-300 ${
+        message.type === 'success' 
+            ? 'bg-green-50 border-green-200 text-green-800 animate-in slide-in-from-top-2' 
+            : 'bg-red-50 border-red-200 text-red-800 animate-shake'
+    }`}>
+        <div className="flex items-start gap-3">
+            <div className="mt-0.5">
+                {message.type === 'success' ? (
+                    <FaCheckCircle className="text-green-500 text-lg" />
+                ) : (
+                    <FaExclamationCircle className="text-red-500 text-lg" />
+                )}
+            </div>
+            <div>
+                <p className="text-sm font-bold leading-tight">
+                    {message.type === 'success' ? 'Update Successful' : 'Update Failed'}
+                </p>
+                <p className="text-xs opacity-90 mt-0.5">{message.text}</p>
+            </div>
+        </div>
+
+        {/* The Countdown Ring */}
+        {countdown !== null && (
+            <div className="relative flex items-center justify-center h-10 w-10">
+                <svg className="absolute h-full w-full -rotate-90">
+                    <circle
+                        cx="20"
+                        cy="20"
+                        r="16"
+                        stroke="currentColor"
+                        strokeWidth="3"
+                        fill="transparent"
+                        className="text-green-200"
+                    />
+                    <circle
+                        cx="20"
+                        cy="20"
+                        r="16"
+                        stroke="currentColor"
+                        strokeWidth="3"
+                        fill="transparent"
+                        strokeDasharray="100"
+                        strokeDashoffset={100 - (countdown * 33.3)}
+                        className="text-green-600 transition-all duration-1000"
+                    />
+                </svg>
+                <span className="text-[10px] font-black text-green-700">{countdown}s</span>
+            </div>
+        )}
+    </div>
                         )}
 
                         <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -145,7 +211,7 @@ export default function AccountSettingsForm({ user }) {
                                     value={oldPassword}
                                     onChange={(e) => setOldPassword(e.target.value)}
                                     icon={<FaKey />}
-                                    disabled={isLoading}
+                                    disabled={isLoading || countdown !== null}
                                     placeholder="Enter current password"
                                 />
                             </div>
@@ -156,7 +222,7 @@ export default function AccountSettingsForm({ user }) {
                                 value={newPassword}
                                 onChange={(e) => setNewPassword(e.target.value)}
                                 icon={<FaLock />}
-                                disabled={isLoading}
+                                disabled={isLoading || countdown !== null}
                                 showRequirements={true}
                                 placeholder="Min. 8 characters"
                             />
@@ -167,7 +233,7 @@ export default function AccountSettingsForm({ user }) {
                                 value={confirmPassword}
                                 onChange={(e) => setConfirmPassword(e.target.value)}
                                 icon={<FaLock />}
-                                disabled={isLoading}
+                                disabled={isLoading || countdown !== null}
                                 isMatching={isMatching}
                                 placeholder="Repeat new password"
                             />
@@ -175,9 +241,9 @@ export default function AccountSettingsForm({ user }) {
                             <div className="md:col-span-2 pt-4">
                                 <button
                                     type="submit"
-                                    disabled={isLoading || !isFormValid}
+                                    disabled={isLoading || !isFormValid || countdown !== null}
                                     className={`w-full md:w-max px-10 py-3.5 rounded-xl font-bold text-white transition-all shadow-lg flex items-center justify-center gap-3 ${
-                                        isLoading || !isFormValid 
+                                        isLoading || !isFormValid || countdown !== null
                                             ? 'bg-gray-300 cursor-not-allowed shadow-none' 
                                             : 'bg-teal-600 hover:bg-teal-700 hover:-translate-y-0.5 active:translate-y-0 shadow-teal-600/20'
                                     }`}
@@ -218,13 +284,13 @@ function PasswordField({ label, icon, value, showRequirements, isMatching, ...pr
 
     return (
         <div className="space-y-3">
-            <div className="flex justify-between items-center">
+            <div className="flex justify-between items-center px-1">
                 <label className="text-sm font-bold text-gray-700 flex items-center gap-2" htmlFor={props.id}>
                     <span className="text-teal-600">{icon}</span>
                     {label}
                 </label>
                 {isMatching && (
-                    <span className="text-green-600 text-[10px] font-bold uppercase flex items-center gap-1">
+                    <span className="text-green-600 text-[10px] font-bold uppercase flex items-center gap-1 animate-pulse">
                         <FaCheck /> Matches
                     </span>
                 )}
@@ -235,7 +301,7 @@ function PasswordField({ label, icon, value, showRequirements, isMatching, ...pr
                     {...props}
                     value={value}
                     type={showPassword ? "text" : "password"}
-                    className="w-full pl-4 pr-12 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 outline-none transition-all placeholder:text-gray-300"
+                    className="w-full pl-4 pr-12 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 outline-none transition-all placeholder:text-gray-300 disabled:opacity-50"
                 />
                 <button
                     type="button"
@@ -247,7 +313,7 @@ function PasswordField({ label, icon, value, showRequirements, isMatching, ...pr
             </div>
 
             {showRequirements && value.length > 0 && (
-                <div className="p-4 bg-gray-50 border border-gray-100 rounded-xl space-y-3">
+                <div className="p-4 bg-gray-50 border border-gray-100 rounded-xl space-y-3 shadow-inner">
                     <div className="h-1.5 w-full bg-gray-200 rounded-full overflow-hidden">
                         <div 
                             className={`h-full transition-all duration-500 ${strength.color}`}

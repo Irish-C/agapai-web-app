@@ -34,12 +34,18 @@ export const fetchApi = async (endpoint, method = 'GET', data = null) => {
 
         // Handle 401 Unauthorized (Expired or missing token)
         if (response.status === 401) {
-            if (!endpoint.includes('/login')) {
-                console.error('fetchApi: 401 Unauthorized. Redirecting to login.');
+            const isAuthAttempt = endpoint.includes('/login');
+            const isPasswordChange = endpoint.includes('/change-password');
+
+            if (!isAuthAttempt && !isPasswordChange) {
+                console.error('fetchApi: Session expired. Redirecting to login.');
                 logoutUser(); 
                 window.location.href = '/login'; 
             }
-            throw new Error("Authentication failed or expired.");
+            
+            // Still throw the error so the Component can catch it and show "Wrong Password"
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(errorData.message || "Incorrect credentials or expired session.");
         }
 
         // Handle non-2xx responses

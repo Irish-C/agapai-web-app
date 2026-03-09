@@ -22,19 +22,44 @@ export default function LoginPage() {
         navigate('/');
     };
 
+// src/components/AccountSettingsForm.jsx
+
     const handleSubmit = async (e) => {
         e.preventDefault();
-        setError('');
+        setMessage(null);
+        if (!isFormValid) return;
+
         setIsLoading(true);
         try {
-            const result = await login(username, password);
-            if (result.success) {
-                navigate('/dashboard');
-            } else {
-                setError(result.message || 'Login failed. Invalid credentials.');
+            const result = await changePassword(oldPassword, newPassword);
+            
+            if (result.status === 'success' || result) {
+                setMessage({ type: 'success', text: "Password changed! Logging out in..." });
+                
+                // Clear inputs and start logout timer
+                setOldPassword('');
+                setNewPassword('');
+                setConfirmPassword('');
+
+                let timer = 3;
+                setCountdown(timer);
+                const interval = setInterval(() => {
+                    timer -= 1;
+                    setCountdown(timer);
+                    if (timer <= 0) {
+                        clearInterval(interval);
+                        logoutUser(); // Use your imported logout function
+                        window.location.href = '/login'; 
+                    }
+                }, 1000);
             }
-        } catch (err) {
-            setError('An unexpected error occurred during login.');
+        } catch (error) {
+            // Because fetchApi threw the error without redirecting, 
+            // we land here and the user stays logged in.
+            setMessage({ 
+                type: 'error', 
+                text: error.message || 'Failed to update password. Please check your current password.' 
+            });
         } finally {
             setIsLoading(false);
         }
