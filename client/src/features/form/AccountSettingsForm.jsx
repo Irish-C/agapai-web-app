@@ -198,16 +198,21 @@ export default function AccountSettingsForm({ user }) {
 
 // --- Specialized Components ---
 
+// 1. Updated PasswordField Component
 function PasswordField({ label, icon, value, showStrength, isMatching, ...props }) {
     const [showPassword, setShowPassword] = useState(false);
 
+    // Individual requirement checks
+    const requirements = [
+        { label: 'At least 8 characters', met: value.length >= 8 },
+        { label: 'Contains a number', met: /[0-9]/.test(value) },
+        { label: 'Uppercase & Lowercase', met: /[A-Z]/.test(value) && /[a-z]/.test(value) },
+        { label: 'Special character (!@#$%)', met: /[^A-Za-z0-9]/.test(value) },
+    ];
+
     const strength = useMemo(() => {
         if (!showStrength || !value) return null;
-        let score = 0;
-        if (value.length >= 8) score++;
-        if (/[A-Z]/.test(value) && /[a-z]/.test(value)) score++;
-        if (/[0-9]/.test(value)) score++;
-        if (/[^A-Za-z0-9]/.test(value)) score++;
+        const metCount = requirements.filter(r => r.met).length;
 
         const levels = [
             { label: 'Weak', color: 'bg-red-400', width: '25%' },
@@ -215,18 +220,18 @@ function PasswordField({ label, icon, value, showStrength, isMatching, ...props 
             { label: 'Good', color: 'bg-blue-400', width: '75%' },
             { label: 'Strong', color: 'bg-green-500', width: '100%' },
         ];
-        return score > 0 ? levels[score - 1] : { label: 'Too short', color: 'bg-gray-200', width: '10%' };
-    }, [value, showStrength]);
+        return metCount > 0 ? levels[metCount - 1] : { label: 'Too short', color: 'bg-gray-200', width: '10%' };
+    }, [value, showStrength, requirements]);
 
     return (
-        <div className="space-y-2">
+        <div className="space-y-3">
             <div className="flex justify-between items-center">
                 <label className="text-sm font-bold text-gray-700 flex items-center gap-2" htmlFor={props.id}>
                     <span className="text-teal-600">{icon}</span>
                     {label}
                 </label>
                 {isMatching && (
-                    <span className="text-green-600 text-[10px] font-bold uppercase flex items-center gap-1">
+                    <span className="text-green-600 text-[10px] font-bold uppercase flex items-center gap-1 animate-bounce">
                         <FaCheck /> Matches
                     </span>
                 )}
@@ -248,17 +253,24 @@ function PasswordField({ label, icon, value, showStrength, isMatching, ...props 
                 </button>
             </div>
 
+            {/* Live Requirement Checklist & Strength Bar */}
             {showStrength && value.length > 0 && (
-                <div className="mt-2">
-                    <div className="h-1.5 w-full bg-gray-100 rounded-full overflow-hidden">
+                <div className="p-4 bg-gray-50 border border-gray-100 rounded-xl space-y-3">
+                    <div className="h-1.5 w-full bg-gray-200 rounded-full overflow-hidden">
                         <div 
                             className={`h-full transition-all duration-500 ${strength.color}`}
                             style={{ width: strength.width }}
                         />
                     </div>
-                    <p className="text-[10px] font-bold text-gray-400 uppercase mt-1 tracking-tighter">
-                        Strength: <span className="text-gray-600">{strength.label}</span>
-                    </p>
+                    
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        {requirements.map((req, index) => (
+                            <div key={index} className={`flex items-center gap-2 text-[11px] font-medium transition-colors ${req.met ? 'text-green-600' : 'text-gray-400'}`}>
+                                {req.met ? <FaCheckCircle /> : <div className="w-3 h-3 rounded-full border-2 border-gray-200" />}
+                                {req.label}
+                            </div>
+                        ))}
+                    </div>
                 </div>
             )}
         </div>
