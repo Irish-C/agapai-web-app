@@ -45,6 +45,15 @@ async def lifespan(app: FastAPI):
     app.state.redis = redis.Redis(host='localhost', port=6379, db=0, decode_responses=False)
     print("[INFO] Connecting to Prisma DB...")
     await db.connect()
+
+    # Start the background camera stream loop (emits frames via Socket.IO)
+    # This is what powers the live stream view in the AGAPAI UI.
+    try:
+        asyncio.create_task(start_camera_processing())
+        print("[INFO] Started camera processing loop.")
+    except Exception as e:
+        print(f"[WARN] Failed to start camera processing loop: {e}")
+
     yield
     # --- Shutdown Logic ---
     print("[INFO] Closing Redis connection...")
