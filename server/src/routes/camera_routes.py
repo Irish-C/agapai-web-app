@@ -6,7 +6,7 @@ from src.controllers.camera_controller import (
     get_cameras_logic,
     create_camera_logic,
     get_camera_logic,
-    stream_camera_loop,  # Import the loop logic
+    stream_camera_loop,
     update_camera_logic,
     delete_camera_logic
 )
