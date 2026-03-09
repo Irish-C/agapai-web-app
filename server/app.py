@@ -34,8 +34,25 @@ socketio_server = socketio.AsyncServer(
     engineio_logger=True,
 )
 
-# --- 3. FASTAPI app ---
-app = FastAPI()
+# --- 3. FASTAPI app with lifespan ---
+from contextlib import asynccontextmanager
+import redis
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # --- Startup Logic ---
+    print("[INFO] Connecting to Redis...")
+    app.state.redis = redis.Redis(host='localhost', port=6379, db=0, decode_responses=False)
+    print("[INFO] Connecting to Prisma DB...")
+    await db.connect()
+    yield
+    # --- Shutdown Logic ---
+    print("[INFO] Closing Redis connection...")
+    app.state.redis.close()
+    print("[INFO] Disconnecting Prisma DB...")
+    await db.disconnect()
+
+app = FastAPI(lifespan=lifespan)
 
 @app.middleware("http")
 async def bigint_middleware(request, call_next):
@@ -56,19 +73,9 @@ app.include_router(settings_router, prefix='/api')
 app.include_router(location_router, prefix='/api')
 
 # --- 4. DB lifecycle + Camera Startup ---
-@app.on_event('startup')
-async def on_startup():
-    if not db.is_connected():
-        await db.connect()
-    
-    # Launch the background vision task
-    asyncio.create_task(start_camera_processing())
-    print("✓ AGAPAI Camera System Initialized")
-
-@app.on_event('shutdown')
-async def on_shutdown():
-    if db.is_connected():
-        await db.disconnect()
+# Startup/shutdown handled by lifespan above
+# --- 4. DB lifecycle + Camera Startup ---
+# Startup/shutdown handled by lifespan above
 
 # --- 5. Utility routes ---
 @app.post('/api/seed_db')
@@ -83,6 +90,42 @@ async def seed_db_route():
 @app.get('/health')
 async def health_check():
     return {'status': 'ok', 'database_connected': db.is_connected()}
+
+# --- 10. Admin Set Active Camera Endpoint ---
+from fastapi import Request
+@app.post('/api/set_active_camera')
+async def set_active_camera(request: Request):
+    data = await request.json()
+    camera_id = data.get('camera_id')
+    r = redis.Redis(host='localhost', port=6379, db=0)
+    r.set('active_camera_id', camera_id)
+    return {'status': 'success', 'active_camera_id': camera_id}
+
+# --- 11. Get Active Camera Endpoint ---
+@app.get('/api/get_active_camera')
+async def get_active_camera():
+    r = redis.Redis(host='localhost', port=6379, db=0)
+    camera_id = r.get('active_camera_id')
+    if camera_id:
+        camera_id = camera_id.decode()
+    return {'active_camera_id': camera_id}
+
+# --- 9. Video Feed Endpoint ---
+from fastapi import Response
+import redis
+import time
+
+@app.get('/video_feed')
+async def video_feed():
+    r = redis.Redis(host='localhost', port=6379, db=0)
+    def generate():
+        while True:
+            frame_bytes = r.get('latest_frame')
+            if frame_bytes:
+                yield (b'--frame\r\n'
+                       b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
+            time.sleep(0.03)
+    return Response(generate(), media_type='multipart/x-mixed-replace; boundary=frame')
 
 # --- 7. Static + SPA fallback ---
 _DIST_DIR = os.path.join(os.path.dirname(__file__), '../client/dist')

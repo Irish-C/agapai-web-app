@@ -84,7 +84,7 @@ async def seed_database():
         print("\nSeeding events...")
         event_types = {
             'Fall': ["Forward Fall", "Backward Fall", "Side Fall"],
-            'Inactivity': ["Low", "Moderate", "High", "Critical"],
+            'Inactivity': ["Inactive (low)", "Inactive (medium)", "Inactive (high)", "Inactive (critical)"],
         }
         
         for type_name, classes in event_types.items():

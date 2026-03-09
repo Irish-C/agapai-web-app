@@ -12,6 +12,36 @@ export default function CameraManager({ locations, onCameraUpdated }) {
     // State to track the camera being edited
     const [editingCam, setEditingCam] = useState(null);
 
+    // State for active camera selection
+    const [activeCameraId, setActiveCameraId] = useState(null);
+
+    // Fetch current active camera from backend
+    useEffect(() => {
+        const fetchActiveCamera = async () => {
+            try {
+                const res = await fetch('/api/get_active_camera');
+                const data = await res.json();
+                if (data.active_camera_id) setActiveCameraId(data.active_camera_id);
+            } catch (e) { /* ignore */ }
+        };
+        fetchActiveCamera();
+    }, []);
+
+    // Set active camera handler
+    const handleSetActiveCamera = async (cameraId) => {
+        try {
+            await fetch('/api/set_active_camera', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ camera_id: cameraId })
+            });
+            setActiveCameraId(cameraId);
+            setCamMessage({ text: 'Active camera updated!', type: 'success' });
+        } catch (error) {
+            setCamMessage({ text: 'Failed to set active camera.', type: 'error' });
+        }
+    };
+
     // --- NEW STATE FOR MODAL ---
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const [cameraToDeleteId, setCameraToDeleteId] = useState(null);
@@ -69,34 +99,6 @@ export default function CameraManager({ locations, onCameraUpdated }) {
             }
         } catch (error) {
             setCamMessage({ text: `Error: ${error.message}`, type: 'error' });
-        }
-    };
-
-    const handleDeleteCamera = (camId) => {
-        setCameraToDeleteId(camId);
-        setIsDeleteModalOpen(true);
-    };
-
-    const confirmDelete = async () => {
-        if (!cameraToDeleteId) {
-            return;
-        }
-
-        setIsDeleteModalOpen(false);
-        setCamMessage({ text: '', type: '' }); 
-
-        try {
-            const data = await fetchApi(`/cameras/${cameraToDeleteId}`, 'DELETE');
-            if (data.status === 'success') {
-                setCamMessage({ text: 'Camera removed successfully!', type: 'success' });
-                await fetchCameras();
-            } else {
-                setCamMessage({ text: `Error: ${data.message}`, type: 'error' });
-            }
-        } catch (error) {
-            setCamMessage({ text: `Error: ${error.message}`, type: 'error' });
-        } finally {
-            setCameraToDeleteId(null);
         }
     };
 
