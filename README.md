@@ -85,6 +85,11 @@ npm run dev-all
 > npm run dev-client
 > ```
 
+> To see the seeded database via a localhost:5555
+>
+> ```bash
+> npx prisma studio
+> ```
 
 # Troubleshooting (common Prisma / Postgres issues)
 
