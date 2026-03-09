@@ -3,7 +3,6 @@ import React, { useState, useContext } from 'react';
 import { AuthContext } from '../components/AuthContext.jsx';
 import { FaLock, FaSignInAlt, FaUser, FaKey, FaSpinner, FaArrowLeft, FaEye, FaEyeSlash } from 'react-icons/fa';
 import { useNavigate } from 'react-router-dom';
-import { FaChevronRight } from 'react-icons/fa';
 
 import filter_bg from '../assets/bg/filter-bg.png';
 import agapaiLogo from '../assets/logo/agapai-logo.png';

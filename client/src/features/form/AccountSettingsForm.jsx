@@ -8,8 +8,11 @@ import { normalizeRole, displayRole } from '../../utils/roleUtils.js';
 // Define default structure for loading state fallback
 const initialProfileState = { 
     firstname: 'Loading', 
+    middle_name: '', 
     lastname: '...', 
     username: 'Loading ...', 
+    email: 'Loading ...', 
+    birthdate: null,
     role: 'Loading ...' 
 };
 
@@ -53,14 +56,16 @@ export default function AccountSettingsForm({ user }) {
                 
                 // SUCCESS PATH
                 setProfile({
-                    ...user, 
-                    ...data, // Fetched data
-                    // FIX 2: Safely use fetched data, falling back to literal defaults if fetched data is null
-                    firstname: data.firstname || 'N/A', 
-                    lastname: data.lastname || 'User',
-                    username: user.username, 
-                    role: normalizeRole(user.role) || normalizeRole(data.role) || initialProfileState.role,
-                });
+                ...user, 
+                ...data, 
+                firstname: data.firstname || 'N/A', 
+                middle_name: data.middle_name || '',
+                lastname: data.lastname || 'User',
+                username: user.username, 
+                email: data.email || 'N/A',
+                birthdate: data.birthdate || null,
+                role: normalizeRole(user.role) || normalizeRole(data.role) || initialProfileState.role,
+            });
 
             } catch (error) {
                 console.error("PROFILE LOAD CRASH/FAIL:", error.message);
@@ -145,7 +150,7 @@ const handleSubmit = async (e) => {
                         {/* Displaying Full Name */}
                         <div className="flex justify-between">
                             <span className="font-medium">Full Name:</span>
-                            <span>{profile.firstname} {profile.lastname}</span> 
+                            <span>{profile.firstname} {profile.middle_name} {profile.lastname}</span> 
                         </div>
                         <div className="flex justify-between">
                             <span className="font-medium">Username:</span>
@@ -158,6 +163,14 @@ const handleSubmit = async (e) => {
                             }`}>
                                 {displayRole(profile.role)}
                             </span>
+                        </div>
+                        <div className="flex justify-between">
+                            <span className="font-medium">Email:</span>
+                            <span>{profile.email}</span>
+                        </div>
+                        <div className="flex justify-between">
+                            <span className="font-medium">Date of Birth:</span>
+                            <span>{profile.birthdate ? new Date(profile.birthdate).toLocaleDateString() : 'N/A'}</span>
                         </div>
                     </div>
                 )}

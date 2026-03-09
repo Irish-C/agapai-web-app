@@ -49,8 +49,11 @@ async def get_profile_logic(user_id):
     
     return {
         "firstname": user.firstname or 'N/A',
+        "middle_name": user.middle_name or '',
         "lastname": user.lastname or 'User',
         "username": user.username,
+        "email": user.email,
+        "birthdate": user.birthdate.isoformat() if user.birthdate else None, 
         "role": user.role.role_name if user.role else 'user'
     }, 200
 
