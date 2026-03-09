@@ -52,12 +52,19 @@ export default function CameraManager({ locations, onCameraUpdated }) {
         fetchCameras();
     }, []);
 
-    // When locations prop updates, set the default for the dropdown
+    // When locations prop updates, set the default for the add form dropdown
     useEffect(() => {
         if (locations.length > 0 && !newCam.locId) {
             setNewCam(prev => ({ ...prev, locId: locations[0].id }));
         }
     }, [locations, newCam.locId]);
+
+    // When locations become available while editing, ensure editingCam has a location selected
+    useEffect(() => {
+        if (editingCam && !editingCam.loc_id && locations.length > 0) {
+            setEditingCam(prev => ({ ...prev, loc_id: locations[0].id }));
+        }
+    }, [locations, editingCam]);
 
     const fetchCameras = async () => {
         try {
@@ -103,11 +110,19 @@ export default function CameraManager({ locations, onCameraUpdated }) {
     };
 
     const handleEditCamera = (cam) => {
+        if (!locations || locations.length === 0) {
+            setCamMessage({ text: 'Locations are still loading. Please try again shortly.', type: 'error' });
+            return;
+        }
+
+        const defaultLocId = locations[0].id;
         setEditingCam({
             ...cam,
             cam_name: cam.name,
-            stream_url: cam.stream_url || '', 
-            loc_id: cam.location_id
+            stream_url: cam.stream_url || '',
+            // Ensure loc_id is always set when editing starts.
+            // If the camera doesn't have a location yet, default to the first available location.
+            loc_id: cam.location_id ?? defaultLocId
         });
     };
 
@@ -129,10 +144,16 @@ export default function CameraManager({ locations, onCameraUpdated }) {
             return;
         }
 
+        const locId = parseInt(editingCam.loc_id) || locations[0]?.id;
+        if (!locId) {
+            setCamMessage({ text: 'Please select a location before saving.', type: 'error' });
+            return;
+        }
+
         const cameraData = {
             cam_name: editingCam.cam_name,
             stream_url: editingCam.stream_url,
-            loc_id: parseInt(editingCam.loc_id)
+            loc_id: locId
         };
 
         try {
@@ -294,7 +315,9 @@ export default function CameraManager({ locations, onCameraUpdated }) {
                                 <div className="flex-shrink-0 flex gap-2">
                                     <button
                                         onClick={() => handleEditCamera(cam)}
-                                        className="flex items-center bg-blue-600 text-white text-sm font-bold py-1 px-3 rounded-lg hover:bg-blue-700"
+                                        disabled={locations.length === 0}
+                                        title={locations.length === 0 ? 'Locations are still loading' : 'Edit camera'}
+                                        className={`flex items-center text-white text-sm font-bold py-1 px-3 rounded-lg ${locations.length === 0 ? 'bg-blue-300 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'}`}
                                         // Removed icon to revert to text, as per the image
                                     >
                                         Edit

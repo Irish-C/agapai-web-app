@@ -8,6 +8,7 @@ from src.controllers.camera_controller import (
     get_camera_logic,
     stream_camera_loop # Import the loop logic
 )
+from src.controllers.camera_controller import update_camera_logic
 from src.utils.auth import get_current_user_id
 
 router = APIRouter()
@@ -38,4 +39,12 @@ async def create_camera(camera_data: dict, user_id: str = Depends(get_current_us
         print(f"Manual Add: Starting background stream for Camera {cam_id}")
         asyncio.create_task(stream_camera_loop(cam_id, rtsp_url))
         
+    return JSONResponse(status_code=code, content=result)
+
+# PATCH endpoint for updating camera details
+from fastapi import Request
+@router.patch('/cameras/{camera_id}')
+async def update_camera(camera_id: int, request: Request, user_id: str = Depends(get_current_user_id)):
+    camera_data = await request.json()
+    result, code = await update_camera_logic(camera_id, camera_data)
     return JSONResponse(status_code=code, content=result)

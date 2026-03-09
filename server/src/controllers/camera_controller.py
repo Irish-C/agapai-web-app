@@ -90,3 +90,23 @@ async def create_camera_logic(camera_data):
         return {"status": "success", "camera_id": str(new_camera.id)}, 201
     except Exception as e:
         return {"error": str(e)}, 500
+
+# PATCH logic for updating camera details
+async def update_camera_logic(camera_id, camera_data):
+    try:
+        cam_name = camera_data.get("cam_name")
+        loc_id = camera_data.get("loc_id")
+        stream_url = camera_data.get("stream_url")
+        if loc_id is None:
+            return {"error": "loc_id is required and cannot be None"}, 400
+        updated_camera = await db.camera.update(
+            where={"id": int(camera_id)},
+            data={
+                "cam_name": cam_name,
+                "loc_id": int(loc_id),
+                "stream_url": stream_url
+            }
+        )
+        return {"status": "success", "camera_id": str(updated_camera.id)}, 200
+    except Exception as e:
+        return {"error": str(e)}, 500

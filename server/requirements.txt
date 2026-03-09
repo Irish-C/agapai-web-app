@@ -1,24 +1,24 @@
 # --- Backend Framework ---
 fastapi
-uvicorn
+uvicorn[standard]       # 'standard' includes high-speed loopers like uvloop
+redis
 
 # --- Database (Prisma) ---
-prisma              # REPLACES flask-sqlalchemy
-psycopg2-binary     # Required for PostgreSQL communication
+prisma
+psycopg2-binary         # Keep this if using PostgreSQL
 
-# --- Real-time & Server ---
-python-socketio
-python-engineio
+# --- Real-time & Events ---
+python-socketio[asyncio_client]
+python-multipart        # REQUIRED for FastAPI to handle form data/logins
 python-dotenv
 
 # --- AI & Vision ---
-ultralytics
+ultralytics             # YOLOv11
 numpy
 Pillow
-
-# --- Realtime / WebSockets ---
-websockets
+opencv-python-headless  # 'headless' is better for servers/Pi (no GUI needed)
 
 # --- Security & Utils ---
+passlib[bcrypt]         # REQUIRED for secure password hashing (Prisma/FastAPI)
+python-jose[cryptography] # REQUIRED if you use JWT tokens for AGAPAI login
 requests
-werkzeug
