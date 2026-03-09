@@ -83,8 +83,8 @@ async def seed_database():
         # ===== 4. SEED EVENT TYPES & CLASSES =====
         print("\nSeeding events...")
         event_types = {
-            'Fall': ["Forward Fall", "Backward Fall", "Side Fall", "Slumped Chair"],
-            'Activity': ["Wandering", "Normal Movement", "Restricted Area Entry"]
+            'Fall': ["Forward Fall", "Backward Fall", "Side Fall"],
+            'Inactivity': ["Low", "Moderate", "High", "Critical"],
         }
         
         for type_name, classes in event_types.items():
@@ -123,3 +123,6 @@ async def seed_database():
         import traceback
         traceback.print_exc()
         return {"status": "error", "message": str(e)}
+
+if __name__ == "__main__":
+    asyncio.run(seed_database())
