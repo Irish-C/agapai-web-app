@@ -14,7 +14,6 @@ const initialProfileState = {
 };
 
 export default function AccountSettingsForm({ user }) {
-    // --- State Management ---
     const [profile, setProfile] = useState(() => ({
         ...initialProfileState,
         username: user?.username || 'Loading...',
@@ -28,7 +27,6 @@ export default function AccountSettingsForm({ user }) {
     const [isLoading, setIsLoading] = useState(false);
     const [message, setMessage] = useState(null); 
 
-    // --- Profile Fetching ---
     useEffect(() => {
         if (!user?.userId) {
             setIsProfileLoading(false);
@@ -56,14 +54,16 @@ export default function AccountSettingsForm({ user }) {
         loadProfile();
     }, [user]);
 
-    // --- Form Logic ---
     const isMatching = newPassword && confirmPassword && newPassword === confirmPassword;
-    const isFormValid = oldPassword && newPassword.length >= 8 && isMatching;
+    
+    // Updated validation: 8+ chars, a number, and a special char
+    const hasNumber = /[0-9]/.test(newPassword);
+    const hasSpecial = /[^A-Za-z0-9]/.test(newPassword);
+    const isFormValid = oldPassword && newPassword.length >= 8 && hasNumber && hasSpecial && isMatching;
 
     const handleSubmit = async (e) => {
         e.preventDefault();
         setMessage(null);
-        
         if (!isFormValid) return;
 
         setIsLoading(true);
@@ -81,7 +81,7 @@ export default function AccountSettingsForm({ user }) {
     };
 
     return (
-        <div className="max-w-6xl mx-auto p-4 lg:p-8 animate-in fade-in duration-500">
+        <div className="max-w-6xl mx-auto p-4 lg:p-8">
             <div className="flex flex-col lg:flex-row gap-8">
                 
                 {/* --- SIDEBAR: PROFILE INFO --- */}
@@ -104,9 +104,7 @@ export default function AccountSettingsForm({ user }) {
                                 <p className="text-sm text-gray-500 italic">@{profile.username}</p>
                                 <div className="mt-3">
                                     <span className={`inline-block px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${
-                                        normalizeRole(profile.role) === 'admin' 
-                                            ? 'bg-indigo-100 text-indigo-700' 
-                                            : 'bg-teal-100 text-teal-700'
+                                        normalizeRole(profile.role) === 'admin' ? 'bg-indigo-100 text-indigo-700' : 'bg-teal-100 text-teal-700'
                                     }`}>
                                         {displayRole(profile.role)}
                                     </span>
@@ -127,11 +125,11 @@ export default function AccountSettingsForm({ user }) {
                     <div className="bg-white p-6 lg:p-8 rounded-2xl shadow-sm border border-gray-200">
                         <div className="mb-8">
                             <h2 className="text-2xl font-bold text-gray-800">Security Settings</h2>
-                            <p className="text-gray-500 mt-1">Change your password to keep your account safe.</p>
+                            <p className="text-gray-500 mt-1">Update your password to keep your account secure.</p>
                         </div>
 
                         {message && (
-                            <div className={`mb-6 p-4 rounded-xl flex items-start gap-3 border transition-all ${
+                            <div className={`mb-6 p-4 rounded-xl flex items-start gap-3 border ${
                                 message.type === 'success' ? 'bg-green-50 border-green-200 text-green-800' : 'bg-red-50 border-red-200 text-red-800'
                             }`}>
                                 {message.type === 'success' ? <FaCheckCircle className="mt-1" /> : <FaExclamationCircle className="mt-1" />}
@@ -148,7 +146,7 @@ export default function AccountSettingsForm({ user }) {
                                     onChange={(e) => setOldPassword(e.target.value)}
                                     icon={<FaKey />}
                                     disabled={isLoading}
-                                    placeholder="••••••••"
+                                    placeholder="Enter current password"
                                 />
                             </div>
                             
@@ -159,7 +157,7 @@ export default function AccountSettingsForm({ user }) {
                                 onChange={(e) => setNewPassword(e.target.value)}
                                 icon={<FaLock />}
                                 disabled={isLoading}
-                                showStrength={true}
+                                showRequirements={true}
                                 placeholder="Min. 8 characters"
                             />
 
@@ -198,30 +196,25 @@ export default function AccountSettingsForm({ user }) {
 
 // --- Specialized Components ---
 
-// 1. Updated PasswordField Component
-function PasswordField({ label, icon, value, showStrength, isMatching, ...props }) {
+function PasswordField({ label, icon, value, showRequirements, isMatching, ...props }) {
     const [showPassword, setShowPassword] = useState(false);
 
-    // Individual requirement checks
     const requirements = [
         { label: 'At least 8 characters', met: value.length >= 8 },
         { label: 'Contains a number', met: /[0-9]/.test(value) },
-        { label: 'Uppercase & Lowercase', met: /[A-Z]/.test(value) && /[a-z]/.test(value) },
         { label: 'Special character (!@#$%)', met: /[^A-Za-z0-9]/.test(value) },
     ];
 
     const strength = useMemo(() => {
-        if (!showStrength || !value) return null;
+        if (!showRequirements || !value) return null;
         const metCount = requirements.filter(r => r.met).length;
-
         const levels = [
-            { label: 'Weak', color: 'bg-red-400', width: '25%' },
-            { label: 'Fair', color: 'bg-orange-400', width: '50%' },
-            { label: 'Good', color: 'bg-blue-400', width: '75%' },
+            { label: 'Weak', color: 'bg-red-400', width: '33%' },
+            { label: 'Good', color: 'bg-blue-400', width: '66%' },
             { label: 'Strong', color: 'bg-green-500', width: '100%' },
         ];
         return metCount > 0 ? levels[metCount - 1] : { label: 'Too short', color: 'bg-gray-200', width: '10%' };
-    }, [value, showStrength, requirements]);
+    }, [value, showRequirements, requirements]);
 
     return (
         <div className="space-y-3">
@@ -231,7 +224,7 @@ function PasswordField({ label, icon, value, showStrength, isMatching, ...props 
                     {label}
                 </label>
                 {isMatching && (
-                    <span className="text-green-600 text-[10px] font-bold uppercase flex items-center gap-1 animate-bounce">
+                    <span className="text-green-600 text-[10px] font-bold uppercase flex items-center gap-1">
                         <FaCheck /> Matches
                     </span>
                 )}
@@ -253,8 +246,7 @@ function PasswordField({ label, icon, value, showStrength, isMatching, ...props 
                 </button>
             </div>
 
-            {/* Live Requirement Checklist & Strength Bar */}
-            {showStrength && value.length > 0 && (
+            {showRequirements && value.length > 0 && (
                 <div className="p-4 bg-gray-50 border border-gray-100 rounded-xl space-y-3">
                     <div className="h-1.5 w-full bg-gray-200 rounded-full overflow-hidden">
                         <div 
@@ -262,8 +254,7 @@ function PasswordField({ label, icon, value, showStrength, isMatching, ...props 
                             style={{ width: strength.width }}
                         />
                     </div>
-                    
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <div className="grid grid-cols-1 gap-2">
                         {requirements.map((req, index) => (
                             <div key={index} className={`flex items-center gap-2 text-[11px] font-medium transition-colors ${req.met ? 'text-green-600' : 'text-gray-400'}`}>
                                 {req.met ? <FaCheckCircle /> : <div className="w-3 h-3 rounded-full border-2 border-gray-200" />}
