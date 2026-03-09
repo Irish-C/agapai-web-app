@@ -9,7 +9,7 @@ import { socket } from '../services/socket.js';
 export const useCameraSocket = () => {
     const [cameraData, setCameraData] = useState({});
     const [incidents, setIncidents] = useState([]);
-    const [isConnected, setIsConnected] = useState(false);
+    const [isConnected, setIsConnected] = useState(socket.connected);
 
     useEffect(() => {
         const handleConnect = () => {
@@ -37,6 +37,9 @@ export const useCameraSocket = () => {
         socket.on('disconnect', handleDisconnect);
         socket.on('camera_frame', handleFrame);
         socket.on('incident_alert', handleIncident);
+
+        // Ensure we reflect the current connection state immediately upon mount
+        setIsConnected(socket.connected);
 
         return () => {
             socket.off('connect', handleConnect);

@@ -26,30 +26,37 @@ async def stream_camera_loop(camera_id, rtsp_url):
     Captures frames, encodes them to base64, and emits them via Socket.IO.
     """
     cap = cv2.VideoCapture(rtsp_url)
-    
-    while cap.isOpened():
-        ret, frame = cap.read()
-        if not ret:
-            print(f"Stream failed for camera {camera_id}. Retrying in 5s...")
-            await asyncio.sleep(5)
-            cap = cv2.VideoCapture(rtsp_url)
-            continue
 
-        # 1. ENCODE FRAME: Convert the OpenCV image to a base64 string
-        _, buffer = cv2.imencode('.jpg', frame)
-        frame_base64 = base64.b64encode(buffer).decode('utf-8')
+    try:
+        while cap.isOpened():
+            ret, frame = cap.read()
+            if not ret:
+                print(f"Stream failed for camera {camera_id}. Retrying in 5s...")
+                await asyncio.sleep(5)
+                cap = cv2.VideoCapture(rtsp_url)
+                continue
 
-        # 2. EMIT TO FRONTEND: Send the frame via the shared socketio_server
-        from app import socketio_server
-        await socketio_server.emit('camera_frame', {
-            'cam_id': str(camera_id), # Cast BigInt to string for frontend compatibility
-            'frame': f"data:image/jpeg;base64,{frame_base64}"
-        })
+            # 1. ENCODE FRAME: Convert the OpenCV image to a base64 string
+            _, buffer = cv2.imencode('.jpg', frame)
+            frame_base64 = base64.b64encode(buffer).decode('utf-8')
 
-        # 3. FPS CONTROL: Slight sleep to prevent 100% CPU usage
-        await asyncio.sleep(0.04) # Approx 25 FPS
+            # 2. EMIT TO FRONTEND: Send the frame via the shared socketio_server
+            from app import socketio_server
+            # Emit only the raw base64 payload (no data URI prefix) so the client can prepend
+            # the appropriate scheme (`data:image/jpeg;base64,`) without duplicating it.
+            await socketio_server.emit('camera_frame', {
+                'cam_id': str(camera_id), # Cast BigInt to string for frontend compatibility
+                'frame': frame_base64
+            })
 
-    cap.release()
+            # 3. FPS CONTROL: Slight sleep to prevent 100% CPU usage
+            await asyncio.sleep(0.04) # Approx 25 FPS
+    except asyncio.CancelledError:
+        # Graceful shutdown: stop streaming when the task is cancelled (e.g., on server shutdown)
+        pass
+    finally:
+        cap.release()
+        print(f"Stopped stream for camera {camera_id}")
 
 # --- EXISTING LOGIC UPDATED FOR BIGINT COMPATIBILITY ---
 

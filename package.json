@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
      "dev-client": "vite --config client/public/vite.config.js",
-    "dev-server": "cd server && . venv/bin/activate && python -m uvicorn app:asgi_app --reload --host 127.0.0.1 --port 5000",
+    "dev-server": "cd server && . venv/bin/activate && python -m uvicorn app:asgi_app --reload --host 127.0.0.1 --port 5000 --log-level warning --no-access-log",
      "dev-all": "concurrently \"npm run dev-client\" \"npm run dev-server\"",
     "prisma:generate": "cd server && PATH=./venv/bin:$PATH ./venv/bin/prisma py generate",
     "prisma:generate:node": "PATH=./server/venv/bin:$PATH npx prisma generate --schema=./server/prisma/schema.prisma",

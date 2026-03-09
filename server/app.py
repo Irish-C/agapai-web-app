@@ -30,8 +30,8 @@ SECRET_KEY = os.getenv('FLASK_SECRET_KEY', 'default_secret_key')
 socketio_server = socketio.AsyncServer(
     async_mode='asgi',
     cors_allowed_origins=['http://127.0.0.1:5173', 'http://localhost:5173'],
-    logger=True,
-    engineio_logger=True,
+    logger=False,           # Disable verbose socket.io logging (e.g., "emitting event")
+    engineio_logger=False,  # Disable engine.io internal logs
 )
 
 # --- 3. FASTAPI app with lifespan ---
