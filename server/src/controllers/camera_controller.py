@@ -110,3 +110,10 @@ async def update_camera_logic(camera_id, camera_data):
         return {"status": "success", "camera_id": str(updated_camera.id)}, 200
     except Exception as e:
         return {"error": str(e)}, 500
+
+async def delete_camera_logic(camera_id):
+    try:
+        await db.camera.delete(where={"id": int(camera_id)})
+        return {"status": "success", "message": "Camera deleted"}, 200
+    except Exception as e:
+        return {"error": str(e)}, 500

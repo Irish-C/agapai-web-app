@@ -109,6 +109,34 @@ export default function CameraManager({ locations, onCameraUpdated }) {
         }
     };
 
+    const handleDeleteCamera = (camId) => {
+        setCameraToDeleteId(camId);
+        setIsDeleteModalOpen(true);
+    };
+
+    const confirmDelete = async () => {
+        if (!cameraToDeleteId) {
+            return;
+        }
+
+        setIsDeleteModalOpen(false);
+        setCamMessage({ text: '', type: '' });
+
+        try {
+            const data = await fetchApi(`/cameras/${cameraToDeleteId}`, 'DELETE');
+            if (data.status === 'success') {
+                setCamMessage({ text: 'Camera removed successfully!', type: 'success' });
+                await fetchCameras();
+            } else {
+                setCamMessage({ text: `Error: ${data.message}`, type: 'error' });
+            }
+        } catch (error) {
+            setCamMessage({ text: `Error: ${error.message}`, type: 'error' });
+        } finally {
+            setCameraToDeleteId(null);
+        }
+    };
+
     const handleEditCamera = (cam) => {
         if (!locations || locations.length === 0) {
             setCamMessage({ text: 'Locations are still loading. Please try again shortly.', type: 'error' });

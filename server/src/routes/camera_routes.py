@@ -6,9 +6,10 @@ from src.controllers.camera_controller import (
     get_cameras_logic,
     create_camera_logic,
     get_camera_logic,
-    stream_camera_loop # Import the loop logic
+    stream_camera_loop,  # Import the loop logic
+    update_camera_logic,
+    delete_camera_logic
 )
-from src.controllers.camera_controller import update_camera_logic
 from src.utils.auth import get_current_user_id
 
 router = APIRouter()
@@ -47,4 +48,9 @@ from fastapi import Request
 async def update_camera(camera_id: int, request: Request, user_id: str = Depends(get_current_user_id)):
     camera_data = await request.json()
     result, code = await update_camera_logic(camera_id, camera_data)
+    return JSONResponse(status_code=code, content=result)
+
+@router.delete('/cameras/{camera_id}')
+async def delete_camera(camera_id: int, user_id: str = Depends(get_current_user_id)):
+    result, code = await delete_camera_logic(camera_id)
     return JSONResponse(status_code=code, content=result)
