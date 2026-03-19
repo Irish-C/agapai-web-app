@@ -13,6 +13,14 @@ export default function CameraGrid() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const [focusedCameraId, setFocusedCameraId] = useState(null);
+  const [publishedCameras, setPublishedCameras] = useState(() => {
+    try {
+      const stored = localStorage.getItem('publishedCameras');
+      return stored ? new Set(JSON.parse(stored)) : new Set();
+    } catch (e) {
+      return new Set();
+    }
+  });
 
   useEffect(() => {
     let mounted = true;
@@ -43,7 +51,22 @@ export default function CameraGrid() {
     };
   }, []);
 
-  const focusedCamera = cameraList.find((c) => c.id === focusedCameraId);
+  useEffect(() => {
+    const handleStorageChange = () => {
+      try {
+        const stored = localStorage.getItem('publishedCameras');
+        setPublishedCameras(stored ? new Set(JSON.parse(stored)) : new Set());
+      } catch (e) {
+        console.error('Error loading publishedCameras from localStorage:', e);
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, []);
+
+  const publishedCameraList = cameraList.filter(cam => publishedCameras.has(cam.id));
+  const focusedCamera = publishedCameraList.find((c) => c.id === focusedCameraId);
 
   const HLS_BASE_URL =
     import.meta.env.VITE_MEDIAMTX_HLS_BASE_URL || 'http://127.0.0.1:8888';
@@ -119,10 +142,10 @@ export default function CameraGrid() {
         <>
           <div className="flex-grow lg:w-3/4">
             {header}
-            {!isLoading && cameraList.length > 0 && (
+            {!isLoading && publishedCameraList.length > 0 && (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {cameraList.map((camera) => (
-                  <div key={camera.id} className={cameraList.length === 1 ? 'md:col-span-2' : ''}>
+                {publishedCameraList.map((camera) => (
+                  <div key={camera.id} className={publishedCameraList.length === 1 ? 'md:col-span-2' : ''}>
                     <VideoFeed
                       camId={camera.id}
                       location={camera.location_name || camera.location || camera.loc_name}
@@ -135,6 +158,11 @@ export default function CameraGrid() {
                     />
                   </div>
                 ))}
+              </div>
+            )}
+            {!isLoading && publishedCameraList.length === 0 && cameraList.length > 0 && (
+              <div className="p-8 bg-gray-50 border border-gray-200 rounded-lg text-center text-gray-600">
+                <p>No published cameras. Go to <strong>Management</strong> tab to publish cameras.</p>
               </div>
             )}
           </div>

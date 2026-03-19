@@ -355,7 +355,7 @@ export default function CameraManager({ locations: initialLocations, onCameraUpd
                     {cameras.length === 0 ? (
                         <div className="py-12 text-center text-gray-500">
                             <FaCameraRetro className="text-5xl mx-auto mb-3 opacity-30" />
-                            <p className="text-lg">No cameras yet. Click "Add Camera" to get started.</p>
+                            <p className="text-lg">No cameras yet. Add a camera from the <strong>Add Camera</strong> tab.</p>
                         </div>
                     ) : (
                         <div className="max-h-screen overflow-y-auto pr-2">
@@ -536,7 +536,7 @@ export default function CameraManager({ locations: initialLocations, onCameraUpd
                             type="submit"
                             className="flex-1 bg-green-600 text-white py-3 rounded-lg hover:bg-green-700 font-bold flex items-center justify-center"
                         >
-                            <FaPlus className="mr-2" /> Add Camera
+                            <FaPlus className="mr-2" />
                         </button>
                         <button
                             type="button"

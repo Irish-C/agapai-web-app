@@ -523,6 +523,6 @@ async def unpublish_camera_from_mediamtx(camera_id):
         except Exception as e:
             return {"error": f"Failed to start mediamtx: {e}"}, 500
 
-        return {"status": "ok", "message": "Camera unpublished successfully"}, 200
+        return {"status": "ok", "message": "Camera unpublished."}, 200
     except Exception as e:
         return {"error": str(e)}, 500
