@@ -8,6 +8,9 @@ import json
 from ultralytics import YOLO
 from database import db
 
+# One-time diagnostic log tracker for camera_frame emits
+FIRST_EMIT_LOGGED: set = set()
+
 # --- STREAMING & BACKGROUND TASKS ---
 
 async def start_camera_processing():
@@ -62,11 +65,16 @@ async def stream_camera_loop(camera_id, rtsp_url):
             _, buffer = cv2.imencode('.jpg', frame)
             frame_base64 = base64.b64encode(buffer).decode('utf-8')
 
-            from app import socketio_server
-            await socketio_server.emit('camera_frame', {
-                'cam_id': str(camera_id),
-                'frame': frame_base64
-            })
+            from app import socketio_server, connected_sids
+            if connected_sids:
+                key = f"cam:{camera_id}"
+                if key not in FIRST_EMIT_LOGGED:
+                    print(f"[camera_worker] Emitting first camera_frame for {camera_id}")
+                    FIRST_EMIT_LOGGED.add(key)
+                await socketio_server.emit('camera_frame', {
+                    'cam_id': str(camera_id),
+                    'frame': frame_base64
+                })
 
             await asyncio.sleep(0.04)  # ~25 FPS
     except asyncio.CancelledError:
@@ -185,11 +193,12 @@ class CameraWorker:
         return False
 
     async def send_alert(self):
-        from app import socketio_server
-        await socketio_server.emit("incident_alert", {
-            "camera_id": str(self.active_camera_id), 
-            "type": "motion"
-        })
+        from app import socketio_server, connected_sids
+        if connected_sids:
+            await socketio_server.emit("incident_alert", {
+                "camera_id": str(self.active_camera_id), 
+                "type": "motion"
+            })
 
 # --- CRUD LOGIC ---
 

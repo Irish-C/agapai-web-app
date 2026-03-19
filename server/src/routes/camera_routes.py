@@ -11,6 +11,7 @@ from src.controllers.camera_controller import (
     update_camera_logic,
     delete_camera_logic
 )
+from src.controllers.camera_controller import publish_camera_to_mediamtx
 from src.utils.auth import get_current_user_id
 
 router = APIRouter()
@@ -55,4 +56,11 @@ async def update_camera(camera_id: int, request: Request, user_id: str = Depends
 @router.delete('/cameras/{camera_id}')
 async def delete_camera(camera_id: int, user_id: str = Depends(get_current_user_id)):
     result, code = await delete_camera_logic(camera_id)
+    return safe_json_response(status_code=code, content=result)
+
+
+@router.post('/cameras/{camera_id}/publish')
+async def publish_camera(camera_id: int, user_id: str = Depends(get_current_user_id)):
+    """Create/update MediaMTX path for camera and restart MediaMTX."""
+    result, code = await publish_camera_to_mediamtx(camera_id)
     return safe_json_response(status_code=code, content=result)

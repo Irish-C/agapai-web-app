@@ -6,6 +6,16 @@ import time
 import uuid
 from ultralytics import YOLO
 from database import db
+import yaml
+import subprocess
+import signal
+import os
+
+# Helper: server root
+_SERVER_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../'))
+_MTX_BIN = os.path.join(_SERVER_DIR, 'mediamtx')
+_MTX_CONF = os.path.join(_SERVER_DIR, 'mediamtx.yml')
+_MTX_PID = os.path.join(_SERVER_DIR, 'mediamtx.pid')
 
 # Snapshot storage (for alert snapshots)
 SNAPSHOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../static/snapshots'))
@@ -24,6 +34,9 @@ try:
         print(f"[camera_controller] YOLO model not found at: {MODEL_PATH}")
 except Exception as e:
     print(f"[camera_controller] Failed to load YOLO model: {e}")
+
+# Track whether we've logged the first emit for a camera (one-time diagnostic)
+_FIRST_EMIT_LOGGED: set = set()
 
 async def start_camera_processing():
     """
@@ -112,7 +125,7 @@ async def stream_camera_loop(camera_id, rtsp_url):
                         emit_flag = bool(getattr(gs, 'emit_inactivity', False))
 
                 if emit_flag:
-                    from app import socketio_server
+                    from app import socketio_server, connected_sids
                     payload = {
                         'id': str(new_event.id),
                         'type': new_event.event_class.class_name,
@@ -120,7 +133,8 @@ async def stream_camera_loop(camera_id, rtsp_url):
                         'timestamp': new_event.timestamp.isoformat(),
                         'snapshot_url': new_event.file_path,
                     }
-                    await socketio_server.emit('new_alert', payload)
+                    if connected_sids:
+                        await socketio_server.emit('new_alert', payload)
             except Exception:
                 pass
 
@@ -245,13 +259,14 @@ async def stream_camera_loop(camera_id, rtsp_url):
                     persist_fall = True
 
                 if emit_fall:
-                    from app import socketio_server
-                    await socketio_server.emit('fall_detected', {
-                        'cam_id': str(camera_id),
-                        'timestamp': now,
-                        'event_type': 'Fall',
-                        'event_class': fall_event_class,
-                    })
+                        from app import socketio_server, connected_sids
+                        if connected_sids:
+                            await socketio_server.emit('fall_detected', {
+                                'cam_id': str(camera_id),
+                                'timestamp': now,
+                                'event_type': 'Fall',
+                                'event_class': fall_event_class,
+                            })
 
                 if persist_fall:
                     await persist_event('Fall', fall_event_class, frame)
@@ -277,11 +292,16 @@ async def stream_camera_loop(camera_id, rtsp_url):
             frame_base64 = base64.b64encode(buffer).decode('utf-8')
 
             # 2. EMIT FRAME TO FRONTEND
-            from app import socketio_server
-            await socketio_server.emit('camera_frame', {
-                'cam_id': str(camera_id), # Cast BigInt to string for frontend compatibility
-                'frame': frame_base64
-            })
+            from app import socketio_server, connected_sids
+            if connected_sids:
+                key = f"cam:{camera_id}"
+                if key not in _FIRST_EMIT_LOGGED:
+                    print(f"[camera_controller] Emitting first camera_frame for {camera_id}")
+                    _FIRST_EMIT_LOGGED.add(key)
+                await socketio_server.emit('camera_frame', {
+                    'cam_id': str(camera_id), # Cast BigInt to string for frontend compatibility
+                    'frame': frame_base64
+                })
 
             # 3. FPS CONTROL
             await asyncio.sleep(0.04)  # ~25 FPS
@@ -364,5 +384,71 @@ async def delete_camera_logic(camera_id):
     try:
         await db.camera.delete(where={"id": int(camera_id)})
         return {"status": "success", "message": "Camera deleted"}, 200
+    except Exception as e:
+        return {"error": str(e)}, 500
+
+
+async def publish_camera_to_mediamtx(camera_id):
+    """Ensure MediaMTX has a path for this camera, restart mediamtx, and
+    return the public HLS and WebRTC endpoints."""
+    try:
+        camera = await db.camera.find_unique(where={"id": int(camera_id)})
+        if not camera:
+            return {"error": "Camera not found"}, 404
+
+        path_name = f"cam{camera.id}"
+        stream_url = camera.stream_url
+
+        # Load existing mediamtx.yml
+        with open(_MTX_CONF, 'r') as f:
+            cfg = yaml.safe_load(f) or {}
+
+        if 'paths' not in cfg:
+            cfg['paths'] = {}
+
+        # Add or update path
+        cfg['paths'][path_name] = {
+            'source': stream_url,
+            'sourceOnDemand': True
+        }
+
+        # Backup and write config
+        try:
+            with open(_MTX_CONF + '.bak', 'w') as bak:
+                yaml.safe_dump(cfg, bak)
+        except Exception:
+            pass
+
+        with open(_MTX_CONF, 'w') as f:
+            yaml.safe_dump(cfg, f)
+
+        # Restart mediamtx: kill if pid exists, then start a new process
+        try:
+            if os.path.exists(_MTX_PID):
+                with open(_MTX_PID, 'r') as pf:
+                    old = pf.read().strip()
+                    if old:
+                        try:
+                            os.kill(int(old), signal.SIGTERM)
+                        except Exception:
+                            pass
+        except Exception:
+            pass
+
+        # Start mediamtx binary
+        try:
+            proc = subprocess.Popen([
+                _MTX_BIN, _MTX_CONF
+            ], cwd=_SERVER_DIR, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            with open(_MTX_PID, 'w') as pf:
+                pf.write(str(proc.pid))
+        except Exception as e:
+            return {"error": f"Failed to start mediamtx: {e}"}, 500
+
+        host = os.getenv('VITE_API_URL') or 'http://127.0.0.1'
+        hls_url = f"{host}:8888/{path_name}/index.m3u8"
+        webrtc_url = f"{host}:8889/{path_name}/whep"
+
+        return {"status": "ok", "hls": hls_url, "webrtc": webrtc_url, "path": path_name}, 200
     except Exception as e:
         return {"error": str(e)}, 500

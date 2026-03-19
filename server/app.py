@@ -55,9 +55,14 @@ socketio_server = socketio.AsyncServer(
     ping_interval=10,
     ping_timeout=20,
     # Enable logging to help trace disconnects during debugging
-    logger=True,
-    engineio_logger=True,
+    # Disable per-emit debug logging to avoid console spam when streaming
+    logger=False,
+    engineio_logger=False,
 )
+
+# Track currently connected Socket.IO session ids. Other modules may import
+# this set and avoid emitting frames when there are no connected clients.
+connected_sids: set = set()
 
 # --- 3. FASTAPI app with lifespan ---
 from contextlib import asynccontextmanager
@@ -221,10 +226,15 @@ else:
 async def connect(sid, environ):
     addr = environ.get('REMOTE_ADDR') if environ else None
     print(f"Socket.IO connect: sid={sid}, addr={addr}")
+    connected_sids.add(sid)
 
 @socketio_server.event
 async def disconnect(sid):
     print(f"Socket.IO disconnect: sid={sid}")
+    try:
+        connected_sids.discard(sid)
+    except Exception:
+        pass
 
 # ASGI app entrypoint
 asgi_app = socketio.ASGIApp(

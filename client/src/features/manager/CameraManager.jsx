@@ -1,7 +1,8 @@
 // src/components/CameraManager.jsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { fetchApi } from '../../services/apiService';
 import { FaTrash, FaPlus, FaPencilAlt, FaSave, FaTimes, FaCameraRetro } from 'react-icons/fa';
+import { startWebRTCStream, stopWebRTCStream } from '../../services/streamService.js';
 
 // This component manages adding, editing, and removing cameras
 export default function CameraManager({ locations, onCameraUpdated }) {
@@ -212,6 +213,36 @@ export default function CameraManager({ locations, onCameraUpdated }) {
 
     const cameraName = cameras.find(c => c.id === cameraToDeleteId)?.name || 'this camera';
 
+    // Preview state/refs for inline WebRTC previews
+    const previewPcsRef = useRef(new Map()); // cameraId -> RTCPeerConnection
+    const [previewIds, setPreviewIds] = useState([]);
+
+    const handleStartPreview = async (cam) => {
+        const id = cam.id;
+        const videoEl = document.getElementById(`preview-${id}`);
+        if (!videoEl) return setCamMessage({ text: 'Preview element not found.', type: 'error' });
+
+        try {
+            setCamMessage({ text: '', type: '' });
+            const pc = await startWebRTCStream(id, videoEl);
+            previewPcsRef.current.set(id, pc);
+            setPreviewIds((p) => (p.includes(id) ? p : [...p, id]));
+        } catch (err) {
+            setCamMessage({ text: `Preview failed: ${err?.message || err}`, type: 'error' });
+        }
+    };
+
+    const handleStopPreview = (id) => {
+        const pc = previewPcsRef.current.get(id);
+        if (pc) {
+            try { stopWebRTCStream(pc, document.getElementById(`preview-${id}`)); } catch (e) {}
+            previewPcsRef.current.delete(id);
+        }
+        const el = document.getElementById(`preview-${id}`);
+        if (el) el.srcObject = null;
+        setPreviewIds((p) => p.filter(x => x !== id));
+    };
+
     return (
         // Outer container structure
         <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-200 mt-2 max-w-4xl"> 
@@ -351,24 +382,46 @@ export default function CameraManager({ locations, onCameraUpdated }) {
                                     </div>
                                 </div>
                                 {/* Button group - ensure buttons maintain original text look */}
-                                <div className="flex-shrink-0 flex gap-2">
+                                <div className="flex-shrink-0 flex gap-2 items-center">
                                     <button
                                         onClick={() => handleEditCamera(cam)}
                                         disabled={locations.length === 0}
                                         title={locations.length === 0 ? 'Locations are still loading' : 'Edit camera'}
                                         className={`flex items-center text-white text-sm font-bold py-1 px-3 rounded-lg ${locations.length === 0 ? 'bg-blue-300 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'}`}
-                                        // Removed icon to revert to text, as per the image
                                     >
                                         Edit
                                     </button>
+
                                     <button
                                         onClick={() => handleDeleteCamera(cam.id)}
                                         className="flex items-center bg-red-600 text-white text-sm font-bold py-1 px-3 rounded-lg hover:bg-red-700"
-                                        // Removed icon to revert to text, as per the image
                                     >
                                         Remove
                                     </button>
+
+                                    {/* Preview controls: start/stop inline WebRTC preview using startWebRTCStream */}
+                                    {previewIds.includes(cam.id) ? (
+                                        <button
+                                            onClick={(e) => { e.stopPropagation(); handleStopPreview(cam.id); }}
+                                            className="flex items-center bg-gray-700 text-white text-sm font-bold py-1 px-3 rounded-lg hover:bg-gray-800"
+                                        >
+                                            Stop Preview
+                                        </button>
+                                    ) : (
+                                        <button
+                                            onClick={(e) => { e.stopPropagation(); handleStartPreview(cam); }}
+                                            className="flex items-center bg-indigo-600 text-white text-sm font-bold py-1 px-3 rounded-lg hover:bg-indigo-700"
+                                        >
+                                            Preview
+                                        </button>
+                                    )}
                                 </div>
+                                {/* Inline preview video (small) */}
+                                {previewIds.includes(cam.id) ? (
+                                    <div className="mt-2 w-48 h-28">
+                                        <video id={`preview-${cam.id}`} autoPlay muted playsInline className="w-full h-full object-cover rounded border" />
+                                    </div>
+                                ) : null}
                             </div>
                         )}
                     </div>
