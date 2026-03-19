@@ -1,19 +1,15 @@
-// src/components/LocationManager.jsx
+// src/features/manager/LocationManager.jsx - REDESIGNED with Simple Cards
 import React, { useState, useEffect } from 'react';
-import { FaMapMarkerAlt, FaTrash, FaPlus,FaPencilAlt,FaSave,FaTimes } from 'react-icons/fa';
-import { fetchApi } from '../../services/apiService'; 
+import { FaMapMarkerAlt, FaTrash, FaPlus, FaPencilAlt, FaSave, FaTimes } from 'react-icons/fa';
+import { fetchApi } from '../../services/apiService';
 
-// This component manages adding, editing, and deleting locations
 export default function LocationManager({ onLocationsUpdated }) {
     const [locations, setLocations] = useState([]);
     const [newLocName, setNewLocName] = useState('');
     const [editingLoc, setEditingLoc] = useState(null);
     const [locMessage, setLocMessage] = useState({ text: '', type: '' });
-
-    // --- NEW STATE FOR MODAL ---
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const [locationToDeleteId, setLocationToDeleteId] = useState(null);
-    // ---------------------------
 
     useEffect(() => {
         fetchLocations();
@@ -24,7 +20,6 @@ export default function LocationManager({ onLocationsUpdated }) {
             const data = await fetchApi('/locations', 'GET');
             if (data.status === 'success') {
                 setLocations(data.locations);
-                // Notify parent component that locations have updated
                 if(onLocationsUpdated) {
                     onLocationsUpdated(data.locations);
                 }
@@ -47,7 +42,7 @@ export default function LocationManager({ onLocationsUpdated }) {
             if (data.status === 'success') {
                 setLocMessage({ text: 'Location added successfully!', type: 'success' });
                 setNewLocName('');
-                await fetchLocations(); 
+                await fetchLocations();
             } else {
                 setLocMessage({ text: `Error: ${data.message}`, type: 'error' });
             }
@@ -57,14 +52,12 @@ export default function LocationManager({ onLocationsUpdated }) {
     };
 
     const handleEditLocation = (loc) => {
-        // Set the editing state with a *copy* of the location object
         setEditingLoc({ ...loc });
     };
 
     const handleUpdateLocation = async (e) => {
         e.preventDefault();
         setLocMessage({ text: '', type: '' });
-
         if (!editingLoc.name.trim()) {
             setLocMessage({ text: 'Location name cannot be empty.', type: 'error' });
             return;
@@ -75,8 +68,8 @@ export default function LocationManager({ onLocationsUpdated }) {
             });
             if (data.status === 'success') {
                 setLocMessage({ text: 'Location updated successfully!', type: 'success' });
-                setEditingLoc(null); // Exit edit mode
-                await fetchLocations(); 
+                setEditingLoc(null);
+                await fetchLocations();
             } else {
                 setLocMessage({ text: `Error: ${data.message}`, type: 'error' });
             }
@@ -85,26 +78,20 @@ export default function LocationManager({ onLocationsUpdated }) {
         }
     };
 
-    // --- UPDATED HANDLER TO OPEN MODAL ---
     const handleDeleteLocation = (locId) => {
         setLocationToDeleteId(locId);
         setIsDeleteModalOpen(true);
     };
 
-    // --- NEW FUNCTION TO CONFIRM DELETION ---
     const confirmDelete = async () => {
-        if (!locationToDeleteId) {
-            return;
-        }
-
-        setIsDeleteModalOpen(false); // Close the modal
-        setLocMessage({ text: '', type: '' }); // Clear message
-
+        if (!locationToDeleteId) return;
+        setIsDeleteModalOpen(false);
+        setLocMessage({ text: '', type: '' });
         try {
             const data = await fetchApi(`/locations/${locationToDeleteId}`, 'DELETE');
             if (data.status === 'success') {
                 setLocMessage({ text: 'Location removed successfully!', type: 'success' });
-                await fetchLocations(); 
+                await fetchLocations();
             } else {
                 setLocMessage({ text: `Error: ${data.message}`, type: 'error' });
             }
@@ -114,112 +101,119 @@ export default function LocationManager({ onLocationsUpdated }) {
             setLocationToDeleteId(null);
         }
     };
-    // ------------------------------------------
 
     const messageClass = (msg) => msg.type === 'success'
         ? 'bg-green-100 border-green-400 text-green-700'
         : 'bg-red-100 border-red-400 text-red-700';
 
-    // Get the name for display in the modal
     const locationName = locations.find(loc => loc.id === locationToDeleteId)?.name || 'this location';
 
     return (
-        <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-200 mt-2 max-w-4xl">
-            <h2 className="text-2xl font-semibold text-gray-800 flex items-center mb-4 pb-2 border-b">
-                <FaMapMarkerAlt className="mr-2 text-indigo-500" /> Location Management
-            </h2>
-            
+        <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-200">
+            {/* Header */}
+            <div className="flex items-center justify-between mb-6 pb-4 ">
+                <h2 className="text-2xl font-bold text-gray-900 flex items-center">
+                    <FaMapMarkerAlt className="mr-3 text-purple-600" /> Location Management
+                </h2>
+            </div>
+
             {locMessage.text && (
-                <div className={`mb-6 p-4 border rounded-xl font-medium ${messageClass(locMessage)}`}>
+                <div className={`mb-6 p-4 border rounded-lg font-medium ${messageClass(locMessage)}`}>
                     {locMessage.text}
                 </div>
             )}
-            
-            <h3 className="text-lg font-semibold text-gray-700 mb-2">Add New Location</h3>
-            <form onSubmit={handleAddLocation} className="flex items-center gap-4 mb-6">
-                <div className="flex-grow">
-                    <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="newLocName">New Location Name</label>
+
+            {/* Quick Add Form */}
+            <form onSubmit={handleAddLocation} className="mb-6">
+                <div className="flex gap-3">
                     <input
                         type="text"
-                        id="newLocName"
-                        name="newLocName"
                         value={newLocName}
                         onChange={(e) => setNewLocName(e.target.value)}
-                        className="w-full border-gray-300 rounded-lg shadow-sm focus:ring-teal-500 focus:border-teal-500 pl-2 py-1"
-                        placeholder="e.g., Main Hall"
+                        className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                        placeholder="e.g., Main Lobby, Dining Hall..."
                         required
                     />
+                    <button
+                        type="submit"
+                        className="px-6 py-3 bg-green-600 text-white font-semibold rounded-lg hover:bg-green-700 flex items-center whitespace-nowrap"
+                    >
+                        <FaPlus className="mr-2" /> Add
+                    </button>
                 </div>
-                <button
-                    type="submit"
-                    className="flex items-center justify-center bg-green-600 text-white font-bold py-2 px-9 rounded-xl hover:bg-green-700 h-10 mt-6"
-                >
-                    Add
-                </button>
             </form>
 
-            <h3 className="text-lg font-semibold text-gray-700 mb-2">Existing Locations</h3>
-            
-            {/* SCROLLABLE WRAPPER*/}
-            <div className="space-y-2 max-h-72 overflow-y-auto pr-2"> 
-                {locations.length === 0 ? <p className="text-gray-500">No locations added yet.</p> : null}
-                {locations.map(loc => (
-                    <div key={loc.id} className="flex justify-between items-center p-3 border rounded-lg bg-gray-50">
-                        
-                        {editingLoc && editingLoc.id === loc.id ? (
-                            // --- Edit Mode (Buttons Swapped) ---
-                            <form onSubmit={handleUpdateLocation} className="flex-grow flex items-center gap-4">
-                                <input
-                                    type="text"
-                                    value={editingLoc.name} 
-                                    onChange={(e) => setEditingLoc(prev => ({ ...prev, name: e.target.value }))} 
-                                    className="w-full border-gray-300 rounded-lg shadow-sm focus:ring-teal-500 focus:border-teal-500 pl-2 py-1"
-                                    required
-                                />
-                                {/* Swapped buttons order */}
-                                <button
-                                    type="button"
-                                    onClick={() => setEditingLoc(null)}
-                                    className="flex items-center bg-gray-500 text-white text-sm font-bold py-1 px-3 rounded-lg hover:bg-gray-600"
-                                >
-                                    Cancel
-                                </button>
-                                <button
-                                    type="submit"
-                                    className="flex items-center bg-green-600 text-white text-sm font-bold py-1 px-3 rounded-lg hover:bg-green-700"
-                                >
-                                    Save
-                                </button>
-                            </form>
-                        ) : (
-                            // --- View Mode ---
-                            <>
-                                <strong className="text-gray-900">{loc.name}</strong>
-                                <div className="flex gap-2">
-                                    <button
-                                        onClick={() => handleEditLocation(loc)}
-                                        className="flex items-center bg-blue-600 text-white text-sm font-bold py-1 px-3 rounded-lg hover:bg-blue-700"
-                                    >
-                                        Edit
-                                    </button>
-                                    <button
-                                        onClick={() => handleDeleteLocation(loc.id)}
-                                        className="flex items-center bg-red-600 text-white text-sm font-bold py-1 px-3 rounded-lg hover:bg-red-700"
-                                    >
-                                        Remove
-                                    </button>
+            {/* Locations Grid */}
+            {locations.length === 0 ? (
+                <div className="py-12 text-center text-gray-500">
+                    <FaMapMarkerAlt className="text-5xl mx-auto mb-3 opacity-30" />
+                    <p className="text-lg">No locations yet. Add one above to get started.</p>
+                </div>
+            ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-96 overflow-y-auto pr-2">
+                    {locations.map((loc) => (
+                        <div key={loc.id} className="border rounded-lg p-4 bg-gradient-to-br from-purple-50 to-transparenthoover:shadow-md transition-shadow">
+                            {editingLoc && editingLoc.id === loc.id ? (
+                                // Edit Mode
+                                <form onSubmit={handleUpdateLocation} className="space-y-2">
+                                    <input
+                                        type="text"
+                                        value={editingLoc.name}
+                                        onChange={(e) => setEditingLoc(prev => ({ ...prev, name: e.target.value }))}
+                                        className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                                        required
+                                    />
+                                    <div className="flex gap-2">
+                                        <button
+                                            type="submit"
+                                            className="flex-1 bg-green-600 text-white py-2 rounded-lg hover:bg-green-700 text-sm font-semibold flex items-center justify-center"
+                                        >
+                                            <FaSave className="mr-1" /> Save
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setEditingLoc(null)}
+                                            className="flex-1 bg-gray-500 text-white py-2 rounded-lg hover:bg-gray-600 text-sm font-semibold"
+                                        >
+                                            Cancel
+                                        </button>
+                                    </div>
+                                </form>
+                            ) : (
+                                // View Mode
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center flex-1">
+                                        <FaMapMarkerAlt className="text-purple-600 mr-3 flex-shrink-0" />
+                                        <strong className="text-gray-900 text-lg">{loc.name}</strong>
+                                    </div>
+                                    <div className="flex gap-2 flex-shrink-0">
+                                        <button
+                                            onClick={() => handleEditLocation(loc)}
+                                            className="p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                                            title="Edit location"
+                                        >
+                                            <FaPencilAlt className="w-4 h-4" />
+                                        </button>
+                                        <button
+                                            onClick={() => handleDeleteLocation(loc.id)}
+                                            className="p-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                                            title="Delete location"
+                                        >
+                                            <FaTrash className="w-4 h-4" />
+                                        </button>
+                                    </div>
                                 </div>
-                            </>
-                        )}
-                    </div>
-                ))}
-            </div>
+                            )}
+                        </div>
+                    ))}
+                </div>
+            )}
 
-            {/* --------------------------- DELETE CONFIRMATION MODAL --------------------------- */}
+            {/* DELETE MODAL */}
             {isDeleteModalOpen && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
                     <div className="bg-white rounded-xl shadow-2xl w-full max-w-md">
-                        <div className="p-6 border-b border-gray-200">
+                        <div className="p-6 border-gray-200">
                             <h4 className="text-xl font-bold text-red-600 flex items-center">
                                 <FaTrash className="mr-2" /> Confirm Deletion
                             </h4>
@@ -228,9 +222,8 @@ export default function LocationManager({ onLocationsUpdated }) {
                             <p className="text-gray-700 mb-4">
                                 Are you sure you want to delete <strong className="font-semibold">{locationName}</strong>?
                             </p>
-                            <p className="text-red-700 mb-6 font-medium">
-                                WARNING: You must re-assign or remove all cameras using this location before deletion.
-                                This action cannot be undone.
+                            <p className="text-red-700 mb-6 font-medium text-sm">
+                                ⚠️ WARNING: You must re-assign or remove all cameras using this location before deletion.
                             </p>
                             <div className="flex justify-end space-x-3">
                                 <button
@@ -253,7 +246,6 @@ export default function LocationManager({ onLocationsUpdated }) {
                     </div>
                 </div>
             )}
-            {/* --------------------------------------------------------------------------------- */}
         </div>
     );
 }
