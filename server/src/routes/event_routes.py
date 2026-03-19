@@ -8,6 +8,7 @@ from src.controllers.event_controller import (
     get_event_logs_logic,
     mark_viewed_logic,
     create_event_logic,
+    export_logs_by_date_logic,
 )
 
 router = APIRouter()
@@ -36,4 +37,13 @@ async def acknowledge_event(log_id: int, user_id: str = Depends(get_current_user
 async def get_event_types():
     return await get_event_types_logic()
 
+@router.get("/logs/export")
+async def export_logs(date: str):
+    """Export incident logs for a specific date in JSON format
+    
+    Query param: date (YYYY-MM-DD format)
+    Example: /api/logs/export?date=2026-03-20
+    """
+    result, code = await export_logs_by_date_logic(date)
+    return safe_json_response(status_code=code, content=result)
 

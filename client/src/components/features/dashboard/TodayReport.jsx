@@ -1,6 +1,6 @@
 // src/components/TodayReport.jsx
 import React, { useState, useEffect } from 'react';
-import { FaExclamationTriangle, FaCheckCircle, FaChartBar, FaCalendarAlt, FaDownload, FaFileAlt } from 'react-icons/fa';
+import { FaExclamationTriangle, FaCheckCircle, FaChartBar, FaCalendarAlt, FaDownload, FaFileAlt, FaSpinner } from 'react-icons/fa';
 
 /**
  * Renders the Today's Incident Log, Activity Summary, and Log Downloader sidebar.
@@ -11,13 +11,12 @@ export default function TodayReport({ incidents, alerts = [], user }) {
     // --- STATE: Activity Summary (Alerts) ---
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState(null);
+    const [isExporting, setIsExporting] = useState(false);
+    const [exportError, setExportError] = useState(null);
 
     // --- STATE: Log Downloader (New) ---
     // Default to today's date in YYYY-MM-DD format
-    const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
-
-    // CONFIGURATION: Replace with your Raspberry Pi's IP Address and the backend port (from picam.py)
-    const RPI_BASE_URL = "http://192.168.2.106:4050"; 
+    const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]); 
 
 
     // --- Data / Activity Summary ---
@@ -36,6 +35,46 @@ export default function TodayReport({ incidents, alerts = [], user }) {
     const formatDateDisplay = (dateString) => {
         const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
         return new Date(dateString).toLocaleDateString(undefined, options);
+    };
+
+    // Download logs from API
+    const handleDownloadLogs = async () => {
+        setIsExporting(true);
+        setExportError(null);
+        
+        try {
+            const response = await fetch(`/api/logs/export?date=${selectedDate}`);
+            
+            if (!response.ok) {
+                const data = await response.json();
+                throw new Error(data.message || 'Failed to export logs');
+            }
+            
+            const data = await response.json();
+            
+            if (data.status !== 'success') {
+                throw new Error(data.message || 'Failed to export logs');
+            }
+            
+            // Create a blob and download
+            const blob = new Blob([JSON.stringify(data, null, 2)], {
+                type: 'application/json',
+            });
+            const url = URL.createObjectURL(blob);
+            const anchor = document.createElement('a');
+            anchor.href = url;
+            anchor.download = `incident-logs-${selectedDate}.json`;
+            document.body.appendChild(anchor);
+            anchor.click();
+            anchor.remove();
+            URL.revokeObjectURL(url);
+            
+        } catch (err) {
+            console.error('Failed to download logs:', err);
+            setExportError(err.message || 'Unable to download logs. Please try again.');
+        } finally {
+            setIsExporting(false);
+        }
     };
 
     const groupedAlerts = React.useMemo(() => {
@@ -171,27 +210,37 @@ export default function TodayReport({ incidents, alerts = [], user }) {
                     {/* Download Button */}
                     <div>
                         <label className="text-xs text-gray-500 mb-1 block font-bold">ACTION</label>
-                        <a
-                            // Link points to the Flask backend route we updated in picam.py
-                            href={`${RPI_BASE_URL}/download_log?date=${selectedDate}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 text-white 
+                        <button
+                            onClick={handleDownloadLogs}
+                            disabled={isExporting}
+                            className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 disabled:bg-gray-400 text-white 
                                      font-semibold py-2 px-4 rounded-md shadow hover:shadow-lg transform hover:-translate-y-0.5 
-                                     transition-all duration-200 w-full"
+                                     transition-all duration-200 w-full disabled:cursor-not-allowed"
                         >
-                            <FaDownload className="text-sm" />
-                            <span>Download Log File</span>
-                        </a>
+                            {isExporting ? (
+                                <>
+                                    <FaSpinner className="animate-spin text-sm" />
+                                    <span>Exporting...</span>
+                                </>
+                            ) : (
+                                <>
+                                    <FaDownload className="text-sm" />
+                                    <span>Download Log File</span>
+                                </>
+                            )}
+                        </button>
+                        {exportError && (
+                            <p className="text-xs text-red-600 mt-2 text-center font-semibold">{exportError}</p>
+                        )}
                         <p className="text-xs text-gray-400 mt-2 text-center">
-                            Downloads a .txt file of all events.
+                            Downloads a JSON file of all incidents for the selected date.
                         </p>
                     </div>
 
                     {/* Note to the User */}
                     <div className="p-3 bg-blue-50 border border-blue-200 rounded-md text-xs text-blue-800">
-                        <strong>Note:</strong> Logs are only available if the monitoring system was active on the selected date. 
-                        If you receive a "No logs found" error, no activity was recorded for that day.
+                        <strong>Note:</strong> Logs will only be downloaded if incidents were recorded on the selected date. 
+                        Empty dates will return a file with zero events.
                     </div>
                 </div>
             </div>

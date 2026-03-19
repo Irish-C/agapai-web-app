@@ -55,8 +55,8 @@ export default function Header({ user, logout }) {
                     <Link to="/dashboard" className="flex items-center group">
                         <img src={agapaiLogo} alt="Logo" className="h-10 w-10 sm:h-12 sm:w-12 rounded-xl shadow-lg" />
                         <div className="ml-4 flex flex-col justify-center">
-                            <h1 className="text-2xl font-black tracking-tighter text-white">AGAPAI<span className="text-teal-400">.</span></h1>
-                            <p className="hidden lg:block text-[9px] uppercase font-bold tracking-[0.25em] text-teal-100/70">Vision Monitoring</p>
+                            <h1 className="text-2xl font-black tracking-tighter text-white">AGAP<span className="text-teal-400">AI</span></h1>
+                            <p className="hidden lg:block text-[9px] uppercase font-bold tracking-[0.25em] text-teal-100/70">Vision-based Monitoring for Elderly</p>
                         </div>
                     </Link>
 

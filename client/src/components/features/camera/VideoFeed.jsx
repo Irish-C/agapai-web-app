@@ -1,17 +1,22 @@
 // src/components/VideoFeed.jsx
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { FaVideo, FaVideoSlash, FaSpinner, FaTimes, FaExpand, FaLink } from 'react-icons/fa';
 
 export default function VideoFeed({ 
-  camId, 
-  location, 
-  streamUrl, 
-  frameData, 
-  isConnected, 
-  isFocused, 
-  onFocusChange 
+  camId, 
+  location, 
+  streamUrl, 
+  frameData, 
+  isConnected, 
+  isFocused, 
+  onFocusChange 
 }) {
-  
+  const [currentDateTime, setCurrentDateTime] = useState(new Date());
+
+  useEffect(() => {
+    const timer = setInterval(() => setCurrentDateTime(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
   const hasFrameData = !!frameData;
   const hasStreamUrl = !!streamUrl;
 
@@ -112,12 +117,11 @@ export default function VideoFeed({
       >
         {content}
 
-        {/* --- Focus/Unfocus Buttons --- */}
-        {isFocused ? (
-          // "Return to Grid" button (visible only when focused)
-          <button
-              onClick={(e) => {
-                e.stopPropagation(); // Stop click from bubbling to the main div
+        {/* CCTV Timestamp Overlay */}
+        <div className="absolute bottom-2 left-2 bg-black/60 text-white px-3 py-1 rounded text-xs font-mono backdrop-blur-sm">
+          <div>{currentDateTime.toLocaleDateString()}</div>
+          <div>{currentDateTime.toLocaleTimeString()}</div>
+        </div>
                 onFocusChange(null); // Pass null to reset focus
               }}
               className="absolute top-2 right-2 p-2 bg-black/60 rounded-full text-white hover:bg-red-600 transition-colors"

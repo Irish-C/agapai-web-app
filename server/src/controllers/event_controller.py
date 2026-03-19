@@ -135,3 +135,51 @@ async def get_event_types():
     except Exception as e:
         print(f"Error fetching types: {e}")
         return []
+
+async def export_logs_by_date_logic(date_str: str):
+    """Export all incident logs for a specific date as JSON"""
+    try:
+        from datetime import datetime, timedelta
+        
+        # Parse the date string (YYYY-MM-DD)
+        target_date = datetime.strptime(date_str, '%Y-%m-%d')
+        start_of_day = target_date.replace(hour=0, minute=0, second=0, microsecond=0)
+        end_of_day = start_of_day + timedelta(days=1)
+        
+        # Query all events for that day
+        logs = await db.eventlog.find_many(
+            where={
+                'timestamp': {
+                    'gte': start_of_day,
+                    'lt': end_of_day
+                }
+            },
+            order={'timestamp': 'desc'},
+            include={'camera': True, 'event_class': True}
+        )
+        
+        # Format the data
+        formatted_data = []
+        for log in logs:
+            formatted_data.append({
+                "id": str(log.id),
+                "type": log.event_class.class_name if log.event_class else "Unknown",
+                "location": log.camera.cam_name if log.camera else "Unknown",
+                "timestamp": log.timestamp.isoformat(),
+                "snapshot_url": log.file_path,
+                "status": log.event_status
+            })
+        
+        total_count = len(formatted_data)
+        return {
+            "status": "success",
+            "date": date_str,
+            "total_events": total_count,
+            "events": formatted_data
+        }, 200
+        
+    except ValueError as e:
+        return {"status": "error", "message": "Invalid date format. Use YYYY-MM-DD"}, 400
+    except Exception as e:
+        print(f"Error exporting logs: {e}")
+        return {"status": "error", "message": str(e)}, 500
