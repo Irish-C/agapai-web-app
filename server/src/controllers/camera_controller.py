@@ -130,9 +130,10 @@ async def stream_camera_loop(camera_id, rtsp_url):
                     payload = {
                         'id': str(new_event.id),
                         'type': new_event.event_class.class_name,
-                        'location': new_event.camera.cam_name if new_event.camera else None,
+                        'location': new_event.camera.cam_name if new_event.camera else 'Unknown',
                         'timestamp': new_event.timestamp.isoformat(),
                         'snapshot_url': new_event.file_path,
+                        'status': 'unacknowledged'
                     }
                     if connected_sids:
                         await socketio_server.emit('new_alert', payload)
@@ -250,26 +251,15 @@ async def stream_camera_loop(camera_id, rtsp_url):
             # Emit fall event (debounced)
             if fall_event_class and (now - last_fall_alert) > fall_alert_cooldown:
                 last_fall_alert = now
-                # Check global settings for fall events (defaults applied if missing)
+                # Check global settings for fall persistence
                 try:
                     gs = await db.globalsetting.find_first()
-                    emit_fall = bool(getattr(gs, 'emit_fall', True)) if gs is not None else True
                     persist_fall = bool(getattr(gs, 'persist_fall', True)) if gs is not None else True
                 except Exception:
-                    emit_fall = True
                     persist_fall = True
 
-                if emit_fall:
-                        from app import socketio_server, connected_sids
-                        if connected_sids:
-                            await socketio_server.emit('fall_detected', {
-                                'cam_id': str(camera_id),
-                                'timestamp': now,
-                                'event_type': 'Fall',
-                                'event_class': fall_event_class,
-                            })
-
                 if persist_fall:
+                    # persist_event handles emission via emit_flag (respects global settings)
                     await persist_event('Fall', fall_event_class, frame)
 
             # Inactivity: prefer model-based detection when available.

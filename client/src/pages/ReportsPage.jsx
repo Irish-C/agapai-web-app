@@ -162,9 +162,6 @@ export default function ReportsPage() {
             {/* --- TOP BAR --- */}
             <div className="flex flex-col md:flex-row justify-between items-center gap-6">
                 <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 flex items-center justify-center bg-teal-600 text-white rounded-2xl shadow-lg">
-                        <FaFileAlt size={20} />
-                    </div>
                     <div>
                         <h1 className="text-3xl font-extrabold text-gray-800 tracking-tight font-sans">Event Logs</h1>
                         <p className="text-sm font-semibold text-gray-400 uppercase tracking-widest font-sans">{filteredLogs.length} Entries</p>

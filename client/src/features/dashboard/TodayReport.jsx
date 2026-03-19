@@ -148,7 +148,6 @@ export default function TodayReport({ incidents = [], alerts = [], user }) {
             {/* 3. LOG PANEL / EXPORT LOGS (New Feature) */}
             <div className="bg-white p-4 rounded-xl shadow-lg border border-gray-200">
                 <h3 className="text-xl font-bold text-gray-800 mb-4 flex items-center border-b pb-2">
-                    <FaFileAlt className="mr-2 text-blue-600" />
                     Download Incident Log
                 </h3>
 

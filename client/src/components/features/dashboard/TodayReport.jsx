@@ -13,10 +13,15 @@ export default function TodayReport({ incidents, alerts = [], user }) {
     const [error, setError] = useState(null);
     const [isExporting, setIsExporting] = useState(false);
     const [exportError, setExportError] = useState(null);
+    const [loadingDownloadDate, setLoadingDownloadDate] = useState(false);
+    const [downloadDateIncidents, setDownloadDateIncidents] = useState([]);
 
     // --- STATE: Log Downloader (New) ---
-    // Default to today's date in YYYY-MM-DD format
-    const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]); 
+    // Default to today's date in YYYY-MM-DD format for downloading from any date
+    const [downloadDate, setDownloadDate] = useState(new Date().toISOString().split('T')[0]);
+    
+    // Today's date (fixed, always today)
+    const todayDate = new Date().toISOString().split('T')[0]; 
 
 
     // --- Data / Activity Summary ---
@@ -25,6 +30,33 @@ export default function TodayReport({ incidents, alerts = [], user }) {
         setIsLoading(false);
         setError(null);
     }, [alerts]);
+
+    // Fetch incidents for selected download date from database
+    useEffect(() => {
+        const fetchIncidentsForDownloadDate = async () => {
+            setLoadingDownloadDate(true);
+            try {
+                const response = await fetch(`/api/logs/export?date=${downloadDate}`);
+                if (!response.ok) {
+                    setDownloadDateIncidents([]);
+                    return;
+                }
+                const data = await response.json();
+                if (data.status === 'success' && data.events) {
+                    setDownloadDateIncidents(data.events);
+                } else {
+                    setDownloadDateIncidents([]);
+                }
+            } catch (err) {
+                console.error('Failed to fetch incidents for download date:', err);
+                setDownloadDateIncidents([]);
+            } finally {
+                setLoadingDownloadDate(false);
+            }
+        };
+        
+        fetchIncidentsForDownloadDate();
+    }, [downloadDate]);
 
     
     // --- Determine System Status (using alerts) ---
@@ -43,7 +75,7 @@ export default function TodayReport({ incidents, alerts = [], user }) {
         setExportError(null);
         
         try {
-            const response = await fetch(`/api/logs/export?date=${selectedDate}`);
+            const response = await fetch(`/api/logs/export?date=${downloadDate}`);
             
             if (!response.ok) {
                 const data = await response.json();
@@ -63,7 +95,7 @@ export default function TodayReport({ incidents, alerts = [], user }) {
             const url = URL.createObjectURL(blob);
             const anchor = document.createElement('a');
             anchor.href = url;
-            anchor.download = `incident-logs-${selectedDate}.json`;
+            anchor.download = `incident-logs-${downloadDate}.json`;
             document.body.appendChild(anchor);
             anchor.click();
             anchor.remove();
@@ -80,9 +112,10 @@ export default function TodayReport({ incidents, alerts = [], user }) {
     const groupedAlerts = React.useMemo(() => {
         const map = {};
         (alerts || []).forEach((alert) => {
-            const type = (alert.type || alert.event_class || alert.event_type || 'Unknown').toUpperCase();
-            const ts = alert.ts || (alert.timestamp ? new Date(alert.timestamp).getTime() : Date.now());
-            const snapshotUrl = alert.snapshot_url || alert.snapshotUrl || null;
+            // Use standard fields from unified data contract
+            const type = (alert.type || 'Unknown').toUpperCase();
+            const ts = alert.ts || Date.now();
+            const snapshotUrl = alert.snapshot_url || null;
 
             if (!map[type]) map[type] = { count: 0, times: [], latestSnapshot: null, latestTs: 0 };
             map[type].count += 1;
@@ -105,9 +138,11 @@ export default function TodayReport({ incidents, alerts = [], user }) {
     return (
         <div className="space-y-4 sticky top-2 h-fit">
 
-            {/* 1. REAL-TIME INCIDENT LOG (WebSocket Data) */}
+            {/* 1. TODAY'S INCIDENT LOG (Real-time, always TODAY) */}
             <div className="bg-white p-4 rounded-xl shadow-lg border border-gray-200">
-                <h3 className="text-xl font-bold text-gray-800 mb-4 border-b pb-2">Today's Incident Log</h3>
+                <h3 className="text-lg font-bold text-gray-800 mb-4 border-b pb-2">
+                    📅 Today is {new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+                </h3>
 
                 {isClear ? (
                     <div className="p-4 bg-green-50 border border-green-300 text-green-700 rounded-lg flex items-center">
@@ -183,65 +218,83 @@ export default function TodayReport({ incidents, alerts = [], user }) {
                 <p className="text-xs text-gray-500 mt-4 text-center">Showing the most recent 10 alerts from the last 24 hours.</p>
             </div>
 
-            {/* 3. LOG PANEL / EXPORT LOGS (New Feature) */}
+            {/* 3. DOWNLOAD INCIDENT LOGS (Separate date picker) */}
             <div className="bg-white p-4 rounded-xl shadow-lg border border-gray-200">
                 <h3 className="text-xl font-bold text-gray-800 mb-4 flex items-center border-b pb-2">
                     <FaFileAlt className="mr-2 text-blue-600" />
-                    Export Daily Logs
+                    Download Incident Logs
                 </h3>
 
                 <div className="space-y-4">
-                    {/* Date Selection */}
+                    {/* Date Selection for Download */}
                     <div>
-                        <label className="text-xs text-gray-500 mb-1 block font-bold">SELECT DATE</label>
+                        <label className="text-xs text-gray-500 mb-2 block font-bold">SELECT DATE</label>
                         <input
                             type="date"
-                            value={selectedDate}
-                            onChange={(e) => setSelectedDate(e.target.value)}
+                            value={downloadDate}
+                            onChange={(e) => setDownloadDate(e.target.value)}
                             className="bg-gray-50 border border-gray-300 rounded-md text-gray-800 px-4 py-2 
                                      focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 
                                      transition-all w-full cursor-pointer"
                         />
                         <p className="mt-1 text-xs text-blue-600 font-medium text-right">
-                            {formatDateDisplay(selectedDate)}
+                            {formatDateDisplay(downloadDate)}
                         </p>
                     </div>
+
+                    {/* Preview of incidents for selected date */}
+                    {loadingDownloadDate ? (
+                        <div className="p-3 text-center text-gray-500 text-sm">
+                            <FaSpinner className="animate-spin inline-block mr-2" /> Loading incidents...
+                        </div>
+                    ) : downloadDateIncidents.length === 0 ? (
+                        <div className="p-3 bg-yellow-50 border border-yellow-200 text-yellow-700 rounded-lg text-sm">
+                            No incidents recorded for {formatDateDisplay(downloadDate)}.
+                        </div>
+                    ) : (
+                        <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                            <p className="text-xs font-semibold text-blue-700 mb-2">
+                                📋 {downloadDateIncidents.length} incident{downloadDateIncidents.length !== 1 ? 's' : ''} found
+                            </p>
+                            <div className="space-y-2 max-h-40 overflow-y-auto">
+                                {downloadDateIncidents.map((incident) => (
+                                    <div key={incident.id} className="text-xs bg-blue-100 border border-blue-300 rounded p-2">
+                                        <span className="font-semibold text-blue-900">{incident.type}</span>
+                                        <span className="text-blue-700"> @ {new Date(incident.timestamp).toLocaleTimeString()}</span>
+                                        <br />
+                                        <span className="text-blue-600">📍 {incident.location}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
 
                     {/* Download Button */}
-                    <div>
-                        <label className="text-xs text-gray-500 mb-1 block font-bold">ACTION</label>
-                        <button
-                            onClick={handleDownloadLogs}
-                            disabled={isExporting}
-                            className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 disabled:bg-gray-400 text-white 
-                                     font-semibold py-2 px-4 rounded-md shadow hover:shadow-lg transform hover:-translate-y-0.5 
-                                     transition-all duration-200 w-full disabled:cursor-not-allowed"
-                        >
-                            {isExporting ? (
-                                <>
-                                    <FaSpinner className="animate-spin text-sm" />
-                                    <span>Exporting...</span>
-                                </>
-                            ) : (
-                                <>
-                                    <FaDownload className="text-sm" />
-                                    <span>Download Log File</span>
-                                </>
-                            )}
-                        </button>
-                        {exportError && (
-                            <p className="text-xs text-red-600 mt-2 text-center font-semibold">{exportError}</p>
+                    <button
+                        onClick={handleDownloadLogs}
+                        disabled={isExporting || downloadDateIncidents.length === 0}
+                        className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 disabled:bg-gray-400 text-white 
+                                 font-semibold py-2 px-4 rounded-md shadow hover:shadow-lg transform hover:-translate-y-0.5 
+                                 transition-all duration-200 w-full disabled:cursor-not-allowed"
+                    >
+                        {isExporting ? (
+                            <>
+                                <FaSpinner className="animate-spin text-sm" />
+                                <span>Exporting...</span>
+                            </>
+                        ) : (
+                            <>
+                                <FaDownload className="text-sm" />
+                                <span>Download {downloadDateIncidents.length > 0 ? `(${downloadDateIncidents.length})` : '(No incidents)'}</span>
+                            </>
                         )}
-                        <p className="text-xs text-gray-400 mt-2 text-center">
-                            Downloads a JSON file of all incidents for the selected date.
-                        </p>
-                    </div>
-
-                    {/* Note to the User */}
-                    <div className="p-3 bg-blue-50 border border-blue-200 rounded-md text-xs text-blue-800">
-                        <strong>Note:</strong> Logs will only be downloaded if incidents were recorded on the selected date. 
-                        Empty dates will return a file with zero events.
-                    </div>
+                    </button>
+                    {exportError && (
+                        <p className="text-xs text-red-600 mt-2 text-center font-semibold">{exportError}</p>
+                    )}
+                    <p className="text-xs text-gray-400 text-center">
+                        Downloads a JSON file of all incidents for {formatDateDisplay(downloadDate)}.
+                    </p>
                 </div>
             </div>
         </div>

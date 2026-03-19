@@ -67,10 +67,10 @@ export default function Settings({ user }) {
     return (
         <div className="flex flex-col min-h-screen">
             <main className="flex-grow container mx-auto p-6">
-                <h1 className="text-3xl font-extrabold text-gray-900 flex items-center mb-2">
-                    <FaCogs className="mr-3 text-teal-600" />
-                    System Settings
-                </h1>
+                {/* <h1 className="text-3xl font-extrabold text-gray-900 flex items-center mb-4">
+                    {/* <FaCogs className="mr-3 text-teal-600" /> */}
+                    {/* Settings
+                </h1> */}
 
                 <div className="flex flex-col lg:flex-row gap-6 bg-white p-4 lg:p-5 rounded-xl shadow-lg border border-gray-200">
                     

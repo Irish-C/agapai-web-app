@@ -3,7 +3,6 @@ import { socket } from '../services/socket.js';
 
 export const useCameraSocket = () => {
   const [cameraData, setCameraData] = useState({});
-  const [incidents, setIncidents] = useState([]);
   const [alerts, setAlerts] = useState([]);
   const [isConnected, setIsConnected] = useState(socket.connected);
 
@@ -15,31 +14,24 @@ export const useCameraSocket = () => {
     const handleDisconnect = () => setIsConnected(false);
 
     const handleFrame = (data) => {
-      const camId = data?.cam_id ?? data?.camera_id ?? data?.cameraId;
-      const frame = data?.frame ?? data?.frameData ?? data?.image;
+      // Standardized frame payload always has cam_id
+      const camId = data?.cam_id;
+      const frame = data?.frame;
       if (camId == null || !frame) return;
       latestFramesRef.current.set(camId, frame);
     };
 
-    const handleIncident = (alert) => {
-      setIncidents((prev) => [alert, ...prev]);
-    };
-
-    const handleFall = (alert) => {
-      const typeLabel = alert.event_class || alert.event_type || 'fall';
-      setAlerts((prev) => [{ ...alert, ts: Date.now(), type: typeLabel }, ...prev]);
-    };
-
-    const handleInactivity = (alert) => {
-      setAlerts((prev) => [{ ...alert, ts: Date.now(), type: 'inactivity' }, ...prev]);
+    const handleNewAlert = (alert) => {
+      // Unified incident structure: {id, type, location, timestamp, snapshot_url, status}
+      // Add ts for frontend sorting convenience
+      const incidentWithTs = { ...alert, ts: Date.now() };
+      setAlerts((prev) => [incidentWithTs, ...prev]);
     };
 
     socket.on('connect', handleConnect);
     socket.on('disconnect', handleDisconnect);
     socket.on('camera_frame', handleFrame);
-    socket.on('incident_alert', handleIncident);
-    socket.on('fall_detected', handleFall);
-    socket.on('inactivity_detected', handleInactivity);
+    socket.on('new_alert', handleNewAlert);
 
     setIsConnected(socket.connected);
 
@@ -62,11 +54,9 @@ export const useCameraSocket = () => {
       socket.off('connect', handleConnect);
       socket.off('disconnect', handleDisconnect);
       socket.off('camera_frame', handleFrame);
-      socket.off('incident_alert', handleIncident);
-      socket.off('fall_detected', handleFall);
-      socket.off('inactivity_detected', handleInactivity);
+      socket.off('new_alert', handleNewAlert);
     };
   }, []);
 
-  return { cameraData, incidents, alerts, isConnected };
+  return { cameraData, alerts, isConnected };
 };

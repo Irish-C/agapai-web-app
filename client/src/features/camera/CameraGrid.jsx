@@ -78,7 +78,8 @@ export default function CameraGrid() {
   const getWebrtcUrl = (camera) => `${WEBRTC_BASE_URL}/${getStreamPath(camera)}/whep`;
 
   const header = (
-    <div className="flex items-center text-2xl font-extrabold text-gray-900 mb-4 border-b pb-2">
+    <div className="flex items-center text-2xl font-extrabold text-gray-900 mb-4 pb-2"> 
+   {/* Removed border-b to prevent double borders when inside a card */}
       <FaVideo className="mr-3 text-gray-900" />
       Live View
       <span

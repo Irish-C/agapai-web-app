@@ -24,9 +24,10 @@ async def create_event_logic(data):
         payload = {
             'id': str(new_event.id),
             'type': new_event.event_class.class_name,
-            'location': new_event.camera.cam_name,
+            'location': new_event.camera.cam_name if new_event.camera else 'Unknown',
             'timestamp': new_event.timestamp.isoformat(),
-            'snapshot_url': new_event.file_path
+            'snapshot_url': new_event.file_path,
+            'status': 'unacknowledged'
         }
         # Emit alert to frontend
         await socketio_server.emit('new_alert', payload)
@@ -139,12 +140,17 @@ async def get_event_types():
 async def export_logs_by_date_logic(date_str: str):
     """Export all incident logs for a specific date as JSON"""
     try:
-        from datetime import datetime, timedelta
+        from datetime import datetime, timedelta, timezone
         
-        # Parse the date string (YYYY-MM-DD)
+        # Parse the date string (YYYY-MM-DD) in user's local timezone context
         target_date = datetime.strptime(date_str, '%Y-%m-%d')
+        
+        # Create start and end of day in UTC (database stores UTC timestamps)
         start_of_day = target_date.replace(hour=0, minute=0, second=0, microsecond=0)
         end_of_day = start_of_day + timedelta(days=1)
+        
+        print(f"[export_logs] Querying for date: {date_str}")
+        print(f"[export_logs] Start: {start_of_day}, End: {end_of_day}")
         
         # Query all events for that day
         logs = await db.eventlog.find_many(
@@ -157,6 +163,8 @@ async def export_logs_by_date_logic(date_str: str):
             order={'timestamp': 'desc'},
             include={'camera': True, 'event_class': True}
         )
+        
+        print(f"[export_logs] Found {len(logs)} events for {date_str}")
         
         # Format the data
         formatted_data = []
