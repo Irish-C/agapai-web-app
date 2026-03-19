@@ -123,6 +123,7 @@ export default function CameraGrid() {
           <VideoFeed
             key={focusedCamera.id}
             camId={focusedCamera.id}
+            cameraName={focusedCamera.name}
             location={focusedCamera.location_name || focusedCamera.location || focusedCamera.loc_name}
             streamUrl={getHlsUrl(focusedCamera)}
             webrtcUrl={getWebrtcUrl(focusedCamera)}
@@ -148,6 +149,7 @@ export default function CameraGrid() {
                   <div key={camera.id} className={publishedCameraList.length === 1 ? 'md:col-span-2' : ''}>
                     <VideoFeed
                       camId={camera.id}
+                      cameraName={camera.name}
                       location={camera.location_name || camera.location || camera.loc_name}
                       streamUrl={getHlsUrl(camera)}
                       webrtcUrl={getWebrtcUrl(camera)}

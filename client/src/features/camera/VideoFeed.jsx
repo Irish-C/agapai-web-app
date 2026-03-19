@@ -5,6 +5,7 @@ import { FaExpand, FaTimes } from 'react-icons/fa';
 
 export default function VideoFeed({
   camId,
+  cameraName,
   location,
   streamUrl,   // HLS
   webrtcUrl,   // WHEP
@@ -183,7 +184,10 @@ export default function VideoFeed({
       onClick={() => !isFocused && onFocusChange?.(camId)}
     >
       <div className="bg-gray-800 text-white p-2 flex items-center justify-between">
-        <h4 className="font-semibold text-sm truncate">{location}</h4>
+        <div className="flex flex-col overflow-hidden">
+          <h4 className="font-semibold text-sm truncate">{cameraName}</h4>
+          <p className="text-xs text-gray-400 truncate">{location}</p>
+        </div>
         <div className="flex items-center gap-2">
           <span className="text-xs text-gray-300">{status}</span>
           <button
