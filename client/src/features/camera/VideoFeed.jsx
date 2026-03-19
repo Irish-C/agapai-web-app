@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { socket } from '../../services/socket.js';
 import Hls from 'hls.js';
 import { FaExpand, FaTimes } from 'react-icons/fa';
 
@@ -27,6 +28,11 @@ export default function VideoFeed({
   const [showDebug, setShowDebug] = useState(false);
 
   const clearAll = () => {
+    try {
+      if (socket && socket.connected) {
+        socket.emit('unsubscribe_camera', { camera_id: camId });
+      }
+    } catch (e) {}
     if (retryTimerRef.current) {
       clearTimeout(retryTimerRef.current);
       retryTimerRef.current = null;
@@ -107,6 +113,12 @@ export default function VideoFeed({
           }
         };
 
+        // Subscribe this client to the camera room so the server only emits
+        // frames to viewers who requested this camera.
+        try {
+          socket.emit('subscribe_camera', { camera_id: camId });
+        } catch (e) {}
+
         const offer = await pc.createOffer();
         await pc.setLocalDescription(offer);
 
@@ -152,6 +164,12 @@ export default function VideoFeed({
 
     return () => {
       cancelled = true;
+      // Ensure we unsubscribe when component unmounts
+      try {
+        if (socket && socket.connected) {
+          socket.emit('unsubscribe_camera', { camera_id: camId });
+        }
+      } catch (e) {}
       clearAll();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps

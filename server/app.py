@@ -236,6 +236,42 @@ async def disconnect(sid):
     except Exception:
         pass
 
+
+# Allow clients to subscribe/unsubscribe to specific camera rooms so we can
+# emit frames only to viewers of that camera instead of broadcasting globally.
+@socketio_server.on('subscribe_camera')
+async def subscribe_camera(sid, data):
+    try:
+        camera_id = None
+        if isinstance(data, dict):
+            camera_id = data.get('camera_id') or data.get('cam_id')
+        else:
+            camera_id = data
+        if camera_id is None:
+            return
+        room = f"camera_{camera_id}"
+        await socketio_server.enter_room(sid, room)
+        print(f"Socket.IO subscribe: sid={sid} -> {room}")
+    except Exception as e:
+        print(f"subscribe_camera error: {e}")
+
+
+@socketio_server.on('unsubscribe_camera')
+async def unsubscribe_camera(sid, data):
+    try:
+        camera_id = None
+        if isinstance(data, dict):
+            camera_id = data.get('camera_id') or data.get('cam_id')
+        else:
+            camera_id = data
+        if camera_id is None:
+            return
+        room = f"camera_{camera_id}"
+        await socketio_server.leave_room(sid, room)
+        print(f"Socket.IO unsubscribe: sid={sid} -> {room}")
+    except Exception as e:
+        print(f"unsubscribe_camera error: {e}")
+
 # ASGI app entrypoint
 asgi_app = socketio.ASGIApp(
     socketio_server, 

@@ -46,6 +46,8 @@ export default function CameraManager({ locations, onCameraUpdated }) {
     // --- NEW STATE FOR MODAL ---
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const [cameraToDeleteId, setCameraToDeleteId] = useState(null);
+    const [isPublishModalOpen, setIsPublishModalOpen] = useState(false);
+    const [publishCameraId, setPublishCameraId] = useState(null);
     // ---------------------------
 
     // Fetch cameras on mount
@@ -243,6 +245,33 @@ export default function CameraManager({ locations, onCameraUpdated }) {
         setPreviewIds((p) => p.filter(x => x !== id));
     };
 
+    // Open publish confirmation modal
+    const handlePublish = (cam) => {
+        setPublishCameraId(cam.id);
+        setIsPublishModalOpen(true);
+    };
+
+    // Called when user confirms publish in modal
+    const confirmPublish = async () => {
+        if (!publishCameraId) return;
+        setIsPublishModalOpen(false);
+        setCamMessage({ text: '', type: '' });
+        try {
+            const data = await fetchApi(`/cameras/${publishCameraId}/publish`, 'POST');
+            if (data && data.status === 'ok') {
+                setCamMessage({ text: `Published: ${data.webrtc || data.hls}`, type: 'success' });
+            } else if (data && data.hls) {
+                setCamMessage({ text: `Published: ${data.hls}`, type: 'success' });
+            } else {
+                setCamMessage({ text: `Publish request succeeded.`, type: 'success' });
+            }
+        } catch (err) {
+            setCamMessage({ text: `Publish failed: ${err?.message || err}`, type: 'error' });
+        } finally {
+            setPublishCameraId(null);
+        }
+    };
+
     return (
         // Outer container structure
         <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-200 mt-2 max-w-4xl"> 
@@ -415,6 +444,13 @@ export default function CameraManager({ locations, onCameraUpdated }) {
                                             Preview
                                         </button>
                                     )}
+                                    {/* Publish button: user-triggered publish to MediaMTX */}
+                                    <button
+                                        onClick={(e) => { e.stopPropagation(); handlePublish(cam); }}
+                                        className="flex items-center bg-yellow-600 text-white text-sm font-bold py-1 px-3 rounded-lg hover:bg-yellow-700"
+                                    >
+                                        Publish
+                                    </button>
                                 </div>
                                 {/* Inline preview video (small) */}
                                 {previewIds.includes(cam.id) ? (
@@ -455,6 +491,37 @@ export default function CameraManager({ locations, onCameraUpdated }) {
                                     className="px-4 py-2 text-sm font-medium rounded-lg text-white bg-red-600 hover:bg-red-700"
                                 >
                                     Delete Camera
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+            {/* --------------------------- PUBLISH CONFIRMATION MODAL --------------------------- */}
+            {isPublishModalOpen && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+                    <div className="bg-white rounded-xl shadow-2xl w-full max-w-md">
+                        <div className="p-6 border-b border-gray-200">
+                            <h4 className="text-xl font-bold text-yellow-600 flex items-center">
+                                <FaCameraRetro className="mr-2" /> Confirm Publish
+                            </h4>
+                        </div>
+                        <div className="p-6">
+                            <p className="text-gray-700 mb-6">
+                                Publish this camera to MediaMTX so it becomes available via HLS/WebRTC. Continue?
+                            </p>
+                            <div className="flex justify-end space-x-3">
+                                <button
+                                    onClick={() => { setIsPublishModalOpen(false); setPublishCameraId(null); }}
+                                    className="px-4 py-2 text-sm font-medium rounded-lg border border-gray-300 text-gray-700 bg-white hover:bg-gray-50"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={confirmPublish}
+                                    className="px-4 py-2 text-sm font-medium rounded-lg text-white bg-yellow-600 hover:bg-yellow-700"
+                                >
+                                    Publish Camera
                                 </button>
                             </div>
                         </div>

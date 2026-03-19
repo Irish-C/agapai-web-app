@@ -10,6 +10,7 @@ import yaml
 import subprocess
 import signal
 import os
+import redis
 
 # Helper: server root
 _SERVER_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../'))
@@ -291,17 +292,32 @@ async def stream_camera_loop(camera_id, rtsp_url):
             _, buffer = cv2.imencode('.jpg', frame)
             frame_base64 = base64.b64encode(buffer).decode('utf-8')
 
-            # 2. EMIT FRAME TO FRONTEND
-            from app import socketio_server, connected_sids
-            if connected_sids:
+            # 2. EMIT FRAME TO FRONTEND: Emit only to the camera-specific room
+            # so that clients who subscribed to this camera receive frames.
+            from app import socketio_server
+            payload = {
+                'cam_id': str(camera_id),
+                'frame': frame_base64
+            }
+
+            # Check if the room has listeners (manager.rooms structure may vary)
+            try:
+                rooms = getattr(socketio_server.manager, 'rooms', None)
+                if isinstance(rooms, dict):
+                    ns_rooms = rooms.get('/', {})
+                    members = ns_rooms.get(f'camera_{camera_id}')
+                    has_listeners = bool(members)
+                else:
+                    has_listeners = True
+            except Exception:
+                has_listeners = True
+
+            if has_listeners:
                 key = f"cam:{camera_id}"
                 if key not in _FIRST_EMIT_LOGGED:
                     print(f"[camera_controller] Emitting first camera_frame for {camera_id}")
                     _FIRST_EMIT_LOGGED.add(key)
-                await socketio_server.emit('camera_frame', {
-                    'cam_id': str(camera_id), # Cast BigInt to string for frontend compatibility
-                    'frame': frame_base64
-                })
+                await socketio_server.emit('camera_frame', payload, room=f'camera_{camera_id}')
 
             # 3. FPS CONTROL
             await asyncio.sleep(0.04)  # ~25 FPS

@@ -65,16 +65,29 @@ async def stream_camera_loop(camera_id, rtsp_url):
             _, buffer = cv2.imencode('.jpg', frame)
             frame_base64 = base64.b64encode(buffer).decode('utf-8')
 
-            from app import socketio_server, connected_sids
-            if connected_sids:
+            from app import socketio_server
+            payload = {
+                'cam_id': str(camera_id),
+                'frame': frame_base64
+            }
+
+            try:
+                rooms = getattr(socketio_server.manager, 'rooms', None)
+                if isinstance(rooms, dict):
+                    ns_rooms = rooms.get('/', {})
+                    members = ns_rooms.get(f'camera_{camera_id}')
+                    has_listeners = bool(members)
+                else:
+                    has_listeners = True
+            except Exception:
+                has_listeners = True
+
+            if has_listeners:
                 key = f"cam:{camera_id}"
                 if key not in FIRST_EMIT_LOGGED:
                     print(f"[camera_worker] Emitting first camera_frame for {camera_id}")
                     FIRST_EMIT_LOGGED.add(key)
-                await socketio_server.emit('camera_frame', {
-                    'cam_id': str(camera_id),
-                    'frame': frame_base64
-                })
+                await socketio_server.emit('camera_frame', payload, room=f'camera_{camera_id}')
 
             await asyncio.sleep(0.04)  # ~25 FPS
     except asyncio.CancelledError:
