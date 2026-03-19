@@ -309,7 +309,7 @@ export default function CameraManager({ locations: initialLocations, onCameraUpd
                 <h2 className="text-2xl font-bold text-gray-900 flex items-center">
                     <FaCameraRetro className="mr-3 text-cyan-600" /> Camera Management
                 </h2>
-            </div>X
+            </div>
 
             {camMessage.text && (
                 <div className={`mb-6 p-4 border rounded-lg font-medium ${messageClass(camMessage)}`}>
@@ -317,7 +317,7 @@ export default function CameraManager({ locations: initialLocations, onCameraUpd
                 </div>
             )}
 
-            <div className="flex gap-2 mb-6 border-b">
+            <div className="flex gap-2 mb-12">
                 <button
                     onClick={() => setActiveTab('list')}
                     className={`px-4 py-2 font-semibold transition-colors ${
