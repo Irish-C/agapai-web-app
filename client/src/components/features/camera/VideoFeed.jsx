@@ -115,30 +115,35 @@ export default function VideoFeed({
           ${isFocused ? 'h-[75vh]' : 'aspect-video'}
         `}
       >
-        {content}
+        {content}
 
         {/* CCTV Timestamp Overlay */}
         <div className="absolute bottom-2 left-2 bg-black/60 text-white px-3 py-1 rounded text-xs font-mono backdrop-blur-sm">
           <div>{currentDateTime.toLocaleDateString()}</div>
           <div>{currentDateTime.toLocaleTimeString()}</div>
         </div>
-                onFocusChange(null); // Pass null to reset focus
-              }}
-              className="absolute top-2 right-2 p-2 bg-black/60 rounded-full text-white hover:bg-red-600 transition-colors"
-              title="Return to Grid"
-          >
-              <FaTimes />
-          </button>
-        ) : (
-          // "Focus" icon (visible on hover when in grid)
-          <div 
-            className="absolute top-2 right-2 p-2 bg-black/60 rounded-full text-white opacity-0 group-hover:opacity-100 transition-opacity"
-            title="Focus"
-          >
-            <FaExpand />
-          </div>
-        )}
-      </div>
-    </div>
-  );
+
+        {/* Focus/Unfocus Button */}
+        {isFocused ? (
+          <button 
+            onClick={() => {
+              onFocusChange(null); // Pass null to reset focus
+            }}
+            className="absolute top-2 right-2 p-2 bg-black/60 rounded-full text-white hover:bg-red-600 transition-colors"
+            title="Return to Grid"
+          >
+            <FaTimes />
+          </button>
+        ) : (
+          // "Focus" icon (visible on hover when in grid)
+          <div 
+            className="absolute top-2 right-2 p-2 bg-black/60 rounded-full text-white opacity-0 group-hover:opacity-100 transition-opacity"
+            title="Focus"
+          >
+            <FaExpand />
+          </div>
+        )}
+      </div>
+    </div>
+  );
 }
