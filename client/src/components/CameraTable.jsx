@@ -1,6 +1,6 @@
 import React from 'react';
 import { FaSave } from 'react-icons/fa';
-import { TableInput, ActionButtons } from '../../components/FormComponents';
+import { TableInput, ActionButtons } from './FormComponents';
 
 export default function CameraTable({ cameras, locations, editingCam, setEditingCam, publishedCameras, onEdit, onDelete, onPublish, onUpdate }) {
   return (

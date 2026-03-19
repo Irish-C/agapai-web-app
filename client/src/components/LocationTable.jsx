@@ -1,5 +1,5 @@
 import React from 'react';
-import { TableInput, ActionButtons } from '../../components/FormComponents';
+import { TableInput, ActionButtons } from './FormComponents';
 
 export default function LocationTable({ locations, editingLoc, setEditingLoc, onEdit, onDelete, onUpdate }) {
   return (
