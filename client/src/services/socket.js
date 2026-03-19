@@ -9,15 +9,20 @@ const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || "http://127.0.0.1:5000";
 // Using polling + disabling upgrades removes the "WebSocket is closed before the connection is established" noise.
 const isDev = import.meta.env.DEV;
 
-// Force WebSocket transport only (skip polling entirely) so we can verify the connection is truly using WS.
-// If this fails, the client will emit a connect_error and we can see the exact reason.
-const transports = ["websocket"];
+// Use polling in development (Vite proxy can be flaky for WS upgrades) and websocket in prod.
+// Polling avoids "WebSocket is closed before the connection is established" errors during dev.
+const transports = isDev ? ["polling"] : ["websocket"];
 
 export const socket = io(SOCKET_URL, {
   transports,
-  upgrade: false,      // No upgrade phase (we start with websocket right away)
+  upgrade: false,
   autoConnect: true,
-  reconnectionAttempts: 5,
+  reconnection: true,
+  reconnectionAttempts: Infinity,
+  reconnectionDelay: 1000,
+  reconnectionDelayMax: 30000,
+  randomizationFactor: 0.5,
+  timeout: 20000,
 });
 
 socket.on('connect', () => {
@@ -31,6 +36,14 @@ socket.on('connect', () => {
 
 socket.on('disconnect', (reason) => {
   console.log('SocketIO: disconnected', reason);
+});
+
+socket.on('reconnect_attempt', (attempt) => {
+  console.log('SocketIO: reconnect attempt', attempt);
+});
+
+socket.on('reconnect_failed', () => {
+  console.error('SocketIO: reconnect failed');
 });
 
 // Helpful debug logging for connection issues

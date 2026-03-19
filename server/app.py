@@ -5,6 +5,7 @@ from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
+from typing import Any
 from fastapi.staticfiles import StaticFiles
 import socketio
 
@@ -23,6 +24,24 @@ from src.utils.input_sanitization import get_sanitized_json, sanitize_input
 # Import the background stream logic from your controller
 from src.controllers.camera_controller import start_camera_processing
 
+from fastapi.responses import JSONResponse
+import json
+
+class PrismaJSONResponse(JSONResponse):
+    def render(self, content: Any) -> bytes:
+        def format_bigint(obj):
+            # JavaScript's Max Safe Integer limit
+            if isinstance(obj, int) and (obj > 9007199254740991 or obj < -9007199254740991):
+                return str(obj)
+            if isinstance(obj, list):
+                return [format_bigint(i) for i in obj]
+            if isinstance(obj, dict):
+                return {k: format_bigint(v) for k, v in obj.items()}
+            return obj
+
+        content = format_bigint(jsonable_encoder(content))
+        return json.dumps(content).encode("utf-8")
+
 # --- 1. LOAD ENVIRONMENT ---
 load_dotenv()
 SECRET_KEY = os.getenv('FLASK_SECRET_KEY', 'default_secret_key')
@@ -30,9 +49,14 @@ SECRET_KEY = os.getenv('FLASK_SECRET_KEY', 'default_secret_key')
 # --- 2. Socket.IO (ASGI) ---
 socketio_server = socketio.AsyncServer(
     async_mode='asgi',
-    cors_allowed_origins=['http://127.0.0.1:5173', 'http://localhost:5173'],
-    logger=False,           # Disable verbose socket.io logging (e.g., "emitting event")
-    engineio_logger=False,  # Disable engine.io internal logs
+    # For development allow all origins (tighten in production)
+    cors_allowed_origins='*',
+    # Tighter heartbeat to detect broken connections faster
+    ping_interval=10,
+    ping_timeout=20,
+    # Enable logging to help trace disconnects during debugging
+    logger=True,
+    engineio_logger=True,
 )
 
 # --- 3. FASTAPI app with lifespan ---
@@ -62,7 +86,7 @@ async def lifespan(app: FastAPI):
     print("[INFO] Disconnecting Prisma DB...")
     await db.disconnect()
 
-app = FastAPI(lifespan=lifespan)
+app = FastAPI(lifespan=lifespan, default_response_class=PrismaJSONResponse)
 
 @app.middleware("http")
 async def bigint_middleware(request, call_next):
@@ -195,11 +219,12 @@ else:
 # --- 8. Socket.IO events ---
 @socketio_server.event
 async def connect(sid, environ):
-    print('Socket.IO connect', sid)
+    addr = environ.get('REMOTE_ADDR') if environ else None
+    print(f"Socket.IO connect: sid={sid}, addr={addr}")
 
 @socketio_server.event
 async def disconnect(sid):
-    print('Socket.IO disconnect', sid)
+    print(f"Socket.IO disconnect: sid={sid}")
 
 # ASGI app entrypoint
 asgi_app = socketio.ASGIApp(

@@ -140,7 +140,7 @@ class CameraWorker:
 
                         # Save latest frame to Redis
                         _, buffer = cv2.imencode('.jpg', self.frame)
-                        self.redis.set('latest_frame', buffer.tobytes())
+                        self.redis.set(f"latest_frame_{self.active_camera_id}", buffer.tobytes())
                     else:
                         await asyncio.sleep(0.5)
 
