@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { FaExpand, FaTimes } from 'react-icons/fa';
+import { socket } from '../../services/socket.js';
 
 export default function VideoFeed({
   camId,
@@ -15,6 +16,22 @@ export default function VideoFeed({
     const timer = setInterval(() => setCurrentDateTime(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
+
+  // Subscribe to camera frame stream
+  useEffect(() => {
+    try {
+      socket.emit('subscribe_camera', { camera_id: camId });
+    } catch (e) {
+      console.warn(`Failed to subscribe to camera ${camId}:`, e);
+    }
+
+    return () => {
+      // Unsubscribe when component unmounts
+      try {
+        socket.emit('unsubscribe_camera', { camera_id: camId });
+      } catch (e) {}
+    };
+  }, [camId]);
 
   const hasFrame = !!frameData;
 
