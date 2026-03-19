@@ -18,6 +18,7 @@ from src.routes.camera_routes import router as camera_router
 from src.routes.event_routes import router as event_router
 from src.routes.settings_routes import router as settings_router
 from src.routes.location_routes import router as location_router
+from src.utils.input_sanitization import get_sanitized_json, sanitize_input
 
 # Import the background stream logic from your controller
 from src.controllers.camera_controller import start_camera_processing
@@ -65,6 +66,34 @@ app = FastAPI(lifespan=lifespan)
 
 @app.middleware("http")
 async def bigint_middleware(request, call_next):
+    # Sanitize incoming JSON bodies so controllers receive cleaned data.
+    # This reads the raw body, sanitizes it with `sanitize_input`, and
+    # injects a new receive() coroutine so downstream `await request.json()`
+    # returns the sanitized payload.
+    try:
+        content_type = request.headers.get('content-type', '')
+        if 'application/json' in content_type.lower():
+            body_bytes = await request.body()
+            if body_bytes:
+                try:
+                    payload = json.loads(body_bytes)
+                    sanitized = sanitize_input(payload)
+                    new_body = json.dumps(sanitized).encode('utf-8')
+
+                    async def receive():
+                        return {"type": "http.request", "body": new_body}
+
+                    # Replace the request's receive with one that returns the
+                    # sanitized body. This makes `await request.json()` return
+                    # the sanitized payload.
+                    request._receive = receive
+                except Exception:
+                    # If parsing/sanitization fails, fall back to original body
+                    pass
+    except Exception:
+        # Be defensive: do not block requests because sanitization failed.
+        pass
+
     response = await call_next(request)
     return response
 
@@ -104,7 +133,7 @@ async def health_check():
 from fastapi import Request
 @app.post('/api/set_active_camera')
 async def set_active_camera(request: Request):
-    data = await request.json()
+    data = await get_sanitized_json(request)
     camera_id = data.get('camera_id')
     r = redis.Redis(host='localhost', port=6379, db=0)
     r.set('active_camera_id', camera_id)
@@ -120,23 +149,38 @@ async def get_active_camera():
     return {'active_camera_id': camera_id}
 
 # --- 9. Video Feed Endpoint ---
-from fastapi import Response
+from fastapi.responses import StreamingResponse
 import redis
-import time
+import asyncio
 
 @app.get('/video_feed')
-async def video_feed():
+async def video_feed(camera_id: str | None = None):
+    """MJPEG streaming endpoint.
+
+    - If `camera_id` is provided, it reads from Redis key `latest_frame_{camera_id}`.
+    - Otherwise, it falls back to the global `latest_frame` key.
+    """
+
+    camera_id = sanitize_input(camera_id)
     r = redis.Redis(host='localhost', port=6379, db=0)
-    def generate():
+    stream_key = f"latest_frame_{camera_id}" if camera_id else "latest_frame"
+
+    async def generate():
         while True:
-            frame_bytes = r.get('latest_frame')
+            frame_bytes = r.get(stream_key)
             if frame_bytes:
                 yield (b'--frame\r\n'
                        b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
-            time.sleep(0.03)
-    return Response(generate(), media_type='multipart/x-mixed-replace; boundary=frame')
+            await asyncio.sleep(0.03)
 
-# --- 7. Static + SPA fallback ---
+    return StreamingResponse(generate(), media_type='multipart/x-mixed-replace; boundary=frame')
+
+# --- 7. Snapshot static folder (used for alert snapshots) ---
+SNAPSHOTS_DIR = os.path.join(os.path.dirname(__file__), 'static', 'snapshots')
+os.makedirs(SNAPSHOTS_DIR, exist_ok=True)
+app.mount('/snapshots', StaticFiles(directory=SNAPSHOTS_DIR), name='snapshots')
+
+# --- 8. Static + SPA fallback ---
 _DIST_DIR = os.path.join(os.path.dirname(__file__), '../client/dist')
 if os.path.isdir(_DIST_DIR):
     app.mount('/', StaticFiles(directory=_DIST_DIR, html=True), name='static')

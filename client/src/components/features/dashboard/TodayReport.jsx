@@ -1,16 +1,14 @@
 // src/components/TodayReport.jsx
 import React, { useState, useEffect } from 'react';
-import { FaExclamationTriangle, FaCheckCircle, FaChartBar, FaCalendarAlt,FaDownload, FaFileAlt} from 'react-icons/fa';
-import { fetchDailySummary } from '../../services/apiService.js'; 
+import { FaExclamationTriangle, FaCheckCircle, FaChartBar, FaCalendarAlt, FaDownload, FaFileAlt } from 'react-icons/fa';
 
 /**
  * Renders the Today's Incident Log, Activity Summary, and Log Downloader sidebar.
  * It receives 'incidents' (real-time data) and 'user' (for the token) as props.
  */
-export default function TodayReport({ incidents, user }) { // <-- Accepts user prop
+export default function TodayReport({ incidents, alerts = [], user }) {
     
-    // --- STATE: Activity Summary (Original) ---
-    const [activityData, setActivityData] = useState([]);
+    // --- STATE: Activity Summary (Alerts) ---
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState(null);
 
@@ -22,48 +20,16 @@ export default function TodayReport({ incidents, user }) { // <-- Accepts user p
     const RPI_BASE_URL = "http://192.168.2.106:4050"; 
 
 
-    // --- Data Fetching Effect for 24h Summary ---
+    // --- Data / Activity Summary ---
+    // The Activity Summary panel now shows recent alerts from the last 24h.
     useEffect(() => {
-        if (!user || !user.token) {
-            setActivityData([]);
-            setIsLoading(false);
-            return;
-        }
-
-        const getDailySummary = async () => {
-            setIsLoading(true);
-            setError(null);
-            try {
-                // Call the new API service function
-                const rawData = await fetchDailySummary(); 
-                
-                // --- Data Transformation (Example based on assumed API response) ---
-                const total = rawData.moving_time + rawData.resting_time;
-                const incident_count = incidents.length; // Use real-time count for Incidents
-
-                const newActivityData = [
-                    { label: 'Mov.', value: rawData.moving_time, percentage: `${Math.round((rawData.moving_time / total) * 100) || 0}%`, color: 'bg-teal-500' },
-                    { label: 'Rest', value: rawData.resting_time, percentage: `${Math.round((rawData.resting_time / total) * 100) || 0}%`, color: 'bg-green-500' },
-                    // Incident is often a separate metric, here we just show count
-                    { label: 'Incid.', value: incident_count, percentage: `${incident_count > 0 ? 5 : 0}%`, color: 'bg-red-500'}
-                ];
-
-                setActivityData(newActivityData);
-
-            } catch (err) {
-                setError('Failed to load 24h summary.');
-            } finally {
-                setIsLoading(false);
-            }
-        };
-
-        getDailySummary();
-    // Re-run if user (token) changes or if the real-time incident count changes
-    }, [user, incidents.length]); 
+        setIsLoading(false);
+        setError(null);
+    }, [alerts]);
 
     
-    // --- Determine System Status ---
-    const incidentCount = incidents.length;
+    // --- Determine System Status (using alerts) ---
+    const incidentCount = alerts?.length || 0;
     const isClear = incidentCount === 0;
 
     // --- HELPER: Date Formatter ---
@@ -71,6 +37,31 @@ export default function TodayReport({ incidents, user }) { // <-- Accepts user p
         const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
         return new Date(dateString).toLocaleDateString(undefined, options);
     };
+
+    const groupedAlerts = React.useMemo(() => {
+        const map = {};
+        (alerts || []).forEach((alert) => {
+            const type = (alert.type || alert.event_class || alert.event_type || 'Unknown').toUpperCase();
+            const ts = alert.ts || (alert.timestamp ? new Date(alert.timestamp).getTime() : Date.now());
+            const snapshotUrl = alert.snapshot_url || alert.snapshotUrl || null;
+
+            if (!map[type]) map[type] = { count: 0, times: [], latestSnapshot: null, latestTs: 0 };
+            map[type].count += 1;
+            map[type].times.push(ts);
+
+            if (snapshotUrl && ts > map[type].latestTs) {
+                map[type].latestTs = ts;
+                map[type].latestSnapshot = snapshotUrl;
+            }
+        });
+
+        Object.values(map).forEach((group) => {
+            group.times.sort((a, b) => b - a);
+            group.times = group.times.slice(0, 5);
+        });
+
+        return map;
+    }, [alerts]);
 
     return (
         <div className="space-y-4 sticky top-2 h-fit">
@@ -85,17 +76,32 @@ export default function TodayReport({ incidents, user }) { // <-- Accepts user p
                         <p className="font-semibold">All systems clear! No incidents recorded today. 🎉</p>
                     </div>
                 ) : (
-                    <div className="space-y-3 max-h-80 overflow-y-auto pr-2">
-                        {incidents.map((incident, index) => (
-                            <div 
-                                key={index} 
-                                className="p-3 bg-red-100 border border-red-400 text-red-800 rounded-lg flex items-start animate-pulse-once"
-                            >
-                                <FaExclamationTriangle className="mt-1 mr-3 flex-shrink-0 text-xl text-red-600" />
-                                <div>
-                                    <p className="font-bold text-base">{incident.type || 'Unknown Incident'}!</p>
-                                    <p className="text-sm">Location: <span className='font-medium'>{incident.location}</span></p>
-                                    <p className="text-xs text-gray-600 mt-1">Time: {new Date(incident.timestamp * 1000).toLocaleTimeString()}</p>
+                    <div className="space-y-4 max-h-80 overflow-y-auto pr-2">
+                        {Object.entries(groupedAlerts).map(([type, group]) => (
+                            <div key={type} className="p-3 bg-red-50 border border-red-200 rounded-lg">
+                                <div className="flex items-center justify-between gap-3">
+                                    <div className="flex items-center gap-2">
+                                        <FaExclamationTriangle className="text-red-600" />
+                                        <span className="font-bold text-base text-red-700">{type}</span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-xs text-gray-500">{group.count}x</span>
+                                        {group.latestSnapshot && (
+                                            <a
+                                                href={group.latestSnapshot}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="text-xs font-semibold text-teal-700 bg-teal-100 hover:bg-teal-200 px-2 py-1 rounded-full"
+                                            >
+                                                View Snapshot
+                                            </a>
+                                        )}
+                                    </div>
+                                </div>
+                                <div className="mt-2 grid grid-cols-2 gap-2 text-xs text-gray-600">
+                                    {group.times.map((ts) => (
+                                        <span key={ts}>@ {new Date(ts).toLocaleTimeString()}</span>
+                                    ))}
                                 </div>
                             </div>
                         ))}
@@ -112,26 +118,30 @@ export default function TodayReport({ incidents, user }) { // <-- Accepts user p
 
                 {isLoading && <p className="text-center text-gray-500">Loading summary...</p>}
                 {error && <p className="text-center text-red-500 font-medium">{error}</p>}
-                
-                {!isLoading && !error && activityData.length > 0 && (
-                    <div className="space-y-4">
-                        {activityData.map((data, index) => (
-                            <div key={index}>
-                                <div className="flex justify-between items-center text-sm font-medium text-gray-700 mb-1">
-                                    <span>{data.label}</span>
-                                    <span>{data.percentage}</span>
+
+                {!isLoading && !error && (!alerts || alerts.length === 0) && (
+                    <p className="text-center text-gray-500">No alerts detected in the last 24 hours.</p>
+                )}
+
+                {!isLoading && !error && alerts && alerts.length > 0 && (
+                    <div className="space-y-2 max-h-52 overflow-y-auto pr-2">
+                        {alerts
+                            .slice()
+                            .sort((a, b) => b.ts - a.ts)
+                            .slice(0, 10)
+                            .map((alert, idx) => (
+                                <div key={idx} className="flex items-center justify-between bg-gray-50 border border-gray-100 rounded-lg px-3 py-2">
+                                    <span className="text-sm font-semibold text-gray-700">
+                                        {alert.type?.toUpperCase() || 'ALERT'}
+                                    </span>
+                                    <span className="text-xs text-gray-500">
+                                        @{new Date(alert.ts).toLocaleTimeString()}
+                                    </span>
                                 </div>
-                                <div className="w-full bg-gray-200 rounded-full h-2.5">
-                                    <div 
-                                        className={`${data.color} h-2.5 rounded-full transition-all duration-700 ease-out`} 
-                                        style={{ width: data.percentage }}
-                                    ></div>
-                                </div>
-                            </div>
-                        ))}
+                            ))}
                     </div>
                 )}
-                <p className="text-xs text-gray-500 mt-4 text-center">Data refreshed daily.</p>
+                <p className="text-xs text-gray-500 mt-4 text-center">Showing the most recent 10 alerts from the last 24 hours.</p>
             </div>
 
             {/* 3. LOG PANEL / EXPORT LOGS (New Feature) */}

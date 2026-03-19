@@ -66,11 +66,27 @@ model Camera {
   cam_name   String     @db.VarChar(100)
   cam_status Boolean    @default(true)
   stream_url String     @db.VarChar(255)
+  // Per-camera toggles for event emission and persistence
+  emit_fall         Boolean @default(true)
+  persist_fall      Boolean @default(true)
+  emit_inactivity   Boolean @default(false)
+  persist_inactivity Boolean @default(false)
   loc_id     BigInt?
   location   Location?  @relation(fields: [loc_id], references: [id])
   logs       EventLog[]
 
   @@map("camera")
+}
+
+// Global settings for notifications and feature toggles
+model GlobalSetting {
+  id                  BigInt  @id @default(autoincrement())
+  emit_fall           Boolean @default(true)
+  persist_fall        Boolean @default(true)
+  emit_inactivity     Boolean @default(false)
+  persist_inactivity  Boolean @default(false)
+
+  @@map("global_settings")
 }
 
 model EventLog {

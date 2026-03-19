@@ -2,7 +2,7 @@ from database import db
 
 async def list_locations_logic():
     locations = await db.location.find_many(order={'loc_name': 'asc'})
-    return {'status': 'success', 'locations': [{'id': loc.id, 'name': loc.loc_name} for loc in locations]}, 200
+    return {'status': 'success', 'locations': [{'id': str(loc.id), 'name': loc.loc_name} for loc in locations]}, 200
 
 async def create_location_logic(data):
     try:
@@ -15,7 +15,7 @@ async def create_location_logic(data):
             return {'status': 'error', 'message': 'Location already exists'}, 409
 
         new_loc = await db.location.create(data={'loc_name': loc_name})
-        return {'status': 'success', 'location': {'id': new_loc.id, 'name': new_loc.loc_name}}, 201
+        return {'status': 'success', 'location': {'id': str(new_loc.id), 'name': new_loc.loc_name}}, 201
     except Exception as e:
         return {'status': 'error', 'message': str(e)}, 500
 

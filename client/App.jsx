@@ -32,11 +32,24 @@ const GlobalAlertModal = ({ alert, onClose }) => {
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black bg-opacity-80 animate-pulse">
             <div className="bg-white border-8 border-red-600 rounded-2xl shadow-2xl p-10 max-w-xl w-full text-center transform scale-110">
                 <div className="text-8xl mb-4 animate-bounce">🚨</div>
-                <h2 className="text-4xl font-black text-red-700 mb-2">FALL DETECTED!</h2>
-                
+                <h2 className="text-4xl font-black text-red-700 mb-2">
+                    {alert.type ? `${alert.type.toUpperCase()} DETECTED!` : 'ALERT DETECTED!'}
+                </h2>
+
                 <p className="text-2xl text-gray-900 mb-6">
                     Location: <span className="font-bold underline">{alert.location || 'Unknown Area'}</span>
                 </p>
+
+                {alert.snapshot_url ? (
+                    <div className="mb-6">
+                        <p className="text-lg font-semibold text-gray-800 mb-2">Snapshot</p>
+                        <img
+                            src={alert.snapshot_url}
+                            alt="Alert snapshot"
+                            className="w-full max-w-md mx-auto rounded-lg border border-gray-300 shadow-sm"
+                        />
+                    </div>
+                ) : null}
 
                 <div className="bg-red-100 border-l-8 border-red-600 text-red-700 px-6 py-4 rounded-lg mb-6 text-left">
                     <p className="font-bold text-xl mb-1">Status: Hardware Alarm Active</p>

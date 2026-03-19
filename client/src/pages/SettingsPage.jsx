@@ -22,7 +22,7 @@ export default function Settings({ user }) {
     // 2. Define the navigation structure with roles
     const fullNavItems = [
         { id: 'my_account', name: 'My Account', icon: FaUserCog, role: 'all' },
-        { id: 'management', name: 'Device and Location', icon: FaConnectdevelop, role: 'admin' }, 
+        { id: 'devloc_management', name: 'Device and Location', icon: FaConnectdevelop, role: 'admin' }, 
         { id: 'notification', name: 'Notifications', icon: FaBell, role: 'all' },
         { id: 'user_management', name: 'User Management', icon: FaUsers, role: 'admin' }, 
     ];
@@ -37,7 +37,7 @@ export default function Settings({ user }) {
             case 'my_account':
                 return <AccountSettingsForm user={user} />;
             
-            case 'management':
+            case 'devloc_management':
                 return isAdmin ? (
                     <ManagementDashboard 
                         locations={locations} 

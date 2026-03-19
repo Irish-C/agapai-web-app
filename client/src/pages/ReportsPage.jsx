@@ -136,9 +136,21 @@ export default function ReportsPage() {
                     {log.acknowledged_by_username || 'System'}
                 </td>
                 <td className="px-8 py-6 whitespace-nowrap text-right">
-                    <button className="w-10 h-10 flex items-center justify-center rounded-full text-gray-300 group-hover:bg-teal-600 group-hover:text-white group-hover:shadow-lg transition-all">
-                        <FaArrowRight size={14} />
-                    </button>
+                    <div className="flex items-center justify-end gap-2">
+                        {log.snapshot_url ? (
+                            <a
+                                href={log.snapshot_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="px-3 py-2 text-xs font-bold rounded-xl bg-teal-600 text-white hover:bg-teal-700 transition"
+                            >
+                                View Snapshot
+                            </a>
+                        ) : null}
+                        <button className="w-10 h-10 flex items-center justify-center rounded-full text-gray-300 group-hover:bg-teal-600 group-hover:text-white group-hover:shadow-lg transition-all">
+                            <FaArrowRight size={14} />
+                        </button>
+                    </div>
                 </td>
             </tr>
         ));

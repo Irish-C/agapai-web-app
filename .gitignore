@@ -13,6 +13,73 @@ build/
 .env.local
 .env.*.local
 server/venv
+server/.venv
+server/.env
+server/yolovenv
+client/.env
+
+# Virtualenvs and Python caches
+.venv/
+venv/
+*/venv/
+
+# Python tooling
+.mypy_cache/
+.pytest_cache/
+coverage/
+htmlcov/
+
+# Generated/temporary files
+*.egg-info/
+build/
+dist/
+
+# Prisma generated client and local prisma artifacts
+.prisma/
+server/.prisma-venv/
+server/.prisma/
+
+# Static snapshots and uploads (runtime generated)
+static/snapshots/
+server/static/snapshots/
+
+# OS-specific files
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Icon?
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+*.log
+
+# IDEs
+.vscode/
+.idea/
+*.sublime-workspace
+*.sublime-project
+
+# Node/Vite cache
+.turbo/
+.vite/
+
+# Environment-specific
+/.env.local
+/.env.development.local
+/.env.test.local
+/.env.production.local
+
+# Python bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Media/large binaries
+server/mediamtx
+server/mediamtx.yml.save
+
 
 # Logs
 npm-debug.log*

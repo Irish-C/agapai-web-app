@@ -52,6 +52,8 @@ export default function CameraManager({ locations, onCameraUpdated }) {
         fetchCameras();
     }, []);
 
+    // Per-camera toggles were moved to the Notifications tab; no local Toggle here.
+
     // When locations prop updates, set the default for the add form dropdown
     useEffect(() => {
         if (locations.length > 0 && !newCam.locId) {
@@ -86,14 +88,16 @@ export default function CameraManager({ locations, onCameraUpdated }) {
         setNewCam(prev => ({ ...prev, [name]: value }));
     };
 
+    // per-camera toggle handlers removed (managed globally under Notifications)
+
     const handleAddCamera = async (e) => {
         e.preventDefault();
         setCamMessage({ text: '', type: '' });
         
         const cameraData = {
             cam_name: newCam.name,
-            stream_url: newCam.url, 
-            loc_id: parseInt(newCam.locId)
+            stream_url: newCam.url,
+            loc_id: parseInt(newCam.locId),
         };
         try {
             const data = await fetchApi('/cameras', 'POST', cameraData);
@@ -150,13 +154,17 @@ export default function CameraManager({ locations, onCameraUpdated }) {
             stream_url: cam.stream_url || '',
             // Ensure loc_id is always set when editing starts.
             // If the camera doesn't have a location yet, default to the first available location.
-            loc_id: cam.location_id ?? defaultLocId
+            loc_id: cam.location_id ?? defaultLocId,
         });
     };
 
     const handleEditChange = (e) => {
         const { name, value } = e.target;
         setEditingCam(prev => ({ ...prev, [name]: value }));
+    };
+
+    const handleEditToggle = (name, checked) => {
+        setEditingCam(prev => ({ ...prev, [name]: checked }));
     };
 
     const handleCancelEdit = () => {
@@ -181,7 +189,7 @@ export default function CameraManager({ locations, onCameraUpdated }) {
         const cameraData = {
             cam_name: editingCam.cam_name,
             stream_url: editingCam.stream_url,
-            loc_id: locId
+            loc_id: locId,
         };
 
         try {
@@ -269,6 +277,8 @@ export default function CameraManager({ locations, onCameraUpdated }) {
                 </div>
             </form>
 
+            {/* Per-camera toggles removed: managed globally under Notifications */}
+
             <h3 className="text-lg font-semibold text-gray-700 mb-2 px-3">Existing Cameras</h3>
             
             {/* SCROLLABLE WRAPPER */}
@@ -311,6 +321,7 @@ export default function CameraManager({ locations, onCameraUpdated }) {
                                         </select>
                                     </div>
                                 </div>
+                                {/* Per-camera toggles removed: managed globally under Notifications */}
                                 <div className="flex justify-end gap-2">
                                     <button
                                         type="button"

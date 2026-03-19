@@ -1,160 +1,149 @@
-// src/components/CameraGrid.jsx
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import VideoFeed from './VideoFeed.jsx';
 import TodayReport from '../dashboard/TodayReport.jsx';
 import { useCameraSocket } from '../../hooks/useCamera.js';
 import { FaPlug, FaSpinner, FaVideo } from 'react-icons/fa';
+import { FiAlertTriangle } from 'react-icons/fi';
 import { fetchCameraList } from '../../services/apiService.js';
 
 export default function CameraGrid() {
-    // Data from our simplified hook
-    const { cameraData, incidents, isConnected } = useCameraSocket();
-    
-    // State for the camera list itself
-    const [cameraList, setCameraList] = useState([]);
-    
-    // State for loading and errors
-    const [isLoading, setIsLoading] = useState(true);
-    const [error, setError] = useState(null);
-    
-    // This state will track which camera is "focused". null = grid view.
-    const [focusedCameraId, setFocusedCameraId] = useState(null);
+  const { cameraData, incidents, alerts, isConnected } = useCameraSocket();
 
-    // Fetch cameras inside useEffect. Runs once on mount.
-    useEffect(() => {
-        const getCameras = async () => {
-            setIsLoading(true);
-            setError(null);
-            try {
-                // Fetch all cameras (authenticated)
-                const data = await fetchCameraList();
+  const [cameraList, setCameraList] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [focusedCameraId, setFocusedCameraId] = useState(null);
 
-                // Assuming the backend returns { status: 'success', cameras: [...] }
-                if (data?.status === 'success' && Array.isArray(data.cameras)) {
-                    setCameraList(data.cameras);
-                } else {
-                    setError('API did not return a valid camera list.');
-                }
-            } catch (err) {
-                console.error("Failed to fetch camera list:", err);
-                setError(`Failed to load camera list: ${err.message}`);
-            } finally {
-                setIsLoading(false);
-            }
-        };
+  useEffect(() => {
+    let mounted = true;
 
-        getCameras();
-    }, []); 
+    const getCameras = async () => {
+      setIsLoading(true);
+      setError(null);
+      try {
+        const data = await fetchCameraList();
+        if (!mounted) return;
 
-    // Find the camera object if one is focused
-    const focusedCamera = cameraList.find(c => c.id === focusedCameraId);
+        if (data?.status === 'success' && Array.isArray(data.cameras)) {
+          setCameraList(data.cameras);
+        } else {
+          setError('API did not return a valid camera list.');
+        }
+      } catch (err) {
+        if (!mounted) return;
+        setError(`Failed to load camera list: ${err?.message || 'Unknown error'}`);
+      } finally {
+        if (mounted) setIsLoading(false);
+      }
+    };
 
-    // Helper function to generate the correct stream URL (proxied via main backend)
-    // NOTE: This URL points to the route you created in app.py: /api/live_stream/<int:cam_id>
-    const getStreamUrl = (camId) => `http://127.0.0.1:4050/video_feed`;
+    getCameras();
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
-    const header = (
-        <div className="flex items-center text-2xl font-extrabold text-gray-900 mb-4 border-b pb-2">
-            <FaVideo className="mr-3 text-gray-900" />
-            Live View
-            <span className={`ml-4 px-3 py-1 text-sm rounded-full font-semibold ${isConnected ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                <FaPlug className='inline-block mr-1' /> {isConnected ? 'WebSocket Live' : 'WebSocket Disconnected'}
-            </span>
-        </div>
-    );
+  const focusedCamera = cameraList.find((c) => c.id === focusedCameraId);
 
-    if (isLoading && cameraList.length === 0) { // Only show full-page loader on initial load
-        return (
-            <div className="p-6">
-                {header}
-                <div className='flex items-center justify-center p-12 text-xl text-gray-700'>
-                    <FaSpinner className='animate-spin mr-2' /> Loading camera configurations...
-                </div>
-            </div>
-        );
-    }
-    
-    if (error) {
-           return (
-             <div className="p-6">
-                 {header}
-                 <div className="p-4 bg-red-100 border border-red-400 text-red-700 rounded-lg mb-4">{error}</div>
-             </div>
-           );
-    }
+  const HLS_BASE_URL =
+    import.meta.env.VITE_MEDIAMTX_HLS_BASE_URL || 'http://127.0.0.1:8888';
+  const WEBRTC_BASE_URL =
+    import.meta.env.VITE_MEDIAMTX_WEBRTC_BASE_URL || 'http://127.0.0.1:8889';
 
+  const getStreamPath = (camera) => camera.stream_path || camera.path || `cam${camera.id}`;
+  const getHlsUrl = (camera) => `${HLS_BASE_URL}/${getStreamPath(camera)}/index.m3u8`;
+  const getWebrtcUrl = (camera) => `${WEBRTC_BASE_URL}/${getStreamPath(camera)}/whep`;
+
+  const header = (
+    <div className="flex items-center text-2xl font-extrabold text-gray-900 mb-4 border-b pb-2">
+      <FaVideo className="mr-3 text-gray-900" />
+      Live View
+      <span
+        className={`ml-4 px-3 py-1 text-sm rounded-full font-semibold ${
+          isConnected ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+        }`}
+      >
+        <FaPlug className="inline-block mr-1" />
+        {isConnected ? 'WebSocket Live' : 'WebSocket Disconnected'}
+      </span>
+    </div>
+  );
+
+
+  if (isLoading && cameraList.length === 0) {
     return (
-        <div className="flex flex-col lg:flex-row gap-6 p-6">
-            
-            {/* Conditional Layout: Focus or Grid */}
-            {focusedCameraId && focusedCamera ? (
-                // --- FOCUS MODE ---
-                <div className="flex-grow w-full">
-                    {header}
-                    <VideoFeed
-                        key={focusedCamera.id}
-                        camId={focusedCamera.id}
-                        location={focusedCamera.location_name || focusedCamera.location || focusedCamera.loc_name}
-                        // Prefer the configured camera stream URL; fall back to the local Pi proxy when missing.
-                        streamUrl={focusedCamera.stream_url || getStreamUrl(focusedCamera.id)}
-                        frameData={cameraData[focusedCamera.id]}
-                        isConnected={isConnected}
-                        isFocused={true}
-                        onFocusChange={setFocusedCameraId} // Pass the setter
-                    />
-                    <button 
-                        onClick={() => setFocusedCameraId(null)}
-                        className="mt-4 px-4 py-2 bg-blue-500 text-white rounded"
-                    >
-                        Back to Grid
-                    </button>+
-                </div>
-
-            ) : (
-                // --- GRID MODE ---
-                <>
-                    {/* Main Content Area (Camera Grid) */}
-                    <div className="flex-grow lg:w-3/4">
-                        {header}
-                        
-                        {/* Show grid only when not loading */}
-                        {!isLoading && cameraList.length > 0 && (
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                {cameraList.map(camera => (
-                                    <div 
-                                        key={camera.id} 
-                                        className={cameraList.length === 1 ? 'md:col-span-2' : ''}
-                                    >
-                                        <VideoFeed
-                                            camId={camera.id}
-                                            location={camera.location_name || camera.location || camera.loc_name} // Handle both formats
-                                            // Prefer configured stream URL; fall back to the local Pi proxy if missing
-                                            streamUrl={camera.stream_url || getStreamUrl(camera.id)}
-                                            frameData={cameraData[camera.id]}
-                                            isConnected={isConnected}
-                                            isFocused={false}
-                                            onFocusChange={setFocusedCameraId} // Pass the setter
-                                        />
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-
-                        {/* Show message if no cameras are found at all */}
-                        {!isLoading && cameraList.length === 0 && ( 
-                            <div className="text-center p-12 text-gray-500">
-                                <p>No cameras have been added yet.</p>
-                                <p>Please go to the Settings page to add a camera.</p>
-                            </div>
-                        )}
-                    </div>
-
-                    {/* Sidebar Area (Incident Log) */}
-                    <div className="lg:w-1/4 lg:flex-shrink-0">
-                        <TodayReport incidents={incidents} />
-                    </div>
-                </>
-            )}
+      <div className="p-6">
+        {header}
+        <div className="flex items-center justify-center p-12 text-xl text-gray-700">
+          <FaSpinner className="animate-spin mr-2" /> Loading camera configurations...
         </div>
+      </div>
     );
+  }
+
+  if (error) {
+    return (
+      <div className="p-6">
+        {header}
+        <div className="p-4 bg-red-100 border border-red-400 text-red-700 rounded-lg mb-4">
+          {error}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col lg:flex-row gap-6 p-6">
+      {focusedCameraId && focusedCamera ? (
+        <div className="flex-grow w-full">
+          {header}
+          <VideoFeed
+            key={focusedCamera.id}
+            camId={focusedCamera.id}
+            location={focusedCamera.location_name || focusedCamera.location || focusedCamera.loc_name}
+            streamUrl={getHlsUrl(focusedCamera)}
+            webrtcUrl={getWebrtcUrl(focusedCamera)}
+            frameData={cameraData[focusedCamera.id]}
+            isConnected={isConnected}
+            isFocused={true}
+            onFocusChange={setFocusedCameraId}
+          />
+          <button
+            onClick={() => setFocusedCameraId(null)}
+            className="mt-4 px-4 py-2 bg-blue-500 text-white rounded"
+          >
+            Back to Grid
+          </button>
+        </div>
+      ) : (
+        <>
+          <div className="flex-grow lg:w-3/4">
+            {header}
+            {!isLoading && cameraList.length > 0 && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {cameraList.map((camera) => (
+                  <div key={camera.id} className={cameraList.length === 1 ? 'md:col-span-2' : ''}>
+                    <VideoFeed
+                      camId={camera.id}
+                      location={camera.location_name || camera.location || camera.loc_name}
+                      streamUrl={getHlsUrl(camera)}
+                      webrtcUrl={getWebrtcUrl(camera)}
+                      frameData={cameraData[camera.id]}
+                      isConnected={isConnected}
+                      isFocused={false}
+                      onFocusChange={setFocusedCameraId}
+                    />
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="lg:w-1/4 lg:flex-shrink-0">
+            <TodayReport incidents={incidents} alerts={alerts} />
+          </div>
+        </>
+      )}
+    </div>
+  );
 }

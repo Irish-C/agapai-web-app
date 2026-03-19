@@ -1,8 +1,11 @@
+import os
+import time
 import cv2
 import asyncio
 import base64
 import redis
 import json
+from ultralytics import YOLO
 from database import db
 
 # --- STREAMING & BACKGROUND TASKS ---
@@ -81,6 +84,26 @@ class CameraWorker:
         self.frame = None
         self.active_camera_id = None
 
+        # YOLO model (optional)
+        self.yolo = None
+        self.yolo_enabled = False
+        self._yolo_frame_counter = 0
+        self._yolo_skip = 5  # run inference every N frames
+        self._yolo_last_alert = 0.0
+        self._yolo_alert_cooldown = 2.0  # seconds between alerts
+
+        model_path = os.path.join(os.path.dirname(__file__), 'ml', 'yolov11_fin.pt')
+        if os.path.exists(model_path):
+            try:
+                self.yolo = YOLO(model_path)
+                self.yolo.to('cpu')
+                self.yolo_enabled = True
+                print(f"[CameraWorker] Loaded YOLO model: {model_path}")
+            except Exception as e:
+                print(f"[CameraWorker] Failed to load YOLO model: {e}")
+        else:
+            print(f"[CameraWorker] YOLO model not found at: {model_path}")
+
     async def start(self):
         print("CameraWorker: Background AI worker started.")
         while True:
@@ -131,7 +154,34 @@ class CameraWorker:
             await asyncio.sleep(0.03)  # ~30 FPS
 
     def detect_incident(self, frame):
-        # Placeholder for YOLO logic
+        """Detect an incident (motion/object) using YOLO.
+
+        Returns True when a detection is present and cooldown has expired.
+        """
+        if not self.yolo_enabled or self.yolo is None:
+            return False
+
+        self._yolo_frame_counter += 1
+        if self._yolo_frame_counter % self._yolo_skip != 0:
+            return False
+
+        now = time.time()
+        if now - self._yolo_last_alert < self._yolo_alert_cooldown:
+            return False
+
+        try:
+            # Run inference at a smaller resolution for performance.
+            results = self.yolo(frame, conf=0.35, imgsz=640, verbose=False)
+            if len(results) == 0:
+                return False
+            r = results[0]
+            # Trigger on any detection; adjust by class if needed.
+            if r.boxes and len(r.boxes) > 0:
+                self._yolo_last_alert = now
+                return True
+        except Exception as e:
+            print(f"[CameraWorker] YOLO inference error: {e}")
+
         return False
 
     async def send_alert(self):

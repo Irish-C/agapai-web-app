@@ -1,5 +1,6 @@
 from database import db
 from datetime import datetime
+from src.utils.role_utils import normalize_role
 
 async def create_event_logic(data):
     try:

@@ -1,140 +1,256 @@
-// src/components/VideoFeed.jsx
-import React from 'react';
-import { FaVideo, FaVideoSlash, FaSpinner, FaTimes, FaExpand, FaLink } from 'react-icons/fa';
+import React, { useEffect, useRef, useState } from 'react';
+import Hls from 'hls.js';
+import { FaExpand, FaTimes } from 'react-icons/fa';
 
-export default function VideoFeed({ 
-  camId, 
-  location, 
-  streamUrl, 
-  frameData, 
-  isConnected, 
-  isFocused, 
-  onFocusChange 
+export default function VideoFeed({
+  camId,
+  location,
+  streamUrl,   // HLS
+  webrtcUrl,   // WHEP
+  isFocused,
+  onFocusChange
 }) {
-  
-  const hasFrameData = !!frameData;
-  const hasStreamUrl = !!streamUrl;
+  const videoRef = useRef(null);
+  const pcRef = useRef(null);
+  const hlsRef = useRef(null);
+  const retryTimerRef = useRef(null);
 
-  let content;
+  const [mode, setMode] = useState('webrtc'); // webrtc | hls
+  const [status, setStatus] = useState('Connecting...');
 
-  if (isConnected && hasStreamUrl && !hasFrameData) {
-    // Case 1: Connected, but the stream is not yet delivering frames (MJPEG stream placeholder).
-    // We display the URL as a debugging placeholder since the camera isn't running.
-    content = (
-      <div className="p-4 flex flex-col items-center justify-center h-full text-gray-400">
-        <FaLink className="text-4xl mb-2" />
-        <span className="font-semibold text-sm mb-1">Stream URL Confirmed:</span>
-        <a 
-          href={streamUrl} 
-          target="_blank" 
-          rel="noopener noreferrer"
-          className="text-xs break-all hover:underline text-teal-400"
-        >
-          {streamUrl}
-        </a>
-        <span className="mt-2 text-xs">Waiting for camera server to start streaming...</span>
-      </div>
-    );
-  } else if (!isConnected) {
-    // Case 2: WebSocket is globally disconnected
-    content = (
-      <div className="flex flex-col items-center justify-center h-full text-red-500">
-        <FaVideoSlash className="text-4xl mb-2" />
-        <span>Disconnected</span>
-      </div>
-    );
-  } else if (!hasFrameData && !isFocused) {
-    // Case 3: WebSocket is connected, but no frame received yet (Grid mode)
-    content = (
-      <div className="flex flex-col items-center justify-center h-full text-gray-500">
-        <FaSpinner className="animate-spin text-4xl mb-2" />
-        <span>Connecting...</span>
-      </div>
-    );
-  } else if (!hasFrameData && isFocused) {
-    // Case 4: Focused, but no data
-     content = (
-      <div className="flex flex-col items-center justify-center h-full text-gray-500">
-        <FaVideo className="text-4xl mb-2" />
-        <span>Waiting for video stream...</span>
-      </div>
-    );
-  } else {
-    // Case 5: We have frame data from the socket stream
-    // Render it as an inline base64 JPEG image.
-    const base64Src = `data:image/jpeg;base64,${frameData}`;
+  const [webrtcDebug, setWebrtcDebug] = useState({
+    url: '',
+    status: null,
+    body: '',
+    error: null,
+  });
+  const [showDebug, setShowDebug] = useState(false);
 
-    content = (
-      <img 
-        src={base64Src} 
-        alt={`${location} Feed`}
-        style={{ width: "100%", height: "130%" }}
-      />
-    );
-  }
+  const clearAll = () => {
+    if (retryTimerRef.current) {
+      clearTimeout(retryTimerRef.current);
+      retryTimerRef.current = null;
+    }
+    if (hlsRef.current) {
+      hlsRef.current.destroy();
+      hlsRef.current = null;
+    }
+    if (pcRef.current) {
+      pcRef.current.ontrack = null;
+      pcRef.current.onconnectionstatechange = null;
+      pcRef.current.close();
+      pcRef.current = null;
+    }
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+      videoRef.current.removeAttribute('src');
+    }
+  };
 
-  const isLive = hasFrameData && isConnected; 
+  const startHls = () => {
+    clearAll();
+    if (!videoRef.current || !streamUrl) return;
+    const v = videoRef.current;
 
-  // Handle click:
-  const handleFocusClick = () => {
-    if (!isFocused) {
-      onFocusChange(camId);
-    }
-  };
+    if (Hls.isSupported()) {
+      const hls = new Hls({ lowLatencyMode: true, backBufferLength: 10 });
+      hlsRef.current = hls;
+      hls.loadSource(streamUrl);
+      hls.attachMedia(v);
+    } else if (v.canPlayType('application/vnd.apple.mpegurl')) {
+      v.src = streamUrl;
+    }
 
-  return (
-    <div 
-      className={`group bg-black rounded-lg shadow-lg overflow-hidden border-2 border-gray-700 relative 
-        ${!isFocused ? 'cursor-pointer hover:border-teal-500 transition-all' : 'border-teal-600'}
-      `}
-      onClick={handleFocusClick}
-    >
-      {/* Header Bar */}
-      <div className="bg-gray-800 text-white p-2 flex items-center justify-between">
-        <h4 className="font-semibold text-sm truncate">
-          <FaVideo className="inline-block mr-2 text-teal-400" />
-          {location}
-        </h4>
-        {/* Status light */}
-        <span 
-          title={isLive ? 'Live' : 'Offline'}
-          className={`w-3 h-3 rounded-full transition-colors ${
-            isLive ? 'bg-green-500' : 'bg-red-500'
-          }`}
-        ></span>
-      </div>
+    setMode('hls');
+    setStatus('HLS fallback');
+  };
 
-      {/* Video Area: changes height if focused */}
-      <div 
-        className={`w-full bg-gray-900 flex items-center justify-center relative
-          ${isFocused ? 'h-[75vh]' : 'aspect-video'}
-        `}
-      >
-        {content}
+  useEffect(() => {
+    let cancelled = false;
+    let attempt = 0;
 
-        {/* --- Focus/Unfocus Buttons --- */}
-        {isFocused ? (
-          // "Return to Grid" button (visible only when focused)
-          <button
-              onClick={(e) => {
-                e.stopPropagation(); // Stop click from bubbling to the main div
-                onFocusChange(null); // Pass null to reset focus
-              }}
-              className="absolute top-2 right-2 p-2 bg-black/60 rounded-full text-white hover:bg-red-600 transition-colors"
-              title="Return to Grid"
-          >
-              <FaTimes />
-          </button>
-        ) : (
-          // "Focus" icon (visible on hover when in grid)
-          <div 
-            className="absolute top-2 right-2 p-2 bg-black/60 rounded-full text-white opacity-0 group-hover:opacity-100 transition-opacity"
-            title="Focus"
-          >
-            <FaExpand />
-          </div>
-        )}
-      </div>
-    </div>
-  );
+    const connectWebRTC = async () => {
+      if (cancelled || !videoRef.current || !webrtcUrl) return;
+
+      try {
+        clearAll();
+        setMode('webrtc');
+        setStatus('Connecting WebRTC...');
+
+        const pc = new RTCPeerConnection({
+          iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+        });
+        pcRef.current = pc;
+
+        pc.addTransceiver('video', { direction: 'recvonly' });
+        pc.addTransceiver('audio', { direction: 'recvonly' });
+
+        pc.ontrack = (e) => {
+          if (!videoRef.current) return;
+          videoRef.current.srcObject = e.streams[0];
+          setStatus('Live (WebRTC)');
+        };
+
+        pc.onconnectionstatechange = () => {
+          const s = pc.connectionState;
+          if (s === 'failed' || s === 'disconnected' || s === 'closed') {
+            if (cancelled || mode !== 'webrtc') return;
+            const delay = Math.min(1000 * (2 ** attempt), 8000);
+            attempt += 1;
+            if (attempt >= 3) {
+              setStatus('WebRTC unavailable, falling back to HLS...');
+              setMode('hls');
+              return;
+            }
+            setStatus(`Reconnecting WebRTC in ${Math.round(delay / 1000)}s...`);
+            retryTimerRef.current = setTimeout(connectWebRTC, delay);
+          }
+        };
+
+        const offer = await pc.createOffer();
+        await pc.setLocalDescription(offer);
+
+        console.debug('[WebRTC] POST WHEP', webrtcUrl);
+        setWebrtcDebug((prev) => ({ ...prev, url: webrtcUrl, status: null, body: '', error: null }));
+
+        const res = await fetch(webrtcUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/sdp' },
+          body: pc.localDescription?.sdp || ''
+        });
+
+        const body = await res.text();
+        console.debug('[WebRTC] WHEP response', res.status, body);
+        setWebrtcDebug((prev) => ({ ...prev, status: res.status, body }));
+
+        if (!res.ok) {
+          // Attach body for better debugging
+          setWebrtcDebug((prev) => ({ ...prev, error: `WHEP ${res.status}: ${body}` }));
+          throw new Error(`WHEP ${res.status}: ${body}`);
+        }
+
+        await pc.setRemoteDescription({ type: 'answer', sdp: body });
+
+        attempt = 0;
+      } catch (err) {
+        if (cancelled || mode !== 'webrtc') return;
+        setWebrtcDebug((prev) => ({ ...prev, error: err.message || String(err) }));
+        const delay = Math.min(1000 * (2 ** attempt), 8000);
+        attempt += 1;
+        if (attempt >= 3) {
+          setStatus('WebRTC unavailable, falling back to HLS...');
+          setMode('hls');
+          return;
+        }
+        setStatus(`WebRTC failed. Retrying in ${Math.round(delay / 1000)}s...`);
+        retryTimerRef.current = setTimeout(connectWebRTC, delay);
+      }
+    };
+
+    if (mode === 'webrtc') connectWebRTC();
+    else startHls();
+
+    return () => {
+      cancelled = true;
+      clearAll();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [camId, webrtcUrl, streamUrl, mode]);
+
+  return (
+    <div
+      className={`group bg-black rounded-lg shadow-lg overflow-hidden border-2 border-gray-700 relative ${
+        !isFocused ? 'cursor-pointer hover:border-teal-500 transition-all' : 'border-teal-600'
+      }`}
+      onClick={() => !isFocused && onFocusChange?.(camId)}
+    >
+      <div className="bg-gray-800 text-white p-2 flex items-center justify-between">
+        <h4 className="font-semibold text-sm truncate">{location}</h4>
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-gray-300">{status}</span>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setShowDebug((prev) => !prev);
+            }}
+            className="text-[10px] uppercase tracking-wide text-gray-300 hover:text-white px-2 py-1 border border-gray-600 rounded"
+            title="Toggle WebRTC debug info"
+          >
+            debug
+          </button>
+        </div>
+      </div>
+
+      <div className={`w-full bg-gray-900 flex items-center justify-center relative ${isFocused ? 'h-[75vh]' : 'aspect-video'}`}>
+        <video ref={videoRef} autoPlay muted playsInline controls className="w-full h-full object-contain" />
+
+        <div className="absolute left-2 top-2 flex gap-2">
+          {mode === 'webrtc' ? (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setMode('hls');
+              }}
+              className="px-2 py-1 text-xs bg-black/60 text-white rounded"
+              title="Use HLS fallback"
+            >
+              Use HLS
+            </button>
+          ) : (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setMode('webrtc');
+              }}
+              className="px-2 py-1 text-xs bg-black/60 text-white rounded"
+              title="Return to WebRTC"
+            >
+              Use WebRTC
+            </button>
+          )}
+        </div>
+
+        {showDebug ? (
+          <div className="absolute bottom-4 left-4 right-4 bg-black/80 text-white rounded-lg p-3 text-xs">
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex-1">
+                <div className="font-semibold mb-1">WebRTC Debug</div>
+                <div className="text-[11px] text-gray-300">URL: <span className="text-white break-all">{webrtcDebug.url || '—'}</span></div>
+                <div className="text-[11px] text-gray-300">Status: <span className="text-white">{webrtcDebug.status ?? '—'}</span></div>
+                <div className="text-[11px] text-gray-300">Error: <span className="text-white">{webrtcDebug.error || '—'}</span></div>
+                <div className="text-[11px] text-gray-300">Body preview:</div>
+                <pre className="max-h-28 overflow-y-auto bg-black/50 p-2 rounded text-[10px] whitespace-pre-wrap">{webrtcDebug.body || '—'}</pre>
+              </div>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowDebug(false);
+                }}
+                className="text-sm px-2 py-1 bg-white/10 rounded text-white hover:bg-white/20"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        ) : null}
+
+        {isFocused ? (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onFocusChange?.(null);
+            }}
+            className="absolute top-2 right-2 p-2 bg-black/60 rounded-full text-white hover:bg-red-600 transition-colors"
+            title="Return to Grid"
+          >
+            <FaTimes />
+          </button>
+        ) : (
+          <div className="absolute top-2 right-2 p-2 bg-black/60 rounded-full text-white opacity-0 group-hover:opacity-100 transition-opacity">
+            <FaExpand />
+          </div>
+        )}
+      </div>
+    </div>
+  );
 }
