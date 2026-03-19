@@ -9,7 +9,7 @@ export function TableInput({ label, type = 'text', name, value, onChange, placeh
           name={name}
           value={value}
           onChange={onChange}
-          className="mt-1 w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+          className="mt-1 w-full pl-4 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 outline-none transition-all text-base"
           required={required}
         >
           {options.map(opt => (
@@ -24,7 +24,7 @@ export function TableInput({ label, type = 'text', name, value, onChange, placeh
           name={name}
           value={value}
           onChange={onChange}
-          className="mt-1 w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+          className="mt-1 w-full pl-4 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 outline-none transition-all placeholder:text-gray-300 text-base"
           placeholder={placeholder}
           required={required}
         />

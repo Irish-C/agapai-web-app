@@ -82,22 +82,24 @@ export default function CameraManager({ locations: initialLocations, onCameraUpd
       )}
 
       {activeTab === 'add' && (
-        <form onSubmit={handleAddCamera} className="space-y-4 max-w-lg">
+        <form onSubmit={handleAddCamera} className="space-y-4 max-w-lg bg-white p-6 rounded-xl border border-gray-200">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">Add New Camera</h3>
           <TableInput label="Camera Name" name="name" value={cam.newCam.name} onChange={(e) => cam.setNewCam(p => ({ ...p, [e.target.name]: e.target.value }))} placeholder="e.g., Hallway Camera 1" />
           <TableInput label="Stream URL" name="url" value={cam.newCam.url} onChange={(e) => cam.setNewCam(p => ({ ...p, [e.target.name]: e.target.value }))} placeholder="rtsp://..." type="url" />
           <TableInput label="Location" name="locId" value={cam.newCam.locId} onChange={(e) => cam.setNewCam(p => ({ ...p, [e.target.name]: e.target.value }))} options={loc.locations} />
-          <div className="flex gap-3">
-            <button type="submit" className="flex-1 bg-green-600 text-white py-3 rounded-lg hover:bg-green-700 font-bold flex items-center justify-center"><FaPlus className="mr-2" /> Add</button>
-            <button type="button" onClick={() => setActiveTab('list')} className="flex-1 bg-gray-500 text-white py-3 rounded-lg hover:bg-gray-600 font-bold">Cancel</button>
+          <div className="flex gap-3 pt-6">
+            <button type="submit" className="flex-1 bg-green-600 text-white py-3 rounded-xl hover:bg-green-700 font-bold flex items-center justify-center transition-colors"><FaPlus className="mr-2" /> Add Camera</button>
+            <button type="button" onClick={() => setActiveTab('list')} className="flex-1 bg-gray-500 text-white py-3 rounded-xl hover:bg-gray-600 font-bold transition-colors">Cancel</button>
           </div>
         </form>
       )}
 
       {activeTab === 'locations' && (
         <>
-          <form onSubmit={handleAddLocation} className="mb-6 flex gap-3">
-            <input type="text" value={loc.newLocName} onChange={(e) => loc.setNewLocName(e.target.value)} className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent" placeholder="e.g., Main Lobby..." required />
-            <button type="submit" className="px-6 py-3 bg-green-600 text-white font-semibold rounded-lg hover:bg-green-700 whitespace-nowrap">Add</button>
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">Add New Location</h3>
+          <form onSubmit={handleAddLocation} className="flex gap-3 mb-6" style={{ maxWidth: '400px' }}>
+            <input type="text" value={loc.newLocName} onChange={(e) => loc.setNewLocName(e.target.value)} className="flex-1 pl-4 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 outline-none transition-all placeholder:text-gray-300 text-base" placeholder="e.g., Main Lobby..." required />
+            <button type="submit" className="px-6 py-3 bg-green-600 text-white font-semibold rounded-xl hover:bg-green-700 whitespace-nowrap transition-colors">Add</button>
           </form>
           {loc.locations.length === 0
             ? <EmptyState Icon={FaMapMarkerAlt} message="No locations yet. Add one above to get started." />
