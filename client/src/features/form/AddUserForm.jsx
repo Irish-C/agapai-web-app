@@ -99,7 +99,7 @@ export default function UserEditModal({ userToEdit, onSave, onClose }) {
             });
     };
 
-    const title = isEditing ? `Edit User: ${userToEdit.username}` : 'Add New System User';
+    const title = isEditing ? `Edit User: ${userToEdit.username}` : 'Add New User';
     const primaryButtonText = isEditing ? 'Update User' : 'Create User';
 
     return (

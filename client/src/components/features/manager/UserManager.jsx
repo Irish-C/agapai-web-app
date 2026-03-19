@@ -204,7 +204,7 @@ export default function UserManager({ user }) {
                     onClick={handleAddUser}
                     className="flex items-center bg-teal-600 hover:bg-teal-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-150"
                 >
-                    <FaUserPlus className="mr-2" /> Add New User
+                    Add New User
                 </button>
             </div>
 

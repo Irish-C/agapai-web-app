@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { FaUserPlus, FaUsers, FaEdit, FaSpinner, FaArchive } from 'react-icons/fa';
 import UserEditModal from '../modal/UserEditModal.jsx'; 
 import { fetchUsers, fetchApi, fetchRolesApi } from '../../services/apiService.js'; 
+import { ActionButtons } from '../../components/FormComponents.jsx';
 
 import { normalizeRole, displayRole } from '../../utils/roleUtils.js';
 
@@ -170,26 +171,27 @@ export default function UserManager({ user }) {
 
     return (
         <div className="space-y-6">
-            <div className="flex flex-wrap items-center gap-4 mb-4">
-                <div className="flex items-center gap-2">
-                    <span className="font-medium">Search:</span>
+            <div className="flex flex-wrap items-end gap-6 mb-6">
+                <div className="flex flex-col gap-2">
+                    <label className="text-sm font-semibold text-gray-700">Search Users</label>
                     <input
                         type="text"
                         value={searchTerm}
                         onChange={e => setSearchTerm(e.target.value)}
                         placeholder="Search by name or username"
-                        className="border rounded px-2 py-1"
-                        style={{ minWidth: '220px' }}
+                        className="pl-4 pr-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 outline-none transition-all placeholder:text-gray-300 text-base"
+                        style={{ minWidth: '280px' }}
                     />
                 </div>
-                <div className="flex items-center gap-2">
-                    <span className="font-medium">Filter by Role:</span>
+                <div className="flex flex-col gap-2">
+                    <label className="text-sm font-semibold text-gray-700">Filter by Role</label>
                     <select
                         value={roleFilter}
                         onChange={e => setRoleFilter(e.target.value)}
-                        className="border rounded px-2 py-1"
+                        className="pl-4 pr-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 outline-none transition-all text-base cursor-pointer"
+                        style={{ minWidth: '180px' }}
                     >
-                        <option value="all">All</option>
+                        <option value="all">All Roles</option>
                         {roles.map(role => (
                             <option key={role} value={role}>{displayRole(role)}</option>
                         ))}
@@ -204,7 +206,7 @@ export default function UserManager({ user }) {
                     onClick={handleAddUser}
                     className="flex items-center bg-teal-600 hover:bg-teal-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-150"
                 >
-                    <FaUserPlus className="mr-2" /> Add New User
+                    Add New User
                 </button>
             </div>
 
@@ -290,22 +292,10 @@ export default function UserManager({ user }) {
                                         </span>
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                                        {/* 🛑 EDIT BUTTON: Calls handleEditUser which opens the modal with user data */}
-                                        <button 
-                                            className="text-indigo-600 hover:text-indigo-900 mr-3"
-                                            onClick={() => handleEditUser(u)} 
-                                        >
-                                            <FaEdit className="inline-block" /> Edit
-                                        </button>
-                                        {/* ARCHIVE BUTTON */}
-                                        {u.id !== user.userId && ( 
-                                            <button 
-                                                className="text-yellow-600 hover:text-yellow-900"
-                                                onClick={() => handleArchiveClick(u)} // Calls Archive Handler (Opens Modal)
-                                            >
-                                                <FaArchive className="inline-block" /> Archive
-                                            </button>
-                                        )}
+                                        <ActionButtons buttons={[
+                                            { label: 'Edit', onClick: () => handleEditUser(u), className: 'bg-blue-600 text-white text-xs py-1 px-2 rounded hover:bg-blue-700 font-semibold' },
+                                            ...(u.id !== user.userId ? [{ label: 'Archive', onClick: () => handleArchiveClick(u), className: 'bg-yellow-600 text-white text-xs py-1 px-2 rounded hover:bg-yellow-700 font-semibold' }] : [])
+                                        ]} />
                                     </td>
                                 </tr>
                             ))}
