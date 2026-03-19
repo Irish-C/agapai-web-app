@@ -468,3 +468,61 @@ async def publish_camera_to_mediamtx(camera_id):
         return {"status": "ok", "hls": hls_url, "webrtc": webrtc_url, "path": path_name}, 200
     except Exception as e:
         return {"error": str(e)}, 500
+
+
+async def unpublish_camera_from_mediamtx(camera_id):
+    """Remove camera path from MediaMTX config and restart mediamtx."""
+    try:
+        camera = await db.camera.find_unique(where={"id": int(camera_id)})
+        if not camera:
+            return {"error": "Camera not found"}, 404
+
+        path_name = f"cam{camera.id}"
+
+        # Load existing mediamtx.yml
+        with open(_MTX_CONF, 'r') as f:
+            cfg = yaml.safe_load(f) or {}
+
+        if 'paths' not in cfg:
+            cfg['paths'] = {}
+
+        # Remove path if it exists
+        if path_name in cfg['paths']:
+            del cfg['paths'][path_name]
+
+        # Backup and write config
+        try:
+            with open(_MTX_CONF + '.bak', 'w') as bak:
+                yaml.safe_dump(cfg, bak)
+        except Exception:
+            pass
+
+        with open(_MTX_CONF, 'w') as f:
+            yaml.safe_dump(cfg, f)
+
+        # Restart mediamtx: kill if pid exists, then start a new process
+        try:
+            if os.path.exists(_MTX_PID):
+                with open(_MTX_PID, 'r') as pf:
+                    old = pf.read().strip()
+                    if old:
+                        try:
+                            os.kill(int(old), signal.SIGTERM)
+                        except Exception:
+                            pass
+        except Exception:
+            pass
+
+        # Start mediamtx binary
+        try:
+            proc = subprocess.Popen([
+                _MTX_BIN, _MTX_CONF
+            ], cwd=_SERVER_DIR, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            with open(_MTX_PID, 'w') as pf:
+                pf.write(str(proc.pid))
+        except Exception as e:
+            return {"error": f"Failed to start mediamtx: {e}"}, 500
+
+        return {"status": "ok", "message": "Camera unpublished successfully"}, 200
+    except Exception as e:
+        return {"error": str(e)}, 500

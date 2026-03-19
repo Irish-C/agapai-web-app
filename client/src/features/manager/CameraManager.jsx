@@ -1,8 +1,7 @@
 // src/components/CameraManager.jsx
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { fetchApi } from '../../services/apiService';
 import { FaTrash, FaPlus, FaPencilAlt, FaSave, FaTimes, FaCameraRetro } from 'react-icons/fa';
-import { startWebRTCStream, stopWebRTCStream } from '../../services/streamService.js';
 
 // This component manages adding, editing, and removing cameras
 export default function CameraManager({ locations, onCameraUpdated }) {
@@ -48,7 +47,26 @@ export default function CameraManager({ locations, onCameraUpdated }) {
     const [cameraToDeleteId, setCameraToDeleteId] = useState(null);
     const [isPublishModalOpen, setIsPublishModalOpen] = useState(false);
     const [publishCameraId, setPublishCameraId] = useState(null);
+    
+    // Initialize publishedCameras from localStorage
+    const [publishedCameras, setPublishedCameras] = useState(() => {
+        try {
+            const stored = localStorage.getItem('publishedCameras');
+            return stored ? new Set(JSON.parse(stored)) : new Set();
+        } catch (e) {
+            return new Set();
+        }
+    });
     // ---------------------------
+
+    // Persist publishedCameras to localStorage whenever it changes
+    useEffect(() => {
+        try {
+            localStorage.setItem('publishedCameras', JSON.stringify(Array.from(publishedCameras)));
+        } catch (e) {
+            console.error('Failed to save published cameras to localStorage:', e);
+        }
+    }, [publishedCameras]);
 
     // Fetch cameras on mount
     useEffect(() => {
@@ -215,58 +233,51 @@ export default function CameraManager({ locations, onCameraUpdated }) {
 
     const cameraName = cameras.find(c => c.id === cameraToDeleteId)?.name || 'this camera';
 
-    // Preview state/refs for inline WebRTC previews
-    const previewPcsRef = useRef(new Map()); // cameraId -> RTCPeerConnection
-    const [previewIds, setPreviewIds] = useState([]);
-
-    const handleStartPreview = async (cam) => {
-        const id = cam.id;
-        const videoEl = document.getElementById(`preview-${id}`);
-        if (!videoEl) return setCamMessage({ text: 'Preview element not found.', type: 'error' });
-
-        try {
-            setCamMessage({ text: '', type: '' });
-            const pc = await startWebRTCStream(id, videoEl);
-            previewPcsRef.current.set(id, pc);
-            setPreviewIds((p) => (p.includes(id) ? p : [...p, id]));
-        } catch (err) {
-            setCamMessage({ text: `Preview failed: ${err?.message || err}`, type: 'error' });
-        }
-    };
-
-    const handleStopPreview = (id) => {
-        const pc = previewPcsRef.current.get(id);
-        if (pc) {
-            try { stopWebRTCStream(pc, document.getElementById(`preview-${id}`)); } catch (e) {}
-            previewPcsRef.current.delete(id);
-        }
-        const el = document.getElementById(`preview-${id}`);
-        if (el) el.srcObject = null;
-        setPreviewIds((p) => p.filter(x => x !== id));
-    };
-
-    // Open publish confirmation modal
+    // Open publish/unpublish confirmation modal
     const handlePublish = (cam) => {
         setPublishCameraId(cam.id);
         setIsPublishModalOpen(true);
     };
 
-    // Called when user confirms publish in modal
+    // Called when user confirms publish/unpublish in modal
     const confirmPublish = async () => {
         if (!publishCameraId) return;
         setIsPublishModalOpen(false);
         setCamMessage({ text: '', type: '' });
+        
+        const isPublished = publishedCameras.has(publishCameraId);
+        const endpoint = isPublished ? `unpublish` : `publish`;
+        const action = isPublished ? 'Unpublished' : 'Published';
+        
         try {
-            const data = await fetchApi(`/cameras/${publishCameraId}/publish`, 'POST');
-            if (data && data.status === 'ok') {
-                setCamMessage({ text: `Published: ${data.webrtc || data.hls}`, type: 'success' });
-            } else if (data && data.hls) {
-                setCamMessage({ text: `Published: ${data.hls}`, type: 'success' });
+            const data = await fetchApi(`/cameras/${publishCameraId}/${endpoint}`, 'POST');
+            if (data && (data.status === 'ok' || data.status === 'success')) {
+                // Update state to toggle published status
+                setPublishedCameras((prev) => {
+                    const updated = new Set(prev);
+                    if (isPublished) {
+                        updated.delete(publishCameraId);
+                    } else {
+                        updated.add(publishCameraId);
+                    }
+                    return updated;
+                });
+                setCamMessage({ text: `${action} successfully: ${data.webrtc || data.hls || data.message || ''}`, type: 'success' });
             } else {
-                setCamMessage({ text: `Publish request succeeded.`, type: 'success' });
+                setCamMessage({ text: `${action} request succeeded.`, type: 'success' });
+                // Update state to toggle published status
+                setPublishedCameras((prev) => {
+                    const updated = new Set(prev);
+                    if (isPublished) {
+                        updated.delete(publishCameraId);
+                    } else {
+                        updated.add(publishCameraId);
+                    }
+                    return updated;
+                });
             }
         } catch (err) {
-            setCamMessage({ text: `Publish failed: ${err?.message || err}`, type: 'error' });
+            setCamMessage({ text: `${action} failed: ${err?.message || err}`, type: 'error' });
         } finally {
             setPublishCameraId(null);
         }
@@ -428,36 +439,18 @@ export default function CameraManager({ locations, onCameraUpdated }) {
                                         Remove
                                     </button>
 
-                                    {/* Preview controls: start/stop inline WebRTC preview using startWebRTCStream */}
-                                    {previewIds.includes(cam.id) ? (
-                                        <button
-                                            onClick={(e) => { e.stopPropagation(); handleStopPreview(cam.id); }}
-                                            className="flex items-center bg-gray-700 text-white text-sm font-bold py-1 px-3 rounded-lg hover:bg-gray-800"
-                                        >
-                                            Stop Preview
-                                        </button>
-                                    ) : (
-                                        <button
-                                            onClick={(e) => { e.stopPropagation(); handleStartPreview(cam); }}
-                                            className="flex items-center bg-indigo-600 text-white text-sm font-bold py-1 px-3 rounded-lg hover:bg-indigo-700"
-                                        >
-                                            Preview
-                                        </button>
-                                    )}
-                                    {/* Publish button: user-triggered publish to MediaMTX */}
+                                    {/* Publish/Unpublish toggle button */}
                                     <button
                                         onClick={(e) => { e.stopPropagation(); handlePublish(cam); }}
-                                        className="flex items-center bg-yellow-600 text-white text-sm font-bold py-1 px-3 rounded-lg hover:bg-yellow-700"
+                                        className={`flex items-center text-white text-sm font-bold py-1 px-3 rounded-lg ${
+                                            publishedCameras.has(cam.id)
+                                                ? 'bg-orange-600 hover:bg-orange-700'
+                                                : 'bg-yellow-600 hover:bg-yellow-700'
+                                        }`}
                                     >
-                                        Publish
+                                        {publishedCameras.has(cam.id) ? 'Unpublish' : 'Publish'}
                                     </button>
                                 </div>
-                                {/* Inline preview video (small) */}
-                                {previewIds.includes(cam.id) ? (
-                                    <div className="mt-2 w-48 h-28">
-                                        <video id={`preview-${cam.id}`} autoPlay muted playsInline className="w-full h-full object-cover rounded border" />
-                                    </div>
-                                ) : null}
                             </div>
                         )}
                     </div>
@@ -497,18 +490,22 @@ export default function CameraManager({ locations, onCameraUpdated }) {
                     </div>
                 </div>
             )}
-            {/* --------------------------- PUBLISH CONFIRMATION MODAL --------------------------- */}
+            {/* --------------------------- PUBLISH/UNPUBLISH CONFIRMATION MODAL --------------------------- */}
             {isPublishModalOpen && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
                     <div className="bg-white rounded-xl shadow-2xl w-full max-w-md">
                         <div className="p-6 border-b border-gray-200">
-                            <h4 className="text-xl font-bold text-yellow-600 flex items-center">
-                                <FaCameraRetro className="mr-2" /> Confirm Publish
+                            <h4 className={`text-xl font-bold flex items-center ${
+                                publishedCameras.has(publishCameraId) ? 'text-orange-600' : 'text-yellow-600'
+                            }`}>
+                                <FaCameraRetro className="mr-2" /> Confirm {publishedCameras.has(publishCameraId) ? 'Unpublish' : 'Publish'}
                             </h4>
                         </div>
                         <div className="p-6">
                             <p className="text-gray-700 mb-6">
-                                Publish this camera to MediaMTX so it becomes available via HLS/WebRTC. Continue?
+                                {publishedCameras.has(publishCameraId)
+                                    ? 'Unpublish this camera from MediaMTX? It will no longer be available via HLS/WebRTC.'
+                                    : 'Publish this camera to MediaMTX so it becomes available via HLS/WebRTC. Continue?'}
                             </p>
                             <div className="flex justify-end space-x-3">
                                 <button
@@ -519,9 +516,13 @@ export default function CameraManager({ locations, onCameraUpdated }) {
                                 </button>
                                 <button
                                     onClick={confirmPublish}
-                                    className="px-4 py-2 text-sm font-medium rounded-lg text-white bg-yellow-600 hover:bg-yellow-700"
+                                    className={`px-4 py-2 text-sm font-medium rounded-lg text-white ${
+                                        publishedCameras.has(publishCameraId)
+                                            ? 'bg-orange-600 hover:bg-orange-700'
+                                            : 'bg-yellow-600 hover:bg-yellow-700'
+                                    }`}
                                 >
-                                    Publish Camera
+                                    {publishedCameras.has(publishCameraId) ? 'Unpublish Camera' : 'Publish Camera'}
                                 </button>
                             </div>
                         </div>
