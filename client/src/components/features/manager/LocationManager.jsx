@@ -154,7 +154,7 @@ export default function LocationManager({ onLocationsUpdated }) {
                     type="submit"
                     className="flex items-center justify-center bg-green-600 text-white font-bold py-2 px-9 rounded-xl hover:bg-green-700 h-10 mt-6"
                 >
-                    Add
+                    Add Location
                 </button>
             </form>
 

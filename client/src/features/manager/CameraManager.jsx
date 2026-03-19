@@ -88,7 +88,7 @@ export default function CameraManager({ locations: initialLocations, onCameraUpd
           <TableInput label="Stream URL" name="url" value={cam.newCam.url} onChange={(e) => cam.setNewCam(p => ({ ...p, [e.target.name]: e.target.value }))} placeholder="rtsp://..." type="url" />
           <TableInput label="Location" name="locId" value={cam.newCam.locId} onChange={(e) => cam.setNewCam(p => ({ ...p, [e.target.name]: e.target.value }))} options={loc.locations} />
           <div className="flex gap-3 pt-6">
-            <button type="submit" className="flex-1 bg-green-600 text-white py-3 rounded-xl hover:bg-green-700 font-bold flex items-center justify-center transition-colors"><FaPlus className="mr-2" /> Add Camera</button>
+            <button type="submit" className="flex-1 bg-green-600 text-white py-3 rounded-xl hover:bg-green-700 font-bold flex items-center justify-center transition-colors">Add Camera</button>
             <button type="button" onClick={() => setActiveTab('list')} className="flex-1 bg-gray-500 text-white py-3 rounded-xl hover:bg-gray-600 font-bold transition-colors">Cancel</button>
           </div>
         </form>
@@ -99,7 +99,7 @@ export default function CameraManager({ locations: initialLocations, onCameraUpd
           <h3 className="text-lg font-semibold text-gray-900 mb-4">Add New Location</h3>
           <form onSubmit={handleAddLocation} className="flex gap-3 mb-6" style={{ maxWidth: '400px' }}>
             <input type="text" value={loc.newLocName} onChange={(e) => loc.setNewLocName(e.target.value)} className="flex-1 pl-4 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 outline-none transition-all placeholder:text-gray-300 text-base" placeholder="e.g., Main Lobby..." required />
-            <button type="submit" className="px-6 py-3 bg-green-600 text-white font-semibold rounded-xl hover:bg-green-700 whitespace-nowrap transition-colors">Add</button>
+            <button type="submit" className="px-6 py-3 bg-green-600 text-white font-semibold rounded-xl hover:bg-green-700 whitespace-nowrap transition-colors">Add Location</button>
           </form>
           {loc.locations.length === 0
             ? <EmptyState Icon={FaMapMarkerAlt} message="No locations yet. Add one above to get started." />
