@@ -1,4 +1,4 @@
-api: false
+api: true
 apiAddress: :9997
 apiAllowOrigin: '*'
 apiEncryption: false
