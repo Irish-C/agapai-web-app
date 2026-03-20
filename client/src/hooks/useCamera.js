@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { socket } from '../services/socket.js';
+import { socket, addEventToBuffer } from '../services/socket.js';
 
 export const useCameraSocket = () => {
   const [cameraData, setCameraData] = useState({});
@@ -8,10 +8,19 @@ export const useCameraSocket = () => {
 
   // camId -> latest frame only (overwrite old immediately)
   const latestFramesRef = useRef(new Map());
+  // Track alert IDs we've already seen to prevent duplicates after sync
+  const seenAlertIdsRef = useRef(new Set());
 
   useEffect(() => {
-    const handleConnect = () => setIsConnected(true);
-    const handleDisconnect = () => setIsConnected(false);
+    const handleConnect = () => {
+      console.log('[useCameraSocket] Socket connected');
+      setIsConnected(true);
+    };
+
+    const handleDisconnect = () => {
+      console.log('[useCameraSocket] Socket disconnected - buffering enabled');
+      setIsConnected(false);
+    };
 
     const handleFrame = (data) => {
       // Standardized frame payload always has cam_id
@@ -24,8 +33,23 @@ export const useCameraSocket = () => {
     const handleNewAlert = (alert) => {
       // Unified incident structure: {id, type, location, timestamp, snapshot_url, status}
       // Add ts for frontend sorting convenience
+      const alertId = alert?.id;
+      
+      // Skip if we've already processed this alert (prevents duplicates after sync)
+      if (alertId && seenAlertIdsRef.current.has(alertId)) {
+        console.debug('[useCameraSocket] Skipping duplicate alert:', alertId);
+        return;
+      }
+      
+      if (alertId) {
+        seenAlertIdsRef.current.add(alertId);
+      }
+      
       const incidentWithTs = { ...alert, ts: Date.now() };
       setAlerts((prev) => [incidentWithTs, ...prev]);
+      
+      // Buffer event if disconnected
+      addEventToBuffer('new_alert', alert);
     };
 
     socket.on('connect', handleConnect);

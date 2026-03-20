@@ -3,11 +3,22 @@ import { FaPlus, FaCameraRetro, FaMapMarkerAlt, FaTrash } from 'react-icons/fa';
 import { useLocalStorageSet } from '../../hooks/useLocalStorageSet';
 import { useCameraManager } from '../../hooks/useCameraManager';
 import { useLocationManager } from '../../hooks/useLocationManager';
+import { publishCamera, unpublishCamera } from '../../services/apiService.js';
 import Modal from '../../components/Modal';
 import CameraTable from '../../components/CameraTable';
 import LocationTable from '../../components/LocationTable';
 import { TableInput, EmptyState } from '../../components/FormComponents';
 import { messageClass, tabButtonClass } from '../../utils/uiConstants';
+
+// Helper: Ensure RTSP URL has subtype=1 for optimal performance
+const ensureSubtype = (url) => {
+  if (!url) return url;
+  if (!url.includes('subtype=')) {
+    const separator = url.includes('?') ? '&' : '?';
+    return `${url}${separator}subtype=1`;
+  }
+  return url;
+};
 
 export default function CameraManager({ locations: initialLocations, onCameraUpdated }) {
   const [activeTab, setActiveTab] = useState('list');
@@ -30,19 +41,20 @@ export default function CameraManager({ locations: initialLocations, onCameraUpd
 
   const handleAddCamera = async (e) => {
     e.preventDefault();
-    if (await cam.addCamera({ cam_name: cam.newCam.name, stream_url: cam.newCam.url, loc_id: parseInt(cam.newCam.locId) })) setActiveTab('list');
+    if (await cam.addCamera({ cam_name: cam.newCam.name, stream_url: ensureSubtype(cam.newCam.url), loc_id: parseInt(cam.newCam.locId) })) setActiveTab('list');
   };
 
   const handleUpdateCamera = async (e) => {
     e.preventDefault();
     if (!cam.editingCam.cam_name.trim()) { cam.setMessage({ text: 'Camera name cannot be empty.', type: 'error' }); return; }
-    await cam.updateCamera(cam.editingCam.id, { cam_name: cam.editingCam.cam_name, stream_url: cam.editingCam.stream_url, loc_id: parseInt(cam.editingCam.loc_id) || loc.locations[0]?.id });
+    await cam.updateCamera(cam.editingCam.id, { cam_name: cam.editingCam.cam_name, stream_url: ensureSubtype(cam.editingCam.stream_url), loc_id: parseInt(cam.editingCam.loc_id) || loc.locations[0]?.id });
   };
 
   const handlePublish = async () => {
     const isPublished = publishedCameras.has(publishModal.id);
     try {
-      await fetch(`/api/cameras/${publishModal.id}/${isPublished ? 'unpublish' : 'publish'}`, { method: 'POST' });
+      const fn = isPublished ? unpublishCamera : publishCamera;
+      await fn(publishModal.id);
       setPublishedCameras(p => {
         const u = new Set(p);
         isPublished ? u.delete(publishModal.id) : u.add(publishModal.id);

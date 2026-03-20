@@ -9,6 +9,7 @@ from src.controllers.event_controller import (
     mark_viewed_logic,
     create_event_logic,
     export_logs_by_date_logic,
+    get_missed_alerts_logic,
 )
 
 router = APIRouter()
@@ -45,5 +46,34 @@ async def export_logs(date: str):
     Example: /api/logs/export?date=2026-03-20
     """
     result, code = await export_logs_by_date_logic(date)
+    return safe_json_response(status_code=code, content=result)
+
+
+@router.get("/alerts/missed/{timestamp_ms}")
+async def get_missed_alerts(timestamp_ms: int):
+    """Fetch alerts (YOLO detections) that occurred after a specific timestamp.
+    
+    Used by frontend after Socket.IO reconnect to sync missed detections.
+    
+    Query param: timestamp_ms (Unix timestamp in milliseconds)
+    Example: /api/alerts/missed/1710950000000
+    
+    Returns missed alerts in same format as Socket.IO 'new_alert' event:
+    {
+        "status": "success",
+        "count": int,
+        "alerts": [
+            {
+                "id": str,
+                "type": str,
+                "location": str,
+                "timestamp": ISO string,
+                "snapshot_url": str,
+                "status": str
+            }
+        ]
+    }
+    """
+    result, code = await get_missed_alerts_logic(timestamp_ms)
     return safe_json_response(status_code=code, content=result)
 

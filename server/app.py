@@ -51,9 +51,9 @@ socketio_server = socketio.AsyncServer(
     async_mode='asgi',
     # For development allow all origins (tighten in production)
     cors_allowed_origins='*',
-    # Tighter heartbeat to detect broken connections faster
-    ping_interval=10,
-    ping_timeout=20,
+    # Longer heartbeat for polling transport (dev uses polling which is slower)
+    ping_interval=15,
+    ping_timeout=35,
     # Enable logging to help trace disconnects during debugging
     # Disable per-emit debug logging to avoid console spam when streaming
     logger=False,
@@ -99,6 +99,11 @@ async def bigint_middleware(request, call_next):
     # This reads the raw body, sanitizes it with `sanitize_input`, and
     # injects a new receive() coroutine so downstream `await request.json()`
     # returns the sanitized payload.
+    
+    # Skip socket.io routes - they need to pass through unmodified
+    if request.url.path.startswith('/socket.io'):
+        return await call_next(request)
+    
     try:
         content_type = request.headers.get('content-type', '')
         if 'application/json' in content_type.lower():
@@ -128,7 +133,7 @@ async def bigint_middleware(request, call_next):
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173", "http://127.0.0.1:5000"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -190,19 +195,44 @@ async def video_feed(camera_id: str | None = None):
     - Otherwise, it falls back to the global `latest_frame` key.
     """
 
-    camera_id = sanitize_input(camera_id)
-    r = redis.Redis(host='localhost', port=6379, db=0)
-    stream_key = f"latest_frame_{camera_id}" if camera_id else "latest_frame"
+    try:
+        camera_id = sanitize_input(camera_id) if camera_id else None
+        if camera_id:
+            camera_id = str(camera_id)
+        
+        r = redis.Redis(host='localhost', port=6379, db=0)
+        stream_key = f"latest_frame_{camera_id}" if camera_id else "latest_frame"
+        
+        # Test Redis connection
+        r.ping()
 
-    async def generate():
-        while True:
-            frame_bytes = r.get(stream_key)
-            if frame_bytes:
-                yield (b'--frame\r\n'
-                       b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
-            await asyncio.sleep(0.03)
+        async def generate():
+            chunk_count = 0
+            no_frame_count = 0
+            while True:
+                try:
+                    frame_bytes = r.get(stream_key)
+                    if frame_bytes:
+                        chunk_count += 1
+                        no_frame_count = 0
+                        yield (b'--frame\r\n'
+                               b'Content-Type: image/jpeg\r\n'
+                               b'Content-Length: ' + str(len(frame_bytes)).encode() + b'\r\n\r\n' 
+                               + frame_bytes + b'\r\n')
+                    else:
+                        # Send keepalive comment to prevent client timeout when no frames available
+                        no_frame_count += 1
+                        if no_frame_count % 10 == 0:  # Every ~330ms (10 * 0.033s)
+                            yield b'--frame\r\nContent-Type: text/plain\r\n\r\nWAITING\r\n'
+                    await asyncio.sleep(0.033)  # ~30fps
+                except Exception as e:
+                    print(f"[video_feed] Streaming error: {e}")
+                    break
 
-    return StreamingResponse(generate(), media_type='multipart/x-mixed-replace; boundary=frame')
+        return StreamingResponse(generate(), media_type='multipart/x-mixed-replace; boundary=frame')
+    except Exception as e:
+        print(f"[video_feed] Error initializing stream for camera {camera_id}: {e}")
+        return JSONResponse(status_code=500, content={'error': str(e)})
 
 # --- 7. Snapshot static folder (used for alert snapshots) ---
 SNAPSHOTS_DIR = os.path.join(os.path.dirname(__file__), 'static', 'snapshots')
@@ -271,6 +301,19 @@ async def unsubscribe_camera(sid, data):
         print(f"Socket.IO unsubscribe: sid={sid} -> {room}")
     except Exception as e:
         print(f"unsubscribe_camera error: {e}")
+
+
+# Health check: respond to client pings with pong
+@socketio_server.on('ping')
+async def handle_ping(sid, data):
+    """Health check handler: client sends ping, we respond with pong."""
+    try:
+        timestamp = data.get('timestamp') if isinstance(data, dict) else None
+        await socketio_server.emit('pong', {'timestamp': timestamp}, to=sid)
+        # Uncomment for verbose health check logs
+        # print(f"SocketIO health check: ping from {sid}, pong sent")
+    except Exception as e:
+        print(f"SocketIO health check error: {e}")
 
 # ASGI app entrypoint
 asgi_app = socketio.ASGIApp(

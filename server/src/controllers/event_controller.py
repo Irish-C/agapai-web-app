@@ -191,3 +191,73 @@ async def export_logs_by_date_logic(date_str: str):
     except Exception as e:
         print(f"Error exporting logs: {e}")
         return {"status": "error", "message": str(e)}, 500
+
+
+async def get_missed_alerts_logic(timestamp_ms: int):
+    """Fetch alerts that occurred since a specific timestamp (milliseconds).
+    
+    Used by frontend to sync missed YOLO detections after Socket.IO reconnect.
+    Returns alerts that should have been emitted but client was offline.
+    
+    Args:
+        timestamp_ms: Unix timestamp in milliseconds when client last saw an alert
+        
+    Returns:
+        {
+            "status": "success",
+            "count": int,
+            "alerts": [
+                {
+                    "id": str,
+                    "type": str (class_name),
+                    "location": str (camera name),
+                    "timestamp": ISO string,
+                    "snapshot_url": str,
+                    "status": str
+                },
+                ...
+            ]
+        }
+    """
+    try:
+        from datetime import datetime
+        
+        # Convert milliseconds to datetime
+        since_datetime = datetime.utcfromtimestamp(timestamp_ms / 1000.0)
+        
+        print(f"[get_missed_alerts] Fetching alerts since {since_datetime.isoformat()}")
+        
+        # Query alerts created since the timestamp (order newest first for priority)
+        alerts = await db.eventlog.find_many(
+            where={
+                'timestamp': {
+                    'gt': since_datetime  # Greater than (strict) to avoid duplicates
+                }
+            },
+            order={'timestamp': 'desc'},  # Newest first
+            include={'camera': True, 'event_class': True}
+        )
+        
+        print(f"[get_missed_alerts] Found {len(alerts)} missed alerts")
+        
+        # Format the data to match Socket.IO 'new_alert' payload
+        formatted_alerts = []
+        for alert in alerts:
+            formatted_alerts.append({
+                'id': str(alert.id),
+                'type': alert.event_class.class_name if alert.event_class else 'unknown',
+                'location': alert.camera.cam_name if alert.camera else 'Unknown',
+                'timestamp': alert.timestamp.isoformat(),
+                'snapshot_url': alert.file_path,
+                'status': alert.event_status or 'unacknowledged'
+            })
+        
+        return {
+            'status': 'success',
+            'count': len(formatted_alerts),
+            'alerts': formatted_alerts
+        }, 200
+        
+    except Exception as e:
+        print(f"Error fetching missed alerts: {e}")
+        return {'status': 'error', 'message': str(e)}, 500

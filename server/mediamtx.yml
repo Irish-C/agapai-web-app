@@ -139,6 +139,12 @@ pathDefaults:
   srtReadPassphrase: null
 paths:
   all_others: null
+  cam19:
+    source: rtsp://admin:agapai143@192.168.254.211:554/cam/realmonitor?channel=1&subtype=1
+    sourceOnDemand: true
+  cam20:
+    source: rtsp://admin:agapai143@192.168.254.211:554/cam/realmonitor?channel=1&subtype=1
+    sourceOnDemand: true
   cam8:
     source: rtsp://admin:agapai143@192.168.254.211:554/cam/realmonitor?channel=1&subtype=1
     sourceOnDemand: true

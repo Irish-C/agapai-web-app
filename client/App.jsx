@@ -7,7 +7,7 @@ import agapai_Bg from './src/assets/bg/gray-bg.png';
 
 // services
 import { loginUser, fetchCameraList, logoutUser } from './src/services/apiService.js';
-import { socket } from './src/services/socket.js';
+import { socket, registerOnBufferFlush, unregisterOnBufferFlush } from './src/services/socket.js';
 
 // helpers
 import { normalizeRole } from './src/utils/roleUtils.js';
@@ -97,12 +97,32 @@ export default function App() {
              setCurrentAlert(null);
         };
 
+        // 3. Handle missed alerts after reconnection
+        const handleBufferFlush = (missedAlerts) => {
+            console.log("📡 SYNCED MISSED ALERTS:", missedAlerts.length, "alerts");
+            
+            // Process missed alerts in reverse chronological order (oldest first)
+            // This ensures the display updates show alerts in temporal sequence
+            for (const alert of [...missedAlerts].reverse()) {
+                console.log("  - Syncing missed alert:", alert.type, "at", alert.timestamp);
+            }
+            
+            // Show the most recent missed alert if any exist
+            if (missedAlerts.length > 0) {
+                const mostRecentAlert = missedAlerts[0];
+                console.log("🔔 Displaying most recent missed alert");
+                setCurrentAlert(mostRecentAlert);
+            }
+        };
+
         socket.on('new_alert', handleAlert);
         socket.on('alert_acknowledged', handleAck);
+        registerOnBufferFlush(handleBufferFlush);
 
         return () => {
             socket.off('new_alert', handleAlert);
             socket.off('alert_acknowledged', handleAck);
+            unregisterOnBufferFlush(handleBufferFlush);
         };
     }, []);
 

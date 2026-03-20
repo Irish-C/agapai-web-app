@@ -36,14 +36,17 @@ export const fetchApi = async (endpoint, method = 'GET', data = null) => {
         if (response.status === 401) {
             const isAuthAttempt = endpoint.includes('/login');
             const isPasswordChange = endpoint.includes('/change-password');
+            const isCameraRequest = endpoint.includes('/cameras');
+            const isNonCritical = endpoint.includes('/events') || endpoint.includes('/logs');
 
-            if (!isAuthAttempt && !isPasswordChange) {
+            // Only logout on 401 for critical auth endpoints, not for data fetches
+            if (!isAuthAttempt && !isPasswordChange && !isCameraRequest && !isNonCritical) {
                 console.error('fetchApi: Session expired. Redirecting to login.');
                 logoutUser(); 
                 window.location.href = '/login'; 
             }
             
-            // Still throw the error so the Component can catch it and show "Wrong Password"
+            // Still throw the error so the Component can catch it and show the message
             const errorData = await response.json().catch(() => ({}));
             throw new Error(errorData.message || "Incorrect credentials or expired session.");
         }
@@ -162,4 +165,14 @@ export const fetchReportsData = (limit, startDate, endDate) => {
     if (endDate) params.append('end_date', endDate);
 
     return fetchApi(`/event_logs?${params.toString()}`, 'GET');
+};
+
+// --- CAMERA PUBLISHING ---
+
+export const publishCamera = (cameraId) => {
+    return fetchApi(`/cameras/${cameraId}/publish`, 'POST');
+};
+
+export const unpublishCamera = (cameraId) => {
+    return fetchApi(`/cameras/${cameraId}/unpublish`, 'POST');
 };

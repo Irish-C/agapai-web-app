@@ -9,8 +9,10 @@ from database import db
 import yaml
 import subprocess
 import signal
-import os
 import redis
+
+# Initialize Redis connection pool (reused for all cameras)
+_REDIS_CLIENT = redis.Redis(host='localhost', port=6379, db=0, decode_responses=False)
 
 # Helper: server root
 _SERVER_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../'))
@@ -49,12 +51,14 @@ async def start_camera_processing():
     try:
         active_cameras = await db.camera.find_many(where={'cam_status': True})
         
+        print(f"[start_camera_processing] Found {len(active_cameras)} active cameras")
+        
         for cam in active_cameras:
-            print(f"Starting background stream for: {cam.cam_name}")
+            print(f"[start_camera_processing] Starting stream: {cam.cam_name} -> {cam.stream_url}")
             # Launch each camera in its own background task
             asyncio.create_task(stream_camera_loop(cam.id, cam.stream_url))
     except Exception as e:
-        print(f"Error starting camera streams: {e}")
+        print(f"[start_camera_processing] Error starting camera streams: {e}")
 
 async def stream_camera_loop(camera_id, rtsp_url):
     """The main loop for a single camera.
@@ -71,6 +75,33 @@ async def stream_camera_loop(camera_id, rtsp_url):
     except Exception:
         # Not all OpenCV builds support setting buffer size; ignore if it fails
         pass
+
+    # Track camera status
+    camera_status = 'connecting'  # connecting, online, offline, error
+    last_status_emit = 0.0
+    connection_start_time = time.time()
+    connection_timeout = 15.0  # seconds before marking as error
+    
+    async def emit_camera_status(status_str: str, reason: str = ''):
+        """Emit camera status update to frontend."""
+        nonlocal last_status_emit
+        now = time.time()
+        if now - last_status_emit < 1.0:  # Avoid spam, max 1 per second
+            return
+        
+        from app import socketio_server
+        try:
+            message = f"{status_str.upper()}"
+            if reason:
+                message += f": {reason}"
+            await socketio_server.emit('camera_status', {
+                'cam_id': str(camera_id),
+                'status': status_str,
+                'message': message
+            })
+            last_status_emit = now
+        except Exception as e:
+            print(f"[stream_camera_loop] Failed to emit status: {e}")
 
     async def persist_event(event_type: str, class_name: str, frame=None):
         """Persist an event log to the DB (including a snapshot) and emit a new_alert socket event."""
@@ -145,7 +176,7 @@ async def stream_camera_loop(camera_id, rtsp_url):
 
     # YOLO inference control
     frame_counter = 0
-    yolo_skip = 3  # Run YOLO every N frames (tunable - lower for faster detection)
+    yolo_skip = 6  # Run YOLO every N frames (tunable - lower for faster detection)
     last_fall_alert = 0.0
     fall_alert_cooldown = 2.0
 
@@ -187,10 +218,30 @@ async def stream_camera_loop(camera_id, rtsp_url):
         while cap.isOpened():
             ret, frame = cap.read()
             if not ret:
-                print(f"Stream failed for camera {camera_id}. Retrying in 5s...")
+                print(f"[stream_camera_loop] Stream failed for camera {camera_id}. Retrying in 5s...")
+                await emit_camera_status('offline', 'No frames received')
                 await asyncio.sleep(5)
                 cap = cv2.VideoCapture(rtsp_url)
+                connection_start_time = time.time()  # Reset timeout when reconnecting
                 continue
+
+            # Camera is online, emit online status once
+            if camera_status != 'online':
+                camera_status = 'online'
+                await emit_camera_status('online', 'Camera connected')
+                connection_start_time = None  # Clear timeout
+
+            # Check connection timeout (only while connecting)
+            if camera_status == 'connecting':
+                elapsed = time.time() - connection_start_time
+                if elapsed > connection_timeout:
+                    camera_status = 'error'
+                    print(f"[stream_camera_loop] Camera {camera_id} connection timeout ({connection_timeout}s)")
+                    await emit_camera_status('error', f'Connection timeout after {int(connection_timeout)}s')
+                    await asyncio.sleep(5)
+                    cap = cv2.VideoCapture(rtsp_url)
+                    connection_start_time = time.time()  # Reset for next attempt
+                    continue
 
             now = time.time()
             frame_counter += 1
@@ -218,6 +269,9 @@ async def stream_camera_loop(camera_id, rtsp_url):
                     results = YOLO_MODEL(frame, conf=0.4, imgsz=320, verbose=False)
                     if len(results):
                         r = results[0]
+                        # Use YOLO's built-in .plot() to draw bounding boxes
+                        frame = r.plot()
+                        
                         if r.boxes is not None and len(r.boxes) > 0:
                             # First: check for person/human detections to drive inactivity logic
                             person_detected = False
@@ -278,13 +332,21 @@ async def stream_camera_loop(camera_id, rtsp_url):
             if inactive_by_model and (now - last_inactivity_alert) > inactivity_alert_cooldown:
                 last_inactivity_alert = now
 
-            # 1. ENCODE FRAME: Convert the OpenCV image to a base64 string
-            _, buffer = cv2.imencode('.jpg', frame)
-            frame_base64 = base64.b64encode(buffer).decode('utf-8')
+            # 1. ENCODE FRAME: Convert the OpenCV image to JPEG
+            # Lower quality (50) for faster transmission - matches Flask example performance
+            _, buffer = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 50])
+            frame_bytes = buffer.tobytes()
 
-            # 2. EMIT FRAME TO FRONTEND: Emit only to the camera-specific room
-            # so that clients who subscribed to this camera receive frames.
+            # 2. STORE TO REDIS: For MJPEG streaming (faster than Socket.IO)
+            try:
+                _REDIS_CLIENT.set(f'latest_frame_{camera_id}', frame_bytes)
+                _REDIS_CLIENT.set('latest_frame', frame_bytes)  # Fallback
+            except Exception as e:
+                print(f"[camera_controller] Redis error: {e}")
+
+            # 3. EMIT FRAME TO FRONTEND: Also emit via Socket.IO for alerts and status
             from app import socketio_server
+            frame_base64 = base64.b64encode(frame_bytes).decode('utf-8')
             payload = {
                 'cam_id': str(camera_id),
                 'frame': frame_base64
@@ -310,7 +372,7 @@ async def stream_camera_loop(camera_id, rtsp_url):
                 await socketio_server.emit('camera_frame', payload, room=f'camera_{camera_id}')
 
             # 3. FPS CONTROL
-            await asyncio.sleep(0.04)  # ~25 FPS
+            await asyncio.sleep(0.0167)  # ~60 FPS
     except asyncio.CancelledError:
         pass
     finally:
@@ -388,8 +450,12 @@ async def update_camera_logic(camera_id, camera_data):
 
 async def delete_camera_logic(camera_id):
     try:
+        # First, unpublish from MediaMTX if published
+        await unpublish_camera_from_mediamtx(camera_id)
+        
+        # Then delete from database
         await db.camera.delete(where={"id": int(camera_id)})
-        return {"status": "success", "message": "Camera deleted"}, 200
+        return {"status": "success", "message": "Camera deleted and unpublished from MediaMTX"}, 200
     except Exception as e:
         return {"error": str(e)}, 500
 

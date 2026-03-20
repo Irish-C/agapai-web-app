@@ -9,7 +9,7 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     // Restore from localStorage
     const storedUser = localStorage.getItem('user');
-    const storedToken = localStorage.getItem('token');
+    const storedToken = localStorage.getItem('authToken');  // Use same key as apiService
     if (storedUser && storedToken) {
       setUser(JSON.parse(storedUser));
       setToken(storedToken);
@@ -31,7 +31,7 @@ export const AuthProvider = ({ children }) => {
         setUser(userData);
         setToken(token);
         localStorage.setItem('user', JSON.stringify(userData));
-        localStorage.setItem('token', token);
+        localStorage.setItem('authToken', token);  // Use same key as apiService
         return { success: true, message: 'Login successful' };
       } else {
         return { success: false, message: 'Login failed. Invalid credentials.' };
@@ -45,7 +45,8 @@ export const AuthProvider = ({ children }) => {
     setUser(null);
     setToken(null);
     localStorage.removeItem('user');
-    localStorage.removeItem('token');
+    localStorage.removeItem('authToken');  // Use same key as apiService
+    // Socket remains connected for alert delivery (independent of auth state)
   };
 
   return (

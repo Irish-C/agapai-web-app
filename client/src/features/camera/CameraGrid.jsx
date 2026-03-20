@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import VideoFeed from './VideoFeed.jsx';
 import TodayReport from '../dashboard/TodayReport.jsx';
 import { useCameraSocket } from '../../hooks/useCamera.js';
@@ -65,7 +65,11 @@ export default function CameraGrid() {
     return () => window.removeEventListener('storage', handleStorageChange);
   }, []);
 
-  const publishedCameraList = cameraList.filter(cam => publishedCameras.has(cam.id));
+  // Memoize publishedCameraList to prevent unnecessary VideoFeed remounts
+  const publishedCameraList = useMemo(
+    () => cameraList.filter(cam => publishedCameras.has(cam.id)),
+    [cameraList, publishedCameras]
+  );
   const focusedCamera = publishedCameraList.find((c) => c.id === focusedCameraId);
 
   const HLS_BASE_URL =
@@ -126,10 +130,6 @@ export default function CameraGrid() {
             camId={focusedCamera.id}
             cameraName={focusedCamera.name}
             location={focusedCamera.location_name || focusedCamera.location || focusedCamera.loc_name}
-            streamUrl={getHlsUrl(focusedCamera)}
-            webrtcUrl={getWebrtcUrl(focusedCamera)}
-            frameData={cameraData[focusedCamera.id]}
-            isConnected={isConnected}
             isFocused={true}
             onFocusChange={setFocusedCameraId}
           />
@@ -152,10 +152,6 @@ export default function CameraGrid() {
                       camId={camera.id}
                       cameraName={camera.name}
                       location={camera.location_name || camera.location || camera.loc_name}
-                      streamUrl={getHlsUrl(camera)}
-                      webrtcUrl={getWebrtcUrl(camera)}
-                      frameData={cameraData[camera.id]}
-                      isConnected={isConnected}
                       isFocused={false}
                       onFocusChange={setFocusedCameraId}
                     />

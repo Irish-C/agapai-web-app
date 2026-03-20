@@ -17,6 +17,12 @@ export default defineConfig({
         secure: false,
         // rewrite: (path) => path
       },
+      // Directs video feed stream to FastAPI
+      '/video_feed': {
+        target: 'http://127.0.0.1:5000',
+        changeOrigin: true,
+        secure: false,
+      },
       // Directs WebSocket traffic to Flask-SocketIO
       '/socket.io': {
         target: 'http://127.0.0.1:5000',

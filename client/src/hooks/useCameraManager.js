@@ -60,6 +60,10 @@ export function useCameraManager(onCameraUpdated) {
     try {
       const data = await fetchApi(`/cameras/${id}`, 'DELETE');
       if (data.status === 'success') {
+        // Clear local storage for deleted camera
+        localStorage.removeItem(`camera_${id}`);
+        localStorage.removeItem(`camera_${id}_settings`);
+        
         setMessage({ text: 'Camera removed successfully!', type: 'success' });
         await fetchCameras();
         return true;
