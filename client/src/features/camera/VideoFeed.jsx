@@ -13,8 +13,6 @@ function MJPEGCanvas({ camId, cameraName, onStatusChange }) {
     if (!canvas) return;
 
     const ctx = canvas.getContext('2d');
-    abortControllerRef.current = new AbortController();
-    const signal = abortControllerRef.current.signal;
 
     // Create Web Worker for MJPEG parsing
     try {
@@ -25,7 +23,18 @@ function MJPEGCanvas({ camId, cameraName, onStatusChange }) {
       console.error('[MJPEGCanvas] Failed to create worker:', err);
     }
 
+    let retryCount = 0;
+    const MAX_RETRIES = 10;
+    const BASE_RETRY_DELAY = 1000; // 1 second
+    let componentMounted = true;
+
     const startStreaming = async () => {
+      if (!componentMounted) return;
+
+      // Create a FRESH AbortController for each attempt
+      abortControllerRef.current = new AbortController();
+      const signal = abortControllerRef.current.signal;
+
       try {
         onStatusChange('connecting');
         console.log(`[MJPEGCanvas] Starting stream for camera ${camId}`);
@@ -51,11 +60,14 @@ function MJPEGCanvas({ camId, cameraName, onStatusChange }) {
 
         console.log(`[MJPEGCanvas] Connected to stream, content-type: ${response.headers.get('content-type')}`);
         onStatusChange('online');
+        retryCount = 0; // Reset retry count on success
         const reader = response.body?.getReader();
         if (!reader) throw new Error('No stream reader');
 
         const frameQueue = [];
         let isRendering = false;
+        let lastRenderedTimestamp = Date.now();
+        let lastCanvasUpdateCheck = Date.now();
 
         // Rendering loop using requestAnimationFrame
         const renderFrame = () => {
@@ -72,6 +84,7 @@ function MJPEGCanvas({ camId, cameraName, onStatusChange }) {
                   canvas.width = img.width;
                   canvas.height = img.height;
                   ctx.drawImage(img, 0, 0);
+                  lastRenderedTimestamp = Date.now(); // Track successful render
                 }
                 URL.revokeObjectURL(url);
               };
@@ -84,6 +97,18 @@ function MJPEGCanvas({ camId, cameraName, onStatusChange }) {
             } catch (err) {
               console.error('Frame rendering error:', err);
             }
+          }
+          
+          // Check if canvas is actually updating (not frozen at render level)
+          const now = Date.now();
+          if (now - lastCanvasUpdateCheck > FROZEN_STATE_TIMEOUT) {
+            const timeSinceLastRender = now - lastRenderedTimestamp;
+            if (timeSinceLastRender > FROZEN_STATE_TIMEOUT && frameQueue.length === 0) {
+              console.warn(`[MJPEGCanvas] Canvas hasn't updated in ${timeSinceLastRender}ms despite stream being open (render frozen), reconnecting...`);
+              onStatusChange('offline');
+              abortControllerRef.current?.abort();
+            }
+            lastCanvasUpdateCheck = now;
           }
           
           if (!signal.aborted) {
@@ -113,44 +138,139 @@ function MJPEGCanvas({ camId, cameraName, onStatusChange }) {
 
         // Main read loop - just forward data to worker
         let frameTimeoutId = null;
-        const FRAME_TIMEOUT = 15000; // 15 seconds without frames = offline
+        let frozenCheckId = null;
+        let readerTimeoutId = null;
+        const FRAME_TIMEOUT = 15000; // 15 seconds without ANY data = offline
+        const FROZEN_STATE_TIMEOUT = 6000; // 6 seconds without NEW frames = frozen, try reconnect
+        let lastFrameTimestamp = Date.now();
 
         const resetFrameTimeout = () => {
           if (frameTimeoutId) clearTimeout(frameTimeoutId);
           
           frameTimeoutId = setTimeout(() => {
-            console.warn(`[MJPEGCanvas] No frames received for ${FRAME_TIMEOUT/1000}s, marking camera offline`);
+            console.error(`[MJPEGCanvas] No data received for ${FRAME_TIMEOUT/1000}s - connection appears dead, aborting`);
             onStatusChange('offline');
             abortControllerRef.current?.abort();
           }, FRAME_TIMEOUT);
         };
 
+        const checkForFrozenState = () => {
+          if (frozenCheckId) clearTimeout(frozenCheckId);
+          
+          frozenCheckId = setTimeout(() => {
+            const timeSinceLastFrame = Date.now() - lastFrameTimestamp;
+            const isStale = timeSinceLastFrame > FROZEN_STATE_TIMEOUT;
+            
+            console.log(`[MJPEGCanvas] Frozen check: elapsed=${timeSinceLastFrame}ms, threshold=${FROZEN_STATE_TIMEOUT}ms, stale=${isStale}`);
+            
+            if (isStale) {
+              console.error(`[MJPEGCanvas] ❌ FROZEN DETECTED: No frames for ${(timeSinceLastFrame/1000).toFixed(1)}s - aborting and reconnecting`);
+              onStatusChange('offline');
+              abortControllerRef.current?.abort();
+            } else {
+              // Continue checking every FROZEN_STATE_TIMEOUT
+              checkForFrozenState();
+            }
+          }, FROZEN_STATE_TIMEOUT);
+        };
+
+        // Race reader.read() against timeout to interrupt hanging reads
+        const readWithTimeout = async (reader) => {
+          const READ_TIMEOUT = 4800; // 4.8 seconds
+          
+          const timeoutPromise = new Promise((_, reject) => {
+            const timeoutId = setTimeout(() => {
+              reject(new Error('reader.read() timeout'));
+            }, READ_TIMEOUT);
+            
+            // Store timeout ID so we can clear it if read succeeds
+            readWithTimeout._timeoutId = timeoutId;
+          });
+          
+          try {
+            return await Promise.race([
+              reader.read(),
+              timeoutPromise
+            ]);
+          } finally {
+            // Clear timeout if read completed (success or error)
+            if (readWithTimeout._timeoutId) {
+              clearTimeout(readWithTimeout._timeoutId);
+              readWithTimeout._timeoutId = null;
+            }
+          }
+        };
+
         resetFrameTimeout(); // Start timeout on initial connect
+        checkForFrozenState(); // Start frozen state detection
+        console.log(`[MJPEGCanvas] Initialized timeouts: FRAME_TIMEOUT=${FRAME_TIMEOUT}ms, FROZEN_STATE_TIMEOUT=${FROZEN_STATE_TIMEOUT}ms`);
 
         while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
+          try {
+            const { done, value } = await readWithTimeout(reader);
+            
+            if (done) {
+              console.log(`[MJPEGCanvas] Stream ended (reader.read returned done)`);
+              break;
+            }
 
-          // Reset timeout on every frame received
-          resetFrameTimeout();
+            // Reset timeouts on data received
+            resetFrameTimeout();
+            lastFrameTimestamp = Date.now();
 
-          // Send data to worker for parsing
-          if (workerRef.current) {
-            workerRef.current.postMessage({
-              type: 'append',
-              data: value
-            });
+            // Send data to worker for parsing
+            if (workerRef.current) {
+              workerRef.current.postMessage({
+                type: 'append',
+                data: value
+              });
+            }
+          } catch (readerErr) {
+            if (readerErr.message === 'reader.read() timeout') {
+              console.error(`[MJPEGCanvas] ❌ TIMEOUT: reader.read() hung for 4.8s - stream is dead, reconnecting`);
+            } else {
+              console.error(`[MJPEGCanvas] Reader error:`, readerErr.message);
+            }
+            onStatusChange('reconnecting'); // Show overlay while trying to reconnect
+            abortControllerRef.current?.abort();
+            break;
           }
         }
 
         if (frameTimeoutId) clearTimeout(frameTimeoutId);
+        if (frozenCheckId) clearTimeout(frozenCheckId);
       } catch (err) {
         if (err.name === 'AbortError') {
           console.log(`[MJPEGCanvas] Stream aborted for camera ${camId}`);
-          // Status already set by timeout handler or cleanup
+          // Attempt reconnect with exponential backoff
+          if (componentMounted && retryCount < MAX_RETRIES) {
+            const delayMs = BASE_RETRY_DELAY * Math.pow(2, retryCount);
+            console.log(`[MJPEGCanvas] Reconnecting in ${delayMs}ms (attempt ${retryCount + 1}/${MAX_RETRIES})`);
+            retryCount++;
+            onStatusChange('reconnecting'); // Show overlay during reconnect attempt
+            setTimeout(() => {
+              if (componentMounted) {
+                startStreaming();
+              }
+            }, delayMs);
+          } else if (retryCount >= MAX_RETRIES) {
+            console.error(`[MJPEGCanvas] Max retries (${MAX_RETRIES}) reached, giving up`);
+            onStatusChange('offline'); // Now show "Camera Offline"
+          }
         } else {
           console.error(`[MJPEGCanvas] Camera ${camId} streaming error:`, err);
-          onStatusChange('offline');
+          onStatusChange('reconnecting'); // Show overlay during reconnect
+          // Retry on other errors too
+          if (componentMounted && retryCount < MAX_RETRIES) {
+            const delayMs = BASE_RETRY_DELAY * Math.pow(2, retryCount);
+            console.log(`[MJPEGCanvas] Reconnecting in ${delayMs}ms (attempt ${retryCount + 1}/${MAX_RETRIES})`);
+            retryCount++;
+            setTimeout(() => {
+              if (componentMounted) {
+                startStreaming();
+              }
+            }, delayMs);
+          }
         }
       }
     };
@@ -158,7 +278,11 @@ function MJPEGCanvas({ camId, cameraName, onStatusChange }) {
     startStreaming();
 
     return () => {
-      abortControllerRef.current?.abort();
+      componentMounted = false;
+      if (abortControllerRef.current) {
+        console.log(`[MJPEGCanvas] Cleaning up camera ${camId} stream`);
+        abortControllerRef.current.abort();
+      }
       if (workerRef.current) {
         workerRef.current.terminate();
       }
@@ -238,7 +362,10 @@ function VideoFeed({
   let statusMessage = 'Connecting...';
   let statusColor = 'text-yellow-400';
   
-  if (cameraStatus === 'offline') {
+  if (cameraStatus === 'reconnecting') {
+    statusMessage = 'Reconnecting...';
+    statusColor = 'text-yellow-400';
+  } else if (cameraStatus === 'offline') {
     statusMessage = 'Camera Offline';
     statusColor = 'text-red-400';
   } else if (cameraStatus === 'error') {
@@ -286,6 +413,7 @@ function VideoFeed({
           cameraStatus === 'online' ? 'bg-green-500' :
           cameraStatus === 'offline' ? 'bg-red-500' :
           cameraStatus === 'error' ? 'bg-red-600' :
+          cameraStatus === 'reconnecting' ? 'bg-yellow-500 animate-pulse' :
           'bg-yellow-500'
         }`}></span>
       </div>

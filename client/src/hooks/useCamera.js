@@ -8,8 +8,12 @@ export const useCameraSocket = () => {
 
   // camId -> latest frame only (overwrite old immediately)
   const latestFramesRef = useRef(new Map());
+  // Track last frame timestamp for each camera (to detect frozen/stale data)
+  const lastFrameTimeRef = useRef(new Map());
   // Track alert IDs we've already seen to prevent duplicates after sync
   const seenAlertIdsRef = useRef(new Set());
+
+  const STALE_FRAME_TIMEOUT = 5000; // 5 seconds - if no update, clear the frame
 
   useEffect(() => {
     const handleConnect = () => {
@@ -28,6 +32,7 @@ export const useCameraSocket = () => {
       const frame = data?.frame;
       if (camId == null || !frame) return;
       latestFramesRef.current.set(camId, frame);
+      lastFrameTimeRef.current.set(camId, Date.now()); // Track when this frame arrived
     };
 
     const handleNewAlert = (alert) => {
@@ -60,16 +65,34 @@ export const useCameraSocket = () => {
     setIsConnected(socket.connected);
 
     // flush at ~30fps, always newest frame only
+    // also clear stale frames that haven't updated for too long
     const flush = setInterval(() => {
-      if (latestFramesRef.current.size === 0) return;
+      const now = Date.now();
+      let hasChanges = false;
 
+      // Check for stale frames and clear them from state
       setCameraData((prev) => {
         const next = { ...prev };
+        let stateChanged = false;
+
+        // Clear frames from UI if they're older than STALE_FRAME_TIMEOUT
+        for (const camId of Object.keys(next)) {
+          const lastTime = lastFrameTimeRef.current.get(camId);
+          if (lastTime && now - lastTime > STALE_FRAME_TIMEOUT) {
+            console.warn(`[useCameraSocket] Camera ${camId} frame is stale (${now - lastTime}ms old), clearing...`);
+            delete next[camId];
+            stateChanged = true;
+          }
+        }
+
+        // Add new frames from buffer
         for (const [camId, frame] of latestFramesRef.current.entries()) {
           next[camId] = frame;
+          stateChanged = true;
         }
         latestFramesRef.current.clear();
-        return next;
+
+        return stateChanged ? next : prev;
       });
     }, 33);
 
@@ -79,6 +102,8 @@ export const useCameraSocket = () => {
       socket.off('disconnect', handleDisconnect);
       socket.off('camera_frame', handleFrame);
       socket.off('new_alert', handleNewAlert);
+      latestFramesRef.current.clear();
+      lastFrameTimeRef.current.clear();
     };
   }, []);
 

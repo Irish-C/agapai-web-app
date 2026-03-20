@@ -4,14 +4,21 @@ import { socket, forceReconnect } from "../services/socket";
 import { FaPlug, FaSync } from "react-icons/fa"; 
 
 export default function ConnectionStatus({ onLogout }) {
-  const [status, setStatus] = useState('disconnected');
+  const [status, setStatus] = useState(socket.connected ? 'connected' : 'disconnected');
   const [isMinimized, setIsMinimized] = useState(false);
   const [disconnectTime, setDisconnectTime] = useState(null);
   const [showManualReset, setShowManualReset] = useState(false);
   const logoutTimeoutRef = React.useRef(null);
 
   useEffect(() => {
+    // Set initial status based on actual socket state
+    if (socket.connected) {
+      setStatus('connected');
+      console.log("[ConnectionStatus] Initial state: socket already connected");
+    }
+
     const handleConnect = () => {
+      console.log("[ConnectionStatus] Connect event fired");
       setStatus('connected');
       setDisconnectTime(null);
       setShowManualReset(false);
