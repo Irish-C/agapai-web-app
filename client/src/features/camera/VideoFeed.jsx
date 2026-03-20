@@ -51,7 +51,7 @@ export default function VideoFeed({
       <img
         src={`data:image/jpeg;base64,${frameData}`}
         alt={`${cameraName} Feed`}
-        className="w-full h-full object-contain"
+        className="w-full h-full object-contain" // Use object-cover to maintain aspect ratio from object-cointain
       />
     );
   }
