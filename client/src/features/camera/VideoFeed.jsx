@@ -209,10 +209,15 @@ function VideoFeed({
       subscriptionRef.current = null;
     }
 
-    // Listen for camera status events
+    // Listen for camera status events (only for critical errors, don't override local MJPEG status)
     const handleCameraStatus = (data) => {
       if (data.cam_id === String(camId)) {
-        setCameraStatus(data.status);
+        // Only override if it's a critical error, otherwise trust MJPEG stream status
+        if (data.status === 'error') {
+          setCameraStatus('error');
+        }
+        // For 'offline' from backend, only set if MJPEG hasn't connected yet
+        // If MJPEG is streaming, that's more reliable than backend status
       }
     };
 
