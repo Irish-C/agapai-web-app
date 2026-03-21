@@ -284,9 +284,17 @@ async def stream_camera_loop(camera_id, rtsp_url):
             # Check if AI is enabled globally
             try:
                 gs = await db.globalsetting.find_first()
-                ai_enabled = bool(getattr(gs, 'ai_enabled', True)) if gs else True
+                ai_enabled_now = bool(getattr(gs, 'ai_enabled', True)) if gs else True
             except Exception:
-                ai_enabled = True
+                ai_enabled_now = True
+            
+            # If AI was disabled, clear the cached annotated frame to show raw video
+            ai_enabled = getattr(stream_camera_loop, '_prev_ai_enabled', True)
+            if ai_enabled and not ai_enabled_now:
+                cached_annotated_frame = None
+                print(f"[stream_camera_loop] 🔴 AI DISABLED: Clearing cached annotated frame, switching to raw video")
+            ai_enabled = ai_enabled_now
+            stream_camera_loop._prev_ai_enabled = ai_enabled
             
             # Debug: Log YOLO condition check every 30 frames
             if frame_counter % 30 == 0:
@@ -348,13 +356,17 @@ async def stream_camera_loop(camera_id, rtsp_url):
                     import traceback
                     traceback.print_exc()
             else:
-                # Reuse cached annotated frame if YOLO didn't run this frame
-                if cached_annotated_frame is not None:
+                # If AI is enabled but YOLO didn't run this frame, reuse cached frame
+                # If AI is disabled, use raw frame (don't use old cached annotated frames)
+                if ai_enabled and cached_annotated_frame is not None:
                     frame = cached_annotated_frame
                     if frame_counter % 60 == 0:  # Log every 60 frames (~1 sec)
                         print(f"[camera_controller] Frame {frame_counter}: Reusing cached annotated frame")
                 elif frame_counter % 150 == 0:
-                    print(f"[camera_controller] Frame {frame_counter}: No cached frame available, using raw frame")
+                    if ai_enabled:
+                        print(f"[camera_controller] Frame {frame_counter}: No cached frame available, using raw frame")
+                    else:
+                        print(f"[camera_controller] Frame {frame_counter}: AI disabled, using raw frame")
             if fall_event_class and (now - last_fall_alert) > fall_alert_cooldown:
                 last_fall_alert = now
                 # Check global settings for fall persistence
