@@ -208,22 +208,16 @@ async def video_feed(camera_id: str | None = None):
 
         async def generate():
             chunk_count = 0
-            no_frame_count = 0
             while True:
                 try:
                     frame_bytes = r.get(stream_key)
                     if frame_bytes:
                         chunk_count += 1
-                        no_frame_count = 0
                         yield (b'--frame\r\n'
                                b'Content-Type: image/jpeg\r\n'
                                b'Content-Length: ' + str(len(frame_bytes)).encode() + b'\r\n\r\n' 
                                + frame_bytes + b'\r\n')
-                    else:
-                        # Send keepalive comment to prevent client timeout when no frames available
-                        no_frame_count += 1
-                        if no_frame_count % 5 == 0:  # Every ~100ms (5 * 0.020s) for faster detection
-                            yield b'--frame\r\nContent-Type: text/plain\r\n\r\nWAITING\r\n'
+                    # If no frame, just sleep and retry (don't send broken MJPEG)
                     await asyncio.sleep(0.020)  # ~50fps for lower latency
                 except Exception as e:
                     print(f"[video_feed] Streaming error: {e}")
