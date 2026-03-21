@@ -9,6 +9,7 @@ export default function CameraNotificationSettings() {
         persist_fall: true,
         emit_inactivity: false,
         persist_inactivity: false,
+        ai_enabled: true,
     });
 
     useEffect(() => {
@@ -23,6 +24,7 @@ export default function CameraNotificationSettings() {
                         persist_fall: data.persist_fall === true,
                         emit_inactivity: data.emit_inactivity === true,
                         persist_inactivity: data.persist_inactivity === true,
+                        ai_enabled: data.ai_enabled === true,
                     });
                 }
             } catch (e) {
@@ -110,15 +112,23 @@ export default function CameraNotificationSettings() {
             <div className="bg-white p-6 rounded-xl shadow-md border border-gray-100">
                 <h2 className="text-xl font-semibold text-gray-800 flex items-center mb-4 border-b pb-2">
                     <FaVideo className="mr-2 text-teal-600" />
-                    Camera Activation Management
+                    AI Detection & Camera Activation
                 </h2>
                 <p className="text-sm text-gray-500 mb-4">
-                    Control which detection models (Fall, Inactivity) are active for each camera location.
+                    Control AI inference and detection models for all cameras.
                 </p>
                 
-                {/* Placeholder for Camera Activation Grid */}
-                <div className="p-4 bg-yellow-50 border border-yellow-300 text-yellow-800 rounded-lg text-sm">
-                    ⚠️ Model activation controls will be implemented here using a table structure.
+                {/* AI Detection Toggle */}
+                <div className="space-y-3 border-b pb-4 mb-4">
+                    <ToggleRow icon={null} label="Enable AI Detection (YOLO)" checked={globalSettings.ai_enabled} onToggle={(v) => saveGlobalSettings({ ai_enabled: v })} />
+                    <p className="text-xs text-gray-500 ml-0">
+                        {globalSettings.ai_enabled ? '✓ AI detection is ACTIVE - runs YOLO inference every 6 frames' : '✗ AI detection is DISABLED - no YOLO processing, raw video only'}
+                    </p>
+                </div>
+                
+                {/* Placeholder for Per-Camera Settings */}
+                <div className="p-4 bg-blue-50 border border-blue-300 text-blue-800 rounded-lg text-sm">
+                    ℹ️ Per-camera model activation controls will be implemented here.
                 </div>
             </div>
         </div>

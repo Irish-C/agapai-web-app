@@ -85,6 +85,7 @@ model GlobalSetting {
   persist_fall        Boolean @default(true)
   emit_inactivity     Boolean @default(false)
   persist_inactivity  Boolean @default(false)
+  ai_enabled          Boolean @default(true)  // Toggle to enable/disable YOLO AI inference
 
   @@map("global_settings")
 }
