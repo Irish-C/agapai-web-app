@@ -11,6 +11,7 @@ from src.controllers.user_controller import (
     create_user_logic,
     update_user_logic,
     archive_user_logic,
+    unarchive_user_logic,
     change_password_logic,
 )
 from src.utils.auth import create_token
@@ -76,8 +77,13 @@ async def get_user_profile(user_id: str = Depends(get_current_user_id)):
     return safe_json_response(status_code=code, content=result)
 
 @router.get('/users')
-async def list_users(user_id: str = Depends(require_admin_user_id)):
-    result, code = await list_users_logic()
+async def list_users(
+    request: Request,
+    user_id: str = Depends(require_admin_user_id),
+):
+    include_archived = str(request.query_params.get('include_archived', 'false')).lower() == 'true'
+    archived_only = str(request.query_params.get('archived_only', 'false')).lower() == 'true'
+    result, code = await list_users_logic(include_archived=include_archived, archived_only=archived_only)
     return safe_json_response(status_code=code, content=result)
 
 @router.post('/users')
@@ -95,6 +101,11 @@ async def update_user(user_id: int, request: Request, current_user_id: str = Dep
 @router.patch('/users/{user_id}/archive')
 async def archive_user(user_id: int, current_user_id: str = Depends(require_admin_user_id)):
     result, code = await archive_user_logic(user_id)
+    return safe_json_response(status_code=code, content=result)
+
+@router.patch('/users/{user_id}/unarchive')
+async def unarchive_user(user_id: int, current_user_id: str = Depends(require_admin_user_id)):
+    result, code = await unarchive_user_logic(user_id)
     return safe_json_response(status_code=code, content=result)
 
 @router.post('/users/change-password')

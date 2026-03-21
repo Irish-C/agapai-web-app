@@ -54,7 +54,7 @@ async def get_current_user_id(
 
         # Deny access if the account was archived/deleted after token issuance.
         user = await db.user.find_unique(where={'id': int(user_id)})
-        if not user:
+        if not user or not getattr(user, 'is_active', True):
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail='Account is inactive or archived',

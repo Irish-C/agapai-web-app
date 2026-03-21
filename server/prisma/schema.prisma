@@ -25,6 +25,7 @@ model User {
   email             String     @unique @db.VarChar(255)
   username          String     @unique @db.VarChar(50)
   password          String     @db.VarChar(255)
+  is_active         Boolean    @default(true)
   role_id           BigInt?
   acknowledged_logs EventLog[]
   role              Role?      @relation(fields: [role_id], references: [id])

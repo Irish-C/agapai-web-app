@@ -9,6 +9,7 @@ export const useUserManager = (user) => {
     const [error, setError] = useState(null);
     const [userToArchive, setUserToArchive] = useState(null);
     const [isArchiveModalOpen, setIsArchiveModalOpen] = useState(false);
+    const [showArchived, setShowArchived] = useState(false);
 
     // Load users from database
     const loadUsers = async () => {
@@ -17,7 +18,7 @@ export const useUserManager = (user) => {
         setError(null);
 
         try {
-            const userData = await fetchUsers();
+            const userData = await fetchUsers({ archivedOnly: showArchived });
             setUsers(Array.isArray(userData) ? userData : []);
         } catch (err) {
             console.error("Error loading users:", err);
@@ -46,7 +47,7 @@ export const useUserManager = (user) => {
     // Fetch users on mount
     useEffect(() => {
         loadUsers();
-    }, [user]);
+    }, [user, showArchived]);
 
     // Fetch roles on mount
     useEffect(() => {
@@ -58,13 +59,27 @@ export const useUserManager = (user) => {
         try {
             const result = await fetchApi(`/users/${userId}/archive`, 'PATCH', { is_active: false });
             if (result.status === 'success') {
-                setUsers(currentUsers => currentUsers.filter(u => u.id !== userId));
+                setUsers(currentUsers => currentUsers.filter(u => u.id !== String(userId)));
                 return { success: true };
             } else {
                 return { success: false, message: result.message || 'Server did not confirm archive.' };
             }
         } catch (err) {
             console.error("Archive error:", err);
+            return { success: false, message: err.message || 'Server error.' };
+        }
+    };
+
+    const unarchiveUser = async (userId) => {
+        try {
+            const result = await fetchApi(`/users/${userId}/unarchive`, 'PATCH');
+            if (result.status === 'success') {
+                setUsers(currentUsers => currentUsers.filter(u => u.id !== String(userId)));
+                return { success: true };
+            }
+            return { success: false, message: result.message || 'Server did not confirm restore.' };
+        } catch (err) {
+            console.error('Unarchive error:', err);
             return { success: false, message: err.message || 'Server error.' };
         }
     };
@@ -97,9 +112,12 @@ export const useUserManager = (user) => {
         error,
         userToArchive,
         isArchiveModalOpen,
+        showArchived,
         setUserToArchive,
         setIsArchiveModalOpen,
+        setShowArchived,
         archiveUser,
+        unarchiveUser,
         saveUser,
         loadUsers,
         setError

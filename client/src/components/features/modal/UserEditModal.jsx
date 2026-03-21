@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { FaUser, FaSave, FaTimes, FaSpinner, FaLock } from 'react-icons/fa';
 
 import { normalizeRole, displayRole } from '../../utils/roleUtils.js';
+import { fetchRolesApi } from '../../services/apiService.js';
 
 
 /**
@@ -41,26 +42,24 @@ export default function UserEditModal({ userToEdit, onSave, onClose }) {
         const fetchRoles = async () => {
             try {
                 setIsLoadingRoles(true);
-                // Ensure the URL matches your backend route
-                const response = await fetch('/api/roles', {
-                    headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
-                });
-                const result = await response.json();
-                
-                if (result.status === 'success') {
-                    setDbRoles(result.data);
-                    // Do NOT auto-select a role for Add User; keep empty
+                const result = await fetchRolesApi();
+                if (result && Array.isArray(result.data)) {
+                    setDbRoles(result.data.map((roleName) => normalizeRole(roleName)));
+                } else if (Array.isArray(result)) {
+                    setDbRoles(result.map((r) => normalizeRole(r.role_name || r.role || r.name)));
+                } else {
+                    setDbRoles([]);
                 }
             } catch (err) {
                 console.error("Failed to fetch roles from DB:", err);
-                setMessage("Could not load roles from database.");
+                setMessage(err.message || "Could not load roles from database.");
             } finally {
                 setIsLoadingRoles(false);
             }
         };
 
         fetchRoles();
-    }, [isEditing]);
+    }, []);
 
     const handleChange = (e) => {
         const { name, value } = e.target;

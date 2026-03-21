@@ -10,7 +10,9 @@ export default function UserTable({
     setSortOrder, 
     onEdit, 
     onArchive, 
-    currentUserId 
+    onUnarchive,
+    currentUserId,
+    emptyMessage = 'No users found.'
 }) {
     const SortHeader = ({ field, label }) => (
         <th
@@ -44,7 +46,7 @@ export default function UserTable({
                     {users.length === 0 && (
                         <tr>
                             <td colSpan="5" className="px-6 py-4 text-center text-sm text-gray-500">
-                                No users found. Try adding a new user.
+                                {emptyMessage}
                             </td>
                         </tr>
                     )}
@@ -59,10 +61,18 @@ export default function UserTable({
                                 </span>
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                                <ActionButtons buttons={[
-                                    { label: 'Edit', onClick: () => onEdit(u), className: 'bg-blue-600 text-white text-xs py-1 px-2 rounded hover:bg-blue-700 font-semibold' },
-                                    ...(u.id !== currentUserId ? [{ label: 'Archive', onClick: () => onArchive(u), className: 'bg-yellow-600 text-white text-xs py-1 px-2 rounded hover:bg-yellow-700 font-semibold' }] : [])
-                                ]} />
+                                {(() => {
+                                    const buttons = [
+                                        { label: 'Edit', onClick: () => onEdit(u), className: 'bg-blue-600 text-white text-xs py-1 px-2 rounded hover:bg-blue-700 font-semibold' }
+                                    ];
+                                    if (onArchive && u.id !== currentUserId) {
+                                        buttons.push({ label: 'Archive', onClick: () => onArchive(u), className: 'bg-yellow-600 text-white text-xs py-1 px-2 rounded hover:bg-yellow-700 font-semibold' });
+                                    }
+                                    if (onUnarchive) {
+                                        buttons.push({ label: 'Restore', onClick: () => onUnarchive(u), className: 'bg-emerald-600 text-white text-xs py-1 px-2 rounded hover:bg-emerald-700 font-semibold' });
+                                    }
+                                    return <ActionButtons buttons={buttons} />;
+                                })()}
                             </td>
                         </tr>
                     ))}

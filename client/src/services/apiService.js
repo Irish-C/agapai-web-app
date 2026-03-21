@@ -110,8 +110,13 @@ export const logoutUser = () => {
 
 // --- USER MANAGEMENT SERVICES ---
 
-export const fetchUsers = () => {
-    return fetchApi('/users', 'GET'); 
+export const fetchUsers = (options = {}) => {
+    const params = new URLSearchParams();
+    if (options.includeArchived) params.append('include_archived', 'true');
+    if (options.archivedOnly) params.append('archived_only', 'true');
+    const qs = params.toString();
+    const endpoint = qs ? `/users?${qs}` : '/users';
+    return fetchApi(endpoint, 'GET');
 };
 
 /**

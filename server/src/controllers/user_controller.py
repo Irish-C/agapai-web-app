@@ -10,6 +10,9 @@ async def login_logic(data):
         include={'role': True}
     )
     
+    if user and not getattr(user, 'is_active', True):
+        return {"status": "error", "message": "Account does not exist."}, 401
+
     if user and check_password_hash(user.password, data.get('password')):
         return {
             "status": "success", 
@@ -21,9 +24,15 @@ async def login_logic(data):
         
     return {"status": "error", "message": "Invalid credentials"}, 401
 
-async def list_users_logic():
+async def list_users_logic(include_archived: bool = False, archived_only: bool = False):
     # Include role here too for the Management table
-    users = await db.user.find_many(include={'role': True})
+    where_clause = {}
+    if archived_only:
+        where_clause['is_active'] = False
+    elif not include_archived:
+        where_clause['is_active'] = True
+
+    users = await db.user.find_many(where=where_clause, include={'role': True})
     result = []
     for user in users:
         result.append({
@@ -35,6 +44,7 @@ async def list_users_logic():
             'role': normalize_role(user.role.role_name) if user.role else None,
             'email': user.email,
             'birthdate': user.birthdate.isoformat() if user.birthdate else None,
+            'is_active': bool(getattr(user, 'is_active', True)),
             'email_notifications': user.email_notifications,
             'alert_threshold': user.alert_threshold,
         })
@@ -44,7 +54,7 @@ async def get_profile_logic(user_id):
         where={'id': int(user_id)},
         include={'role': True}
     )
-    if not user:
+    if not user or not getattr(user, 'is_active', True):
         return {"error": "User not found"}, 404
     
     return {
@@ -99,9 +109,21 @@ async def update_user_logic(user_id, data):
         
 async def archive_user_logic(user_id):
     try:
-        # We do not currently have an is_active field in the schema, so archiving deletes the user.
-        await db.user.delete(where={'id': int(user_id)})
+        await db.user.update(
+            where={'id': int(user_id)},
+            data={'is_active': False}
+        )
         return {"status": "success", "message": "User archived"}, 200
+    except Exception as e:
+        return {"status": "error", "message": str(e)}, 500
+
+async def unarchive_user_logic(user_id):
+    try:
+        await db.user.update(
+            where={'id': int(user_id)},
+            data={'is_active': True}
+        )
+        return {"status": "success", "message": "User restored"}, 200
     except Exception as e:
         return {"status": "error", "message": str(e)}, 500
 

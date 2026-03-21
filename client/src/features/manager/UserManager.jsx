@@ -13,7 +13,22 @@ export default function UserManager({ user }) {
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [userToEdit, setUserToEdit] = useState(null);
 
-    const { users, roles, isLoading, error, userToArchive, isArchiveModalOpen, setUserToArchive, setIsArchiveModalOpen, archiveUser, saveUser, setError } = useUserManager(user);
+    const {
+        users,
+        roles,
+        isLoading,
+        error,
+        userToArchive,
+        isArchiveModalOpen,
+        showArchived,
+        setUserToArchive,
+        setIsArchiveModalOpen,
+        setShowArchived,
+        archiveUser,
+        unarchiveUser,
+        saveUser,
+        setError,
+    } = useUserManager(user);
 
     // Sort and filter users
     const sortedFilteredUsers = users
@@ -49,6 +64,11 @@ export default function UserManager({ user }) {
         const result = await archiveUser(userToArchive.id);
         if (!result.success) setError(`Archive failed: ${result.message}`);
         setUserToArchive(null);
+    };
+
+    const handleUnarchiveClick = async (userItem) => {
+        const result = await unarchiveUser(userItem.id);
+        if (!result.success) setError(`Restore failed: ${result.message}`);
     };
 
     const handleSaveUser = async (formData) => {
@@ -92,14 +112,24 @@ export default function UserManager({ user }) {
 
             <div className="flex justify-between items-center mb-4">
                 <h3 className="text-xl font-semibold flex items-center">
-                    <FaUsers className="mr-2" /> Current System Users
+                    <FaUsers className="mr-2" /> {showArchived ? 'Archived Users' : 'Current System Users'}
                 </h3>
-                <button 
-                    onClick={handleAddUser}
-                    className="flex items-center bg-teal-600 hover:bg-teal-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-150"
-                >
-                    Add New User
-                </button>
+                <div className="flex items-center gap-2">
+                    <button
+                        onClick={() => setShowArchived(prev => !prev)}
+                        className={`flex items-center font-bold py-2 px-4 rounded-lg transition duration-150 border ${showArchived ? 'bg-slate-700 text-white border-slate-700 hover:bg-slate-800' : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-100'}`}
+                    >
+                        <FaArchive className="mr-2" /> {showArchived ? 'Show Active' : 'Archived'}
+                    </button>
+                    {!showArchived && (
+                        <button
+                            onClick={handleAddUser}
+                            className="flex items-center bg-teal-600 hover:bg-teal-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-150"
+                        >
+                            Add New User
+                        </button>
+                    )}
+                </div>
             </div>
 
             {isLoading && (
@@ -122,8 +152,10 @@ export default function UserManager({ user }) {
                     sortOrder={sortOrder}
                     setSortOrder={setSortOrder}
                     onEdit={handleEditUser}
-                    onArchive={handleArchiveClick}
+                    onArchive={showArchived ? undefined : handleArchiveClick}
+                    onUnarchive={showArchived ? handleUnarchiveClick : undefined}
                     currentUserId={user?.userId}
+                    emptyMessage={showArchived ? 'No archived users found.' : 'No users found. Try adding a new user.'}
                 />
             )}
 
