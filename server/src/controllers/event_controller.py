@@ -1,5 +1,5 @@
 from database import db
-from datetime import datetime
+from datetime import datetime, timedelta
 from src.utils.role_utils import normalize_role
 
 async def create_event_logic(data):
@@ -55,9 +55,39 @@ async def get_event_logs_logic(filters=None):
     try:
         # Get limit from filters, default to 50 if not provided
         limit = int(filters.get('limit', 50)) if filters else 50
+
+        where_clause = {}
+        if filters:
+            start_date = filters.get('start_date')
+            end_date = filters.get('end_date')
+
+            if start_date or end_date:
+                timestamp_filter = {}
+
+                if start_date:
+                    start_dt = datetime.strptime(start_date, '%Y-%m-%d').replace(
+                        hour=0,
+                        minute=0,
+                        second=0,
+                        microsecond=0,
+                    )
+                    timestamp_filter['gte'] = start_dt
+
+                if end_date:
+                    # Include the full selected end date by filtering to next day (exclusive).
+                    end_dt = datetime.strptime(end_date, '%Y-%m-%d').replace(
+                        hour=0,
+                        minute=0,
+                        second=0,
+                        microsecond=0,
+                    ) + timedelta(days=1)
+                    timestamp_filter['lt'] = end_dt
+
+                where_clause['timestamp'] = timestamp_filter
         
         logs = await db.eventlog.find_many(
             take=limit, # Use the limit here
+            where=where_clause,
             order={'timestamp': 'desc'},
             include={'camera': True, 'event_class': True}
         )
@@ -75,6 +105,8 @@ async def get_event_logs_logic(filters=None):
             })
             
         return {"status": "success", "report": formatted_data}, 200
+    except ValueError:
+        return {"status": "error", "message": "Invalid date format. Use YYYY-MM-DD"}, 400
     except Exception as e:
         print(f"Error: {e}")
         return {"status": "error", "message": str(e)}, 500

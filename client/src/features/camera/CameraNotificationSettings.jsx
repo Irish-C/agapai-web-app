@@ -1,6 +1,7 @@
 // src/components/CameraNotificationSettings.jsx
 import React, { useState, useEffect } from 'react';
 import { FaBell, FaVideo } from 'react-icons/fa';
+import { fetchApi } from '../../services/apiService.js';
 
 // ============================================================================
 // CONSTANTS & CONFIGURATION
@@ -133,10 +134,7 @@ export default function CameraNotificationSettings() {
         const fetchSettings = async () => {
             setIsLoading(true);
             try {
-                const res = await fetch(API_ENDPOINT);
-                if (!res.ok) throw new Error('Failed to fetch settings');
-
-                const data = await res.json();
+                const data = await fetchApi('/settings/notifications/global', 'GET');
                 setGlobalSettings({
                     emit_fall: data.emit_fall === true,
                     persist_fall: data.persist_fall === true,
@@ -148,7 +146,14 @@ export default function CameraNotificationSettings() {
                 setError(null);
             } catch (err) {
                 console.error('Failed to load global settings:', err);
-                setError('Failed to load settings. Please refresh and try again.');
+                const message = (err?.message || '').toLowerCase();
+                if (message.includes('403') || message.includes('admin')) {
+                    setError('Access denied. Only admin accounts can view or edit global settings.');
+                } else if (message.includes('401') || message.includes('expired') || message.includes('credentials')) {
+                    setError('Session expired. Please sign in again.');
+                } else {
+                    setError('Failed to load settings. Please refresh and try again.');
+                }
             } finally {
                 setIsLoading(false);
             }
@@ -165,17 +170,18 @@ export default function CameraNotificationSettings() {
         setGlobalSettings(updatedSettings);
 
         try {
-            const res = await fetch(API_ENDPOINT, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(updatedSettings),
-            });
-
-            if (!res.ok) throw new Error('Failed to save settings');
+            await fetchApi('/settings/notifications/global', 'POST', updatedSettings);
             setError(null);
         } catch (err) {
             console.error('Error saving global settings:', err);
-            setError('Failed to save settings. Changes were reverted.');
+            const message = (err?.message || '').toLowerCase();
+            if (message.includes('403') || message.includes('admin')) {
+                setError('Access denied. Only admin accounts can edit global settings.');
+            } else if (message.includes('401') || message.includes('expired') || message.includes('credentials')) {
+                setError('Session expired. Please sign in again.');
+            } else {
+                setError('Failed to save settings. Changes were reverted.');
+            }
             // Rollback on error
             setGlobalSettings(prevSettings);
         }

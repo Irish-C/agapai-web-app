@@ -84,7 +84,9 @@ export default function ReportsPage() {
     const indexOfFirstRow = indexOfLastRow - rowsPerPage;
     const currentRows = filteredLogs.slice(indexOfFirstRow, indexOfLastRow);
     const totalPages = Math.ceil(filteredLogs.length / rowsPerPage);
-    const visibleClassifications = showAllClassifications ? classifications : classifications.slice(0, 1);
+    const visibleClassifications = showAllClassifications
+        ? classifications
+        : classifications.filter((opt, idx) => idx === 0 || filterClass.includes(opt));
 
     // --- HANDLERS ---
     const sanitizeSearchInput = (value) => {
