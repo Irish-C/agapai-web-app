@@ -6,7 +6,7 @@ import { FaPlug, FaSpinner, FaVideo, FaSync } from 'react-icons/fa';
 import { fetchCameraList } from '../../services/apiService.js';
 
 export default function CameraGrid() {
-  const { cameraData, incidents, alerts, isConnected } = useCameraSocket();
+  const { cameraData, alerts, isConnected } = useCameraSocket();
 
   const [cameraList, setCameraList] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -232,7 +232,7 @@ export default function CameraGrid() {
           </div>
 
           <div className="lg:w-1/4 lg:flex-shrink-0">
-            <TodayReport incidents={incidents} alerts={alerts} />
+            <TodayReport incidents={alerts} alerts={alerts} />
           </div>
         </>
       )}

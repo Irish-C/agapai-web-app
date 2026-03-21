@@ -46,12 +46,12 @@ export default function TodayReport({ incidents = [], alerts = [], user }) {
     // CONFIGURATION: Replace with your Raspberry Pi's IP Address and the backend port (from picam.py)
     const RPI_BASE_URL = "http://192.168.2.106:4050";
 
-    // Fetch today's persisted logs from database (only once on mount)
+    // Fetch recent persisted logs from database (only once on mount).
+    // Today's filtering is applied client-side using local date keys.
     useEffect(() => {
         const fetchTodaysLogs = async () => {
             try {
-                const today = getLocalDateKey(new Date());
-                const response = await fetchReportsData(1000, today, today);
+                const response = await fetchReportsData(1000, '', '');
                 const todaysLogs = response.report || response.data || [];
                 
                 // Store database logs - will be merged with real-time incidents below
@@ -69,8 +69,8 @@ export default function TodayReport({ incidents = [], alerts = [], user }) {
     const sortedIncidents = useMemo(() => {
         const todayKey = getLocalDateKey(new Date());
         
-        // Combine database logs + real-time incidents
-        const combined = [...allIncidents, ...incidents];
+        // Combine database logs + real-time incidents/alerts
+        const combined = [...allIncidents, ...incidents, ...alerts];
         
         // Remove duplicates by timestamp + type
         const unique = Array.from(new Map(
@@ -88,7 +88,7 @@ export default function TodayReport({ incidents = [], alerts = [], user }) {
                 return dateKey === todayKey;
             })
             .sort((a, b) => getIncidentEpochMs(b) - getIncidentEpochMs(a));
-    }, [allIncidents, incidents]);
+    }, [allIncidents, incidents, alerts]);
 
     // --- Derived State ---
     // Count ALL incidents from today, regardless of acknowledgment status

@@ -451,16 +451,36 @@ async def stream_camera_loop(camera_id, rtsp_url):
                     print(f"[camera_controller] Frame {frame_counter}: AI disabled, using raw frame")
             if fall_event_class and (now - last_fall_alert) > fall_alert_cooldown:
                 last_fall_alert = now
-                # Check global settings for fall persistence
+                # Check global settings for independent emit/persist controls.
                 try:
                     gs = await db.globalsetting.find_first()
                     persist_fall = bool(getattr(gs, 'persist_fall', True)) if gs is not None else True
+                    emit_fall = bool(getattr(gs, 'emit_fall', True)) if gs is not None else True
                 except Exception:
                     persist_fall = True
+                    emit_fall = True
 
                 if persist_fall:
-                    # persist_event handles emission via emit_flag (respects global settings)
+                    # Persist and emit (persist_event respects emit_fall internally).
                     await persist_event('Fall', fall_event_class, frame)
+                elif emit_fall:
+                    # Emit realtime popup even when database persistence is disabled.
+                    try:
+                        from app import socketio_server, connected_sids
+
+                        if connected_sids:
+                            camera = await db.camera.find_unique(where={'id': int(camera_id)})
+                            payload = {
+                                'id': f"rt-{uuid.uuid4().hex[:10]}",
+                                'type': fall_event_class,
+                                'location': camera.cam_name if camera else 'Unknown',
+                                'timestamp': datetime.now().isoformat(),
+                                'snapshot_url': '',
+                                'status': 'unacknowledged',
+                            }
+                            await socketio_server.emit('new_alert', payload)
+                    except Exception as e:
+                        print(f"[camera_controller] Failed to emit realtime fall alert: {e}")
 
             # Inactivity: prefer model-based detection when available.
             inactive_by_model = False
