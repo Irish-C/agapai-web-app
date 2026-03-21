@@ -22,6 +22,7 @@ export default function ReportsPage() {
     const [searchTerm, setSearchTerm] = useState('');
     const [filterClass, setFilterClass] = useState([]);
     const [filterStatus, setFilterStatus] = useState([]);
+    const [showAllClassifications, setShowAllClassifications] = useState(false);
 
     // Pagination States
     const [currentPage, setCurrentPage] = useState(1);
@@ -45,10 +46,15 @@ export default function ReportsPage() {
                     setLogs(dataArray);
                 }
 
-                // Handle Dynamic Classifications from DB
-                if (classResponse && Array.isArray(classResponse)) {
-                    setClassifications(classResponse.map(c => c.name || c.type));
-                }
+                // Merge classifications from DB event types and fetched logs
+                const dbClassifications = Array.isArray(classResponse)
+                    ? classResponse.map(c => c.name || c.type).filter(Boolean)
+                    : [];
+                const logClassifications = Array.isArray(dataArray)
+                    ? dataArray.map(log => log.event_class_name || log.type).filter(Boolean)
+                    : [];
+
+                setClassifications([...new Set([...dbClassifications, ...logClassifications])]);
 
                 setCurrentPage(1); 
             } catch (err) {
@@ -76,6 +82,7 @@ export default function ReportsPage() {
     const indexOfFirstRow = indexOfLastRow - rowsPerPage;
     const currentRows = filteredLogs.slice(indexOfFirstRow, indexOfLastRow);
     const totalPages = Math.ceil(filteredLogs.length / rowsPerPage);
+    const visibleClassifications = showAllClassifications ? classifications : classifications.slice(0, 1);
 
     // --- HANDLERS ---
     const toggleFilter = (item, currentArray, setter) => {
@@ -195,7 +202,7 @@ export default function ReportsPage() {
                         <div className="space-y-2">
                             <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-1 font-sans">Classification</span>
                             <div className="flex flex-wrap gap-2">
-                                {classifications.map(opt => (
+                                {visibleClassifications.map(opt => (
                                     <button
                                         key={opt}
                                         onClick={() => toggleFilter(opt, filterClass, setFilterClass)}
@@ -204,6 +211,14 @@ export default function ReportsPage() {
                                         {opt}
                                     </button>
                                 ))}
+                                {classifications.length > 1 && (
+                                    <button
+                                        onClick={() => setShowAllClassifications(prev => !prev)}
+                                        className="px-3 py-2 rounded-xl text-xs font-black text-gray-500 bg-white border border-gray-200 hover:border-teal-500 hover:text-teal-600 transition-all font-sans"
+                                    >
+                                        {showAllClassifications ? 'Less' : '...'}
+                                    </button>
+                                )}
                             </div>
                         </div>
 
@@ -236,7 +251,15 @@ export default function ReportsPage() {
                             <option value={20}>20 Rows</option>
                             <option value={50}>50 Rows</option>
                             <option value={100}>100 Rows</option>
+                            <option value={1000}>1000 Rows</option>
                         </select>
+                        <button
+                            onClick={() => alert("Generating dynamic document...")}
+                            className="bg-gray-900 text-white px-5 py-3 rounded-2xl flex items-center gap-2 hover:bg-teal-600 transition-all active:scale-95 font-sans"
+                        >
+                            <FaDownload size={13} />
+                            <span className="text-[10px] font-bold uppercase tracking-widest">Generate Report</span>
+                        </button>
                     </div>
                 </div>
             )}
@@ -273,14 +296,6 @@ export default function ReportsPage() {
                 </div>
             </div>
 
-            {/* --- FLOATING EXPORT BUTTON --- */}
-            <button 
-                onClick={() => alert("Generating dynamic document...")}
-                className="fixed bottom-8 right-8 bg-gray-900 text-white px-7 py-4 rounded-2xl shadow-2xl flex items-center gap-3 hover:bg-teal-600 hover:-translate-y-1 transition-all active:scale-95 z-50 font-sans"
-            >
-                <FaDownload size={14} />
-                <span className="text-[11px] font-bold uppercase tracking-widest">Generate Report</span>
-            </button>
         </div>
     );
 }
