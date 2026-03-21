@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { FaUserCircle, FaSignOutAlt, FaTimes, FaCog, FaFile, FaBars, FaTh } from 'react-icons/fa';
 import agapaiLogo from '../../assets/logo/agapai-logo.png';
@@ -7,7 +7,8 @@ export default function Header({ user, logout }) {
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const [hidden, setHidden] = useState(false);
     const [scrolled, setScrolled] = useState(false);
-    const [lastScrollY, setLastScrollY] = useState(0);
+    const lastScrollYRef = useRef(0);
+    const tickingRef = useRef(false);
     const location = useLocation();
     const [showLogoutModal, setShowLogoutModal] = useState(false);
 
@@ -20,16 +21,32 @@ export default function Header({ user, logout }) {
     ];
 
     useEffect(() => {
+        lastScrollYRef.current = window.scrollY;
+
         const handleScroll = () => {
+            if (tickingRef.current) return;
+
+            tickingRef.current = true;
+
+            window.requestAnimationFrame(() => {
             const currentScrollY = window.scrollY;
-            if (currentScrollY > lastScrollY && currentScrollY > 100) setHidden(true);
-            else setHidden(false);
-            setScrolled(currentScrollY > 20);
-            setLastScrollY(currentScrollY);
+                const delta = currentScrollY - lastScrollYRef.current;
+
+                if (delta > 4 && currentScrollY > 100) {
+                    setHidden(true);
+                } else if (delta < -4 || currentScrollY <= 100) {
+                    setHidden(false);
+                }
+
+                setScrolled(currentScrollY > 20);
+                lastScrollYRef.current = currentScrollY;
+                tickingRef.current = false;
+            });
         };
-        window.addEventListener('scroll', handleScroll);
+
+        window.addEventListener('scroll', handleScroll, { passive: true });
         return () => window.removeEventListener('scroll', handleScroll);
-    }, [lastScrollY]);
+    }, []);
 
     if (!shouldRenderHeader) return null;
 
@@ -46,7 +63,7 @@ export default function Header({ user, logout }) {
                     hidden ? '-translate-y-full' : 'translate-y-0'
                 } ${
                     scrolled 
-                    ? 'bg-[#015954]/95 backdrop-blur-md border-b border-teal-700/50 py-2 shadow-xl' 
+                    ? 'bg-[#015954] border-b border-teal-700/50 py-2 shadow-xl' 
                     : 'bg-gradient-to-r from-[#2d3092] to-[#015954] py-4 shadow-lg'
                 }`}
             >

@@ -80,11 +80,11 @@ try:
         print(f"[camera_controller] Model file exists, loading...")
         YOLO_MODEL = YOLO(MODEL_PATH)
         YOLO_MODEL.to('cpu')
-        print(f"[camera_controller] ✓ Loaded YOLO model: {MODEL_PATH}")
+        print(f"[camera_controller] Loaded YOLO model: {MODEL_PATH}")
     else:
-        print(f"[camera_controller] ✗ YOLO model not found at: {MODEL_PATH}")
+        print(f"[camera_controller] YOLO model not found at: {MODEL_PATH}")
 except Exception as e:
-    print(f"[camera_controller] ✗ Failed to load YOLO model: {e}")
+    print(f"[camera_controller] Failed to load YOLO model: {e}")
     import traceback
     traceback.print_exc()
 

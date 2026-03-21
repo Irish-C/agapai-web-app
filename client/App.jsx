@@ -158,7 +158,10 @@ export default function App() {
     const authProps = { user, logout, cameras };
 
     return (
-        <div className="flex flex-col min-h-screen relative font-sans">
+        <div
+            className="flex flex-col min-h-screen relative font-sans bg-cover bg-center bg-no-repeat bg-fixed"
+            style={{ backgroundImage: `url(${agapai_Bg})` }}
+        >
             {/* ALERT MODAL (Highest Z-Index) */}
             <GlobalAlertModal 
                 alert={currentAlert} 
@@ -169,10 +172,7 @@ export default function App() {
 
             {user && <Header user={user} logout={logout} />}
 
-            <main
-                className="flex-grow min-h-screen bg-cover bg-center bg-no-repeat bg-fixed"
-                style={{ backgroundImage: `url(${agapai_Bg})` }}
-            >
+            <main className="flex-grow min-h-screen">
                 {!isAuthReady ? (
                     <div className="flex items-center justify-center min-h-screen">
                         <div className="text-gray-600">Loading...</div>
