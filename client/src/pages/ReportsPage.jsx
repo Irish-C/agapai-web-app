@@ -93,6 +93,46 @@ export default function ReportsPage() {
         setSearchTerm(''); setFilterClass([]); setFilterStatus([]); setStartDate(''); setEndDate('');
     };
 
+    const handleGenerateReport = () => {
+        if (filteredLogs.length === 0) {
+            alert('No filtered records available to export.');
+            return;
+        }
+
+        const headers = ['Timestamp', 'Classification', 'Location', 'Status', 'Acknowledged By', 'Snapshot URL'];
+        const escapeCsv = (value) => {
+            const safeValue = value ?? '';
+            const stringValue = String(safeValue).replace(/"/g, '""');
+            return `"${stringValue}"`;
+        };
+
+        const rows = filteredLogs.map((log) => {
+            const timestamp = log.timestamp ? new Date(log.timestamp).toISOString() : '';
+            const classification = log.event_class_name || log.type || '';
+            const location = log.location || '';
+            const status = log.status || '';
+            const acknowledgedBy = log.acknowledged_by_username || 'System';
+            const snapshotUrl = log.snapshot_url || '';
+
+            return [timestamp, classification, location, status, acknowledgedBy, snapshotUrl]
+                .map(escapeCsv)
+                .join(',');
+        });
+
+        const csvContent = [headers.join(','), ...rows].join('\n');
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
+
+        link.href = url;
+        link.download = `event_report_${timestamp}.csv`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+    };
+
     const renderTableBody = () => {
         if (isLoading) return (
             <tr>
@@ -254,7 +294,7 @@ export default function ReportsPage() {
                             <option value={1000}>1000 Rows</option>
                         </select>
                         <button
-                            onClick={() => alert("Generating dynamic document...")}
+                            onClick={handleGenerateReport}
                             className="bg-gray-900 text-white px-5 py-3 rounded-2xl flex items-center gap-2 hover:bg-teal-600 transition-all active:scale-95 font-sans"
                         >
                             <FaDownload size={13} />
