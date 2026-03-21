@@ -256,13 +256,14 @@ class CameraWorker:
                 # Use annotated frame if available
                 output_frame = cached_annotated if cached_annotated is not None else frame
                 
-                # Save to Redis
-                try:
-                    _, buffer = cv2.imencode('.jpg', output_frame, [cv2.IMWRITE_JPEG_QUALITY, 50])
-                    if buffer is not None:
-                        self.redis.set(f"latest_frame_{camera_id}", buffer.tobytes())
-                except Exception as e:
-                    print(f"[CameraWorker-{camera_id}] Frame save error: {e}")
+                # NOTE: Redis writes are now handled by camera_controller.py (stream_camera_loop)
+                # which has YOLO caching logic. Disabled here to avoid race conditions.
+                # try:
+                #     _, buffer = cv2.imencode('.jpg', output_frame, [cv2.IMWRITE_JPEG_QUALITY, 50])
+                #     if buffer is not None:
+                #         self.redis.set(f"latest_frame_{camera_id}", buffer.tobytes())
+                # except Exception as e:
+                #     print(f"[CameraWorker-{camera_id}] Frame save error: {e}")
                 
                 # Dynamic sleep: adjust based on actual processing time
                 elapsed = time.time() - frame_start
@@ -319,7 +320,7 @@ class CameraWorker:
                         # Check for detections and cache the annotated frame
                         if r.boxes and len(r.boxes) > 0:
                             # Plot immediately and cache the result
-                            self.cached_annotated_frame = r.plot()
+                            self.cached_annotated_frame = results[0].plot()
                             self._yolo_last_alert = now
                             detected = True
                             print(f"[CameraWorker] 🎯 Detection on camera {self.active_camera_id}: {len(r.boxes)} object(s)")

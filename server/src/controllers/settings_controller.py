@@ -40,7 +40,9 @@ async def get_global_notifications_logic():
                 'emit_fall': True,
                 'persist_fall': True,
                 'emit_inactivity': False,
-                'persist_inactivity': False
+                'persist_inactivity': False,
+                'ai_enabled': True,
+                'email_fallback': True,
             }, 200
 
         return {
@@ -48,6 +50,8 @@ async def get_global_notifications_logic():
             'persist_fall': bool(getattr(gs, 'persist_fall', True)),
             'emit_inactivity': bool(getattr(gs, 'emit_inactivity', False)),
             'persist_inactivity': bool(getattr(gs, 'persist_inactivity', False)),
+            'ai_enabled': bool(getattr(gs, 'ai_enabled', True)),
+            'email_fallback': bool(getattr(gs, 'email_fallback', True)),
         }, 200
 
     except Exception as e:
@@ -66,6 +70,10 @@ async def save_global_notifications_logic(data):
             payload['emit_inactivity'] = bool(data.get('emit_inactivity'))
         if 'persist_inactivity' in data:
             payload['persist_inactivity'] = bool(data.get('persist_inactivity'))
+        if 'ai_enabled' in data:
+            payload['ai_enabled'] = bool(data.get('ai_enabled'))
+        if 'email_fallback' in data:
+            payload['email_fallback'] = bool(data.get('email_fallback'))
 
         # If a row exists, update it; otherwise create one
         gs = await db.globalsetting.find_first()

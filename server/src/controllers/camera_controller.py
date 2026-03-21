@@ -27,17 +27,21 @@ os.makedirs(SNAPSHOT_DIR, exist_ok=True)
 SNAPSHOT_BASE_URL = os.getenv('SNAPSHOT_BASE_URL') or os.getenv('VITE_API_URL') or 'http://localhost:5000'
 
 # Load YOLO model if available
-MODEL_PATH = os.path.join(os.path.dirname(__file__), '../ml/yolov11_fin.pt')
+MODEL_PATH = os.path.join(os.path.dirname(__file__), '../../ml/yolov11_fin.pt')
 YOLO_MODEL = None
+print(f"[camera_controller] Attempting to load YOLO from: {MODEL_PATH}")
 try:
     if os.path.exists(MODEL_PATH):
+        print(f"[camera_controller] Model file exists, loading...")
         YOLO_MODEL = YOLO(MODEL_PATH)
         YOLO_MODEL.to('cpu')
-        print(f"[camera_controller] Loaded YOLO model: {MODEL_PATH}")
+        print(f"[camera_controller] ✓ Loaded YOLO model: {MODEL_PATH}")
     else:
-        print(f"[camera_controller] YOLO model not found at: {MODEL_PATH}")
+        print(f"[camera_controller] ✗ YOLO model not found at: {MODEL_PATH}")
 except Exception as e:
-    print(f"[camera_controller] Failed to load YOLO model: {e}")
+    print(f"[camera_controller] ✗ Failed to load YOLO model: {e}")
+    import traceback
+    traceback.print_exc()
 
 # Track whether we've logged the first emit for a camera (one-time diagnostic)
 _FIRST_EMIT_LOGGED: set = set()
@@ -178,6 +182,7 @@ async def stream_camera_loop(camera_id, rtsp_url):
     # YOLO inference control
     frame_counter = 0
     yolo_skip = 6  # Run YOLO every N frames (tunable - lower for faster detection)
+    cached_annotated_frame = None  # Cache annotated frame to reuse across YOLO cycles
     last_fall_alert = 0.0
     fall_alert_cooldown = 2.0
 
@@ -216,6 +221,9 @@ async def stream_camera_loop(camera_id, rtsp_url):
         return None
 
     try:
+        # Log YOLO status on first frame
+        yolo_status_logged = False
+        
         while cap.isOpened():
             ret, frame = cap.read()
             if not ret:
@@ -225,6 +233,14 @@ async def stream_camera_loop(camera_id, rtsp_url):
                 cap = cv2.VideoCapture(rtsp_url)
                 connection_start_time = time.time()  # Reset timeout when reconnecting
                 continue
+
+            # Log YOLO status once on first frame
+            if not yolo_status_logged:
+                if YOLO_MODEL is not None:
+                    print(f"[stream_camera_loop] Camera {camera_id}: YOLO_MODEL is LOADED ✓")
+                else:
+                    print(f"[stream_camera_loop] Camera {camera_id}: YOLO_MODEL is NONE ✗ (not loaded)")
+                yolo_status_logged = True
 
             # Camera is online, emit online status once
             if camera_status != 'online':
@@ -264,16 +280,51 @@ async def stream_camera_loop(camera_id, rtsp_url):
 
             # Run YOLO periodically (reduces CPU load) and trigger fall alerts
             fall_event_class = None
-            if YOLO_MODEL and (frame_counter % yolo_skip == 0):
+            
+            # Check if AI is enabled globally
+            try:
+                gs = await db.globalsetting.find_first()
+                ai_enabled_now = bool(getattr(gs, 'ai_enabled', True)) if gs else True
+            except Exception:
+                ai_enabled_now = True
+            
+            # Get previous AI state (initialize on first run)
+            if not hasattr(stream_camera_loop, '_prev_ai_enabled'):
+                stream_camera_loop._prev_ai_enabled = ai_enabled_now
+            
+            ai_enabled = ai_enabled_now
+            
+            # If AI was enabled but is now disabled, clear the cached annotated frame immediately
+            if stream_camera_loop._prev_ai_enabled and not ai_enabled:
+                cached_annotated_frame = None
+                print(f"[stream_camera_loop] 🔴 Frame {frame_counter}: AI DISABLED - clearing cache, switching to raw video")
+            
+            # Update previous state for next iteration
+            stream_camera_loop._prev_ai_enabled = ai_enabled
+            
+            # Debug: Log YOLO condition check every 600 frames (10x reduction for performance)
+            if frame_counter % 600 == 0:
+                print(f"[stream_camera_loop] Frame {frame_counter}: YOLO_MODEL={YOLO_MODEL is not None}, ai_enabled={ai_enabled}, frame_counter%yolo_skip={frame_counter % yolo_skip}")
+            
+            if YOLO_MODEL and ai_enabled and (frame_counter % yolo_skip == 0):
                 try:
-                    # Run the model at a lower resolution for speed (320) and slightly higher confidence
-                    results = YOLO_MODEL(frame, conf=0.4, imgsz=320, verbose=False)
-                    if len(results):
+                    # Run the model at higher resolution for better accuracy
+                    # Lowered conf to 0.3 to catch more detections
+                    results = YOLO_MODEL(frame, conf=0.3, imgsz=640, verbose=False)
+                    
+                    if len(results) > 0:
                         r = results[0]
-                        # Use YOLO's built-in .plot() to draw bounding boxes
-                        frame = r.plot()
+                        num_detections = len(r.boxes) if r.boxes else 0
                         
-                        if r.boxes is not None and len(r.boxes) > 0:
+                        if frame_counter % 600 == 0:  # Log every 600 frames (~10 sec at 60fps)
+                            print(f"[camera_controller] Frame {frame_counter}: YOLO ran, detected {num_detections} object(s)")
+                        
+                        # Use YOLO's built-in .plot() to draw bounding boxes and cache it
+                        cached_annotated_frame = r.plot()
+                        frame = cached_annotated_frame
+                        
+                        if r.boxes is not None and len(r.boxes) > 0:  # Removed per-frame logging for performance
+                            # Detections logged above at frame_counter % 600 interval
                             # First: check for person/human detections to drive inactivity logic
                             person_detected = False
                             for box in r.boxes:
@@ -299,11 +350,28 @@ async def stream_camera_loop(camera_id, rtsp_url):
                             if fall_event_class:
                                 # If a fall is detected, consider that activity as well
                                 last_person_detection = now
+                        else:
+                            if frame_counter % 3000 == 0:  # Log every 3000 frames (~50 sec)
+                                print(f"[camera_controller] Frame {frame_counter}: No objects detected by YOLO")
+                    else:
+                        if frame_counter % 3000 == 0:
+                            print(f"[camera_controller] Frame {frame_counter}: Empty YOLO results")
 
                 except Exception as e:
-                    print(f"[camera_controller] YOLO inference error: {e}")
-
-            # Emit fall event (debounced)
+                    print(f"[camera_controller] YOLO inference error on frame {frame_counter}: {e}")
+                    import traceback
+                    traceback.print_exc()
+            else:
+                # If AI is enabled but YOLO didn't run this frame, reuse cached frame
+                # If AI is disabled, use raw frame (don't use old cached annotated frames)
+                if ai_enabled and cached_annotated_frame is not None:
+                    frame = cached_annotated_frame
+                    if frame_counter % 1200 == 0:  # Log every 1200 frames (~20 sec at 60fps)
+                        print(f"[camera_controller] Frame {frame_counter}: Reusing cached annotated frame")
+                elif ai_enabled and frame_counter % 3000 == 0:
+                    print(f"[camera_controller] Frame {frame_counter}: No cached frame available, using raw frame")
+                elif not ai_enabled and frame_counter % 3000 == 0:
+                    print(f"[camera_controller] Frame {frame_counter}: AI disabled, using raw frame")
             if fall_event_class and (now - last_fall_alert) > fall_alert_cooldown:
                 last_fall_alert = now
                 # Check global settings for fall persistence

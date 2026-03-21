@@ -5,7 +5,7 @@ import { FaPlug, FaSync } from "react-icons/fa";
 
 export default function ConnectionStatus({ onLogout }) {
   const [status, setStatus] = useState(socket.connected ? 'connected' : 'disconnected');
-  const [isMinimized, setIsMinimized] = useState(false);
+  const [isMinimized, setIsMinimized] = useState(true);
   const [disconnectTime, setDisconnectTime] = useState(null);
   const [showManualReset, setShowManualReset] = useState(false);
   const logoutTimeoutRef = React.useRef(null);

@@ -1,9 +1,8 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import VideoFeed from './VideoFeed.jsx';
 import TodayReport from '../dashboard/TodayReport.jsx';
 import { useCameraSocket } from '../../hooks/useCamera.js';
-import { FaPlug, FaSpinner, FaVideo } from 'react-icons/fa';
-import { FiAlertTriangle } from 'react-icons/fi';
+import { FaPlug, FaSpinner, FaVideo, FaSync } from 'react-icons/fa';
 import { fetchCameraList } from '../../services/apiService.js';
 
 export default function CameraGrid() {
@@ -92,7 +91,12 @@ export default function CameraGrid() {
     () => cameraList.filter(cam => publishedCameras.has(cam.id)),
     [cameraList, publishedCameras]
   );
-  const focusedCamera = publishedCameraList.find((c) => c.id === focusedCameraId);
+  
+  // Memoize focusedCamera to prevent VideoFeed remounting when incidents change
+  const focusedCamera = useMemo(
+    () => publishedCameraList.find((c) => c.id === focusedCameraId),
+    [publishedCameraList, focusedCameraId]
+  );
 
   const HLS_BASE_URL =
     import.meta.env.VITE_MEDIAMTX_HLS_BASE_URL || 'http://127.0.0.1:8888';
@@ -103,19 +107,51 @@ export default function CameraGrid() {
   const getHlsUrl = (camera) => `${HLS_BASE_URL}/${getStreamPath(camera)}/index.m3u8`;
   const getWebrtcUrl = (camera) => `${WEBRTC_BASE_URL}/${getStreamPath(camera)}/whep`;
 
+  // Refresh cameras function
+  const refreshCameras = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const data = await fetchCameraList();
+      if (data?.status === 'success' && Array.isArray(data.cameras)) {
+        setCameraList(data.cameras);
+      } else {
+        setError('API did not return a valid camera list.');
+      }
+    } catch (err) {
+      setError(`Failed to load camera list: ${err?.message || 'Unknown error'}`);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
   const header = (
-    <div className="flex items-center text-2xl font-extrabold text-gray-900 mb-4 pb-2"> 
-   {/* Removed border-b to prevent double borders when inside a card */}
-      <FaVideo className="mr-3 text-gray-900" />
-      Live View
-      <span
-        className={`ml-4 px-3 py-1 text-sm rounded-full font-semibold ${
-          isConnected ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+    <div className="flex items-center justify-between mb-4 pb-2">
+      <div className="flex items-center text-2xl font-extrabold text-gray-900">
+        <FaVideo className="mr-3 text-gray-900" />
+        Live View
+        <span
+          className={`ml-4 px-3 py-1 text-sm rounded-full font-semibold ${
+            isConnected ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+          }`}
+        >
+          <FaPlug className="inline-block mr-1" />
+          {isConnected ? 'WebSocket Live' : 'WebSocket Disconnected'}
+        </span>
+      </div>
+      <button
+        onClick={refreshCameras}
+        disabled={isLoading}
+        className={`flex items-center gap-2 px-4 py-2 rounded-lg font-semibold transition-colors ${
+          isLoading
+            ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+            : 'bg-cyan-800 text-white hover:bg-gray-500'
         }`}
+        title="Refresh all cameras"
       >
-        <FaPlug className="inline-block mr-1" />
-        {isConnected ? 'WebSocket Live' : 'WebSocket Disconnected'}
-      </span>
+        <FaSync className={isLoading ? 'animate-spin' : ''} />
+        {isLoading ? 'Refreshing...' : 'Refresh'}
+      </button>
     </div>
   );
 
@@ -168,17 +204,20 @@ export default function CameraGrid() {
             {header}
             {!isLoading && publishedCameraList.length > 0 && (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {publishedCameraList.map((camera) => (
-                  <div key={camera.id} className={publishedCameraList.length === 1 ? 'md:col-span-2' : ''}>
-                    <VideoFeed
-                      camId={camera.id}
-                      cameraName={camera.name}
-                      location={camera.location_name || camera.location || camera.loc_name}
-                      isFocused={false}
-                      onFocusChange={setFocusedCameraId}
-                    />
-                  </div>
-                ))}
+                {publishedCameraList.map((camera) => {
+                  const location = camera.location_name || camera.location || camera.loc_name;
+                  return (
+                    <div key={camera.id} className={publishedCameraList.length === 1 ? 'md:col-span-2' : ''}>
+                      <VideoFeed
+                        camId={camera.id}
+                        cameraName={camera.name}
+                        location={location}
+                        isFocused={false}
+                        onFocusChange={setFocusedCameraId}
+                      />
+                    </div>
+                  );
+                })}
               </div>
             )}
             {!isLoading && publishedCameraList.length === 0 && cameraList.length > 0 && (

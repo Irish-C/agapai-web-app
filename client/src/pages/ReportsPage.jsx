@@ -144,7 +144,7 @@ export default function ReportsPage() {
                                 rel="noopener noreferrer"
                                 className="px-3 py-2 text-xs font-bold rounded-xl bg-teal-600 text-white hover:bg-teal-700 transition"
                             >
-                                View Snapshot
+                                View
                             </a>
                         ) : null}
                         <button className="w-10 h-10 flex items-center justify-center rounded-full text-gray-300 group-hover:bg-teal-600 group-hover:text-white group-hover:shadow-lg transition-all">

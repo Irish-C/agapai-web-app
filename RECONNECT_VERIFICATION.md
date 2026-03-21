@@ -1,32 +1,32 @@
 # Auto-Reconnect + Auto-Sync - Quick Verification Guide
 
-## ✅ What Was Implemented
+## What Was Implemented
 
 ### 1. Backend Changes
 **File**: `server/src/controllers/event_controller.py`
-- ✅ New function: `get_missed_alerts_logic(timestamp_ms)`
+- New function: `get_missed_alerts_logic(timestamp_ms)`
   - Queries eventlog since timestamp
   - Returns alerts in Socket.IO format
   - Handles timezone conversion
 
 **File**: `server/src/routes/event_routes.py`
-- ✅ New import: `get_missed_alerts_logic`
-- ✅ New endpoint: `GET /api/alerts/missed/{timestamp_ms}`
+- New import: `get_missed_alerts_logic`
+- New endpoint: `GET /api/alerts/missed/{timestamp_ms}`
   - Returns JSON with missed alerts
   - Includes auth token in request
   - Accessible at: http://127.0.0.1:5000/api/alerts/missed/1710950000000
 
 **File**: `server/app.py`
-- ✅ Already registered with @socketio_server.on('ping') handler
+- Registered with @socketio_server.on('ping') handler
   - Responds with pong + timestamp
   - Health check support built-in
 
 ### 2. Frontend Changes
 
 **File**: `client/src/services/socket.js`
-- ✅ Subscription tracking (Set of camera IDs)
-- ✅ Event buffering (array of events during disconnection)
-- ✅ Exports:
+- Subscription tracking (Set of camera IDs)
+- Event buffering (array of events during disconnection)
+- Exports:
   - `addSubscribedCamera(camId)`
   - `removeSubscribedCamera(camId)`
   - `addEventToBuffer(type, data)`
@@ -34,37 +34,37 @@
   - `fetchMissedAlerts()` (internal)
   - `resubscribeToAllCameras()` (internal)
   - `forceReconnect()`, `startSocketHealthCheck()`
-- ✅ Auto-reconnect flow:
+- Auto-reconnect flow:
   - On 'connect': re-subscribe + fetch missed alerts
   - On 'disconnect': enable buffering
   - Network online event: force immediate reconnect
 
 **File**: `client/src/features/camera/VideoFeed.jsx`
-- ✅ Imports: `addSubscribedCamera`, `removeSubscribedCamera`
-- ✅ On mount: calls `addSubscribedCamera(camId)`
-- ✅ On unmount: calls `removeSubscribedCamera(camId)`
-- ✅ Camera subscriptions tracked globally
+- Imports: `addSubscribedCamera`, `removeSubscribedCamera`
+- On mount: calls `addSubscribedCamera(camId)`
+- On unmount: calls `removeSubscribedCamera(camId)`
+- Camera subscriptions tracked globally
 
 **File**: `client/src/hooks/useCamera.js`
-- ✅ Imports: `addEventToBuffer`
-- ✅ Added: `seenAlertIdsRef` to track seen alert IDs
-- ✅ Deduplication: skip alerts already processed
-- ✅ Event buffering: calls `addEventToBuffer` for new alerts
-- ✅ Handles connect/disconnect lifecycle
+- Imports: `addEventToBuffer`
+- Added: `seenAlertIdsRef` to track seen alert IDs
+- Deduplication: skip alerts already processed
+- Event buffering: calls `addEventToBuffer` for new alerts
+- Handles connect/disconnect lifecycle
 
 **File**: `client/App.jsx`
-- ✅ Imports: `registerOnBufferFlush`, `unregisterOnBufferFlush`
-- ✅ New handler: `handleBufferFlush(missedAlerts)`
-- ✅ Registered callback for buffer flush
-- ✅ Displays most recent missed alert in UI
+- Imports: `registerOnBufferFlush`, `unregisterOnBufferFlush`
+- New handler: `handleBufferFlush(missedAlerts)`
+- Registered callback for buffer flush
+- Displays most recent missed alert in UI
 
 ---
 
-## 🧪 Verification Checklist
+## Verification Checklist
 
 ### Step 1: Backend Endpoint
 ```bash
-# In terminal, verify the endpoint exists:
+# In terminal, verify that the endpoint exists:
 curl -H "Authorization: Bearer YOUR_TOKEN" \
   http://127.0.0.1:5000/api/alerts/missed/1710950000000
 
@@ -147,7 +147,7 @@ curl -H "Authorization: Bearer YOUR_TOKEN" \
 
 ---
 
-## 📊 Expected Behavior Summary
+## Expected Behavior Summary
 
 | Scenario | Duration | Status | Result |
 |----------|----------|--------|--------|
@@ -161,7 +161,7 @@ curl -H "Authorization: Bearer YOUR_TOKEN" \
 
 ---
 
-## 📝 Console Log Quick Reference
+## Console Log Quick Reference
 
 ### Successful Reconnection
 ```
@@ -201,7 +201,7 @@ curl -H "Authorization: Bearer YOUR_TOKEN" \
 
 ---
 
-## 🔧 Configuration Adjustments
+## Configuration Adjustments
 
 If reconnection is too slow:
 ```javascript
@@ -229,7 +229,7 @@ setTimeout(() => {
 
 ---
 
-## 🚀 Deployment Checklist
+## Deployment Checklist
 
 - [ ] Backend changes deployed (`event_controller.py`, `event_routes.py`)
 - [ ] Frontend socket.js updated
@@ -244,7 +244,7 @@ setTimeout(() => {
 
 ---
 
-## ❓ FAQ
+## FAQ
 
 **Q: What if missed alerts are lost?**
 A: Only in-memory buffers (few seconds). Historical alerts always available via `/api/event_logs`. For longer persistence, consider server-side event buffering.
@@ -256,14 +256,14 @@ A: No, `/api/alerts/missed/` is auth-protected. Query filters only return events
 A: 30 seconds (forced logout). After that, user must login again. Network-level issues lasting longer should trigger manual admin intervention.
 
 **Q: Does this work on mobile?**
-A: Yes. Network changes (mobile to WiFi) trigger `window.online` event. Reconnection behavior identical to desktop.
+A: Yes. Network changes (mobile to WiFi) trigger the `window.online` event. Reconnection behavior is identical to desktop.
 
 **Q: What about production WebSocket?**
 A: In production, Socket.IO uses WebSocket (not polling). Health checks still work. Network resilience even better (lower latency).
 
 ---
 
-## 📞 Support
+## Support
 
 For issues:
 1. Check console for `[SocketIO` logs

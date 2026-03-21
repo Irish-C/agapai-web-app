@@ -120,6 +120,19 @@ async def mark_viewed_logic(log_id, user_id):
     except Exception as e:
         return {"status": "error", "message": str(e)}, 500
 
+async def mark_unviewed_logic(log_id):
+    try:
+        await db.eventlog.update(
+            where={'id': int(log_id)},
+            data={
+                'ack_by_user_id': None,
+                'event_status': 'unacknowledged'
+            }
+        )
+        return {"status": "success", "message": "Event unacknowledged"}, 200
+    except Exception as e:
+        return {"status": "error", "message": str(e)}, 500
+
 async def get_event_types():
     try:
         # Fetch unique types/classes from your database using Prisma or SQL
