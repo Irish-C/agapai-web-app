@@ -23,7 +23,7 @@ const SETTINGS_DEFAULTS = {
 const NOTIFICATION_SECTIONS = [
     {
         id: 'fall',
-        icon: '🎯',
+        icon: '',
         title: 'Fall Detection Alerts',
         toggles: [
             {
@@ -42,7 +42,7 @@ const NOTIFICATION_SECTIONS = [
     },
     {
         id: 'inactivity',
-        icon: '⏱️',
+        icon: '',
         title: 'Inactivity Detection Alerts',
         subtitle: 'Triggered when no person detected for 20+ seconds',
         toggles: [
@@ -201,6 +201,17 @@ export default function CameraNotificationSettings() {
                     Manage system-wide behavior for event detection and notification delivery methods.
                 </p>
 
+                {/* AI Detection Status Message */}
+                <div className={`mb-4 p-3 rounded-lg text-sm font-medium ${
+                    globalSettings.ai_enabled
+                        ? 'bg-teal-50 border border-teal-300 text-teal-800'
+                        : 'bg-red-50 border border-red-300 text-red-800'
+                }`}>
+                    {globalSettings.ai_enabled
+                        ? 'AI Detection is ENABLED'
+                        : 'AI Detection is DISABLED'}
+                </div>
+
                 {/* Error Display */}
                 {error && (
                     <div className="mb-4 p-3 bg-red-50 border border-red-300 text-red-700 rounded-lg text-sm">
@@ -246,8 +257,8 @@ export default function CameraNotificationSettings() {
                         label="Enable AI Detection (YOLO)"
                         description={
                             globalSettings.ai_enabled
-                                ? '✓ AI is ACTIVE - runs YOLO inference every 6 frames'
-                                : '✗ AI is DISABLED - no YOLO processing, raw video only'
+                                ? 'Inference'
+                                : 'Raw streaming data is used'
                         }
                         checked={globalSettings.ai_enabled}
                         onToggle={(v) => saveGlobalSettings({ ai_enabled: v })}
@@ -256,7 +267,7 @@ export default function CameraNotificationSettings() {
 
                     {/* Placeholder for Per-Camera Settings */}
                     <div className="p-4 bg-blue-50 border border-blue-300 text-blue-800 rounded-lg text-sm mt-4">
-                        ℹ️ Per-camera model activation controls will be implemented here.
+                        Per-camera model activation controls will be implemented here.
                     </div>
                 </div>
             </div>

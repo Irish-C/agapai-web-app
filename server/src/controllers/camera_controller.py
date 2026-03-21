@@ -358,7 +358,7 @@ async def stream_camera_loop(camera_id, rtsp_url):
                             print(f"[camera_controller] Frame {frame_counter}: Empty YOLO results")
 
                 except Exception as e:
-                    print(f"[camera_controller] ❌ YOLO inference error on frame {frame_counter}: {e}")
+                    print(f"[camera_controller] YOLO inference error on frame {frame_counter}: {e}")
                     import traceback
                     traceback.print_exc()
             else:

@@ -209,7 +209,7 @@ export default function TodayReport({ incidents = [], alerts = [], user }) {
                         <p className="font-semibold">No incidents recorded today.</p>
                     </div>
                 ) : (
-                    <div className="space-y-3 max-h-96 overflow-y-auto pr-2">
+                    <div className="space-y-3 min-h-120 max-h-160 overflow-y-auto pr-2">
                         {sortedIncidents.map((incident, idx) => {
                             const type = getIncidentType(incident);
                             const time = getIncidentTimestamp(incident);
