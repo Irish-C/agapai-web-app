@@ -1,33 +1,66 @@
 // src/components/TodayReport.jsx
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { FaExclamationTriangle, FaCheckCircle, FaDownload, FaFileAlt } from 'react-icons/fa';
+import { fetchReportsData } from '../../services/apiService.js';
 
 /**
  * Renders the Today's Incident Log, Activity Summary, and Log Downloader sidebar.
  * It receives 'incidents' (real-time data) and 'user' (for the token) as props.
+ * Also fetches today's persisted logs from the database.
  */
 export default function TodayReport({ incidents = [], alerts = [], user }) {
     
     // --- STATE ---
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState(null);
+    const [allIncidents, setAllIncidents] = useState([]);
 
     // --- STATE: Log Downloader (New) ---
     // Default to today's date in YYYY-MM-DD format
     const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
 
     // CONFIGURATION: Replace with your Raspberry Pi's IP Address and the backend port (from picam.py)
-    const RPI_BASE_URL = "http://192.168.2.106:4050"; 
+    const RPI_BASE_URL = "http://192.168.2.106:4050";
+
+    // Fetch today's persisted logs from database
+    useEffect(() => {
+        const fetchTodaysLogs = async () => {
+            try {
+                const today = new Date().toISOString().split('T')[0];
+                const response = await fetchReportsData(1000, today, today);
+                const todaysLogs = response.report || response.data || [];
+                
+                // Combine real-time incidents with persisted database logs
+                const combined = [...incidents, ...todaysLogs];
+                
+                // Remove duplicates by checking timestamp + type combination
+                const unique = Array.from(new Map(
+                    combined.map(item => {
+                        const key = `${item.ts || item.timestamp || 0}-${item.type || item.event_class || 'unknown'}`;
+                        return [key, item];
+                    })
+                ).values());
+                
+                setAllIncidents(unique);
+            } catch (err) {
+                console.error('Failed to fetch today logs from database:', err);
+                // Fallback to just real-time incidents if fetch fails
+                setAllIncidents(incidents);
+            }
+        };
+        
+        fetchTodaysLogs();
+    }, [incidents]); 
 
 
-    const incidentCount = incidents.length;
+    const incidentCount = allIncidents.length;
     const isClear = incidentCount === 0;
 
     // --- Helper: sorted incident list for display ---
     const sortedIncidents = useMemo(() => {
         const todayKey = new Date().toISOString().split('T')[0];
 
-        return (incidents || [])
+        return (allIncidents || [])
             .filter((inc) => {
                 const ts = inc.ts || inc.timestamp || 0;
                 if (!ts) return false;
@@ -36,7 +69,7 @@ export default function TodayReport({ incidents = [], alerts = [], user }) {
             })
             .slice()
             .sort((a, b) => (b.ts || 0) - (a.ts || 0));
-    }, [incidents]);
+    }, [allIncidents]);
 
     const getIncidentType = (incident) => {
         return (incident.type || incident.event_class || incident.event_type || 'UNKNOWN').toUpperCase();
@@ -65,7 +98,7 @@ export default function TodayReport({ incidents = [], alerts = [], user }) {
         try {
             const payload = {
                 date: selectedDate,
-                incidents: incidents || [],
+                incidents: allIncidents || [],
             };
 
             const blob = new Blob([JSON.stringify(payload, null, 2)], {
@@ -132,9 +165,9 @@ export default function TodayReport({ incidents = [], alerts = [], user }) {
                                                 href={snapshotUrl}
                                                 target="_blank"
                                                 rel="noopener noreferrer"
-                                                className="text-xs font-semibold text-teal-700 bg-teal-100 hover:bg-teal-200 px-2 py-1 rounded-full"
+                                                className="text-xs font-semibold text-red-700 100 hover:bg-red-200 px-2 py-1 rounded full"
                                             >
-                                                View Snapshot
+                                                View
                                             </a>
                                         )}
                                     </div>

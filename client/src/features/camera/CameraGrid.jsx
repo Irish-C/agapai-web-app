@@ -1,8 +1,8 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import VideoFeed from './VideoFeed.jsx';
 import TodayReport from '../dashboard/TodayReport.jsx';
 import { useCameraSocket } from '../../hooks/useCamera.js';
-import { FaPlug, FaSpinner, FaVideo } from 'react-icons/fa';
+import { FaPlug, FaSpinner, FaVideo, FaSync } from 'react-icons/fa';
 import { fetchCameraList } from '../../services/apiService.js';
 
 export default function CameraGrid() {
@@ -102,19 +102,51 @@ export default function CameraGrid() {
   const getHlsUrl = (camera) => `${HLS_BASE_URL}/${getStreamPath(camera)}/index.m3u8`;
   const getWebrtcUrl = (camera) => `${WEBRTC_BASE_URL}/${getStreamPath(camera)}/whep`;
 
+  // Refresh cameras function
+  const refreshCameras = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const data = await fetchCameraList();
+      if (data?.status === 'success' && Array.isArray(data.cameras)) {
+        setCameraList(data.cameras);
+      } else {
+        setError('API did not return a valid camera list.');
+      }
+    } catch (err) {
+      setError(`Failed to load camera list: ${err?.message || 'Unknown error'}`);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
   const header = (
-    <div className="flex items-center text-2xl font-extrabold text-gray-900 mb-4 pb-2"> 
-   {/* Removed border-b to prevent double borders when inside a card */}
-      <FaVideo className="mr-3 text-gray-900" />
-      Live View
-      <span
-        className={`ml-4 px-3 py-1 text-sm rounded-full font-semibold ${
-          isConnected ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+    <div className="flex items-center justify-between mb-4 pb-2">
+      <div className="flex items-center text-2xl font-extrabold text-gray-900">
+        <FaVideo className="mr-3 text-gray-900" />
+        Live View
+        <span
+          className={`ml-4 px-3 py-1 text-sm rounded-full font-semibold ${
+            isConnected ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+          }`}
+        >
+          <FaPlug className="inline-block mr-1" />
+          {isConnected ? 'WebSocket Live' : 'WebSocket Disconnected'}
+        </span>
+      </div>
+      <button
+        onClick={refreshCameras}
+        disabled={isLoading}
+        className={`flex items-center gap-2 px-4 py-2 rounded-lg font-semibold transition-colors ${
+          isLoading
+            ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+            : 'bg-cyan-800 text-white hover:bg-gray-500'
         }`}
+        title="Refresh all cameras"
       >
-        <FaPlug className="inline-block mr-1" />
-        {isConnected ? 'WebSocket Live' : 'WebSocket Disconnected'}
-      </span>
+        <FaSync className={isLoading ? 'animate-spin' : ''} />
+        {isLoading ? 'Refreshing...' : 'Refresh'}
+      </button>
     </div>
   );
 

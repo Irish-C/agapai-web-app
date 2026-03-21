@@ -167,7 +167,7 @@ export default function TodayReport({ incidents, alerts = [], user }) {
                                                 rel="noopener noreferrer"
                                                 className="text-xs font-semibold text-teal-700 bg-teal-100 hover:bg-teal-200 px-2 py-1 rounded-full"
                                             >
-                                                View Snapshot
+                                                View
                                             </a>
                                         )}
                                     </div>
