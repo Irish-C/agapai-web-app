@@ -22,7 +22,7 @@ export default function TodayReport({ incidents = [], alerts = [], user }) {
     // CONFIGURATION: Replace with your Raspberry Pi's IP Address and the backend port (from picam.py)
     const RPI_BASE_URL = "http://192.168.2.106:4050";
 
-    // Fetch today's persisted logs from database
+    // Fetch today's persisted logs from database (only once on mount)
     useEffect(() => {
         const fetchTodaysLogs = async () => {
             try {
@@ -30,27 +30,16 @@ export default function TodayReport({ incidents = [], alerts = [], user }) {
                 const response = await fetchReportsData(1000, today, today);
                 const todaysLogs = response.report || response.data || [];
                 
-                // Combine real-time incidents with persisted database logs
-                const combined = [...incidents, ...todaysLogs];
-                
-                // Remove duplicates by checking timestamp + type combination
-                const unique = Array.from(new Map(
-                    combined.map(item => {
-                        const key = `${item.ts || item.timestamp || 0}-${item.type || item.event_class || 'unknown'}`;
-                        return [key, item];
-                    })
-                ).values());
-                
-                setAllIncidents(unique);
+                // Store database logs - will be merged with real-time incidents below
+                setAllIncidents(todaysLogs);
             } catch (err) {
                 console.error('Failed to fetch today logs from database:', err);
-                // Fallback to just real-time incidents if fetch fails
-                setAllIncidents(incidents);
+                setAllIncidents([]);
             }
         };
         
         fetchTodaysLogs();
-    }, [incidents]); 
+    }, []); // Empty dependency = fetch only once on mount 
 
 
     const incidentCount = allIncidents.length;
@@ -59,17 +48,27 @@ export default function TodayReport({ incidents = [], alerts = [], user }) {
     // --- Helper: sorted incident list for display ---
     const sortedIncidents = useMemo(() => {
         const todayKey = new Date().toISOString().split('T')[0];
+        
+        // Combine database logs + real-time incidents
+        const combined = [...allIncidents, ...incidents];
+        
+        // Remove duplicates by timestamp + type
+        const unique = Array.from(new Map(
+            combined.map(item => {
+                const key = `${item.ts || item.timestamp || 0}-${item.type || item.event_class || 'unknown'}`;
+                return [key, item];
+            })
+        ).values());
 
-        return (allIncidents || [])
+        return (unique || [])
             .filter((inc) => {
                 const ts = inc.ts || inc.timestamp || 0;
                 if (!ts) return false;
                 const dateKey = new Date(ts).toISOString().split('T')[0];
                 return dateKey === todayKey;
             })
-            .slice()
             .sort((a, b) => (b.ts || 0) - (a.ts || 0));
-    }, [allIncidents]);
+    }, [allIncidents, incidents]);
 
     const getIncidentType = (incident) => {
         return (incident.type || incident.event_class || incident.event_type || 'UNKNOWN').toUpperCase();
@@ -98,7 +97,7 @@ export default function TodayReport({ incidents = [], alerts = [], user }) {
         try {
             const payload = {
                 date: selectedDate,
-                incidents: allIncidents || [],
+                incidents: sortedIncidents || [],
             };
 
             const blob = new Blob([JSON.stringify(payload, null, 2)], {
