@@ -68,7 +68,8 @@ export default function TodayReport({ incidents = [], alerts = [], user }) {
     }, [allIncidents, incidents]);
 
     // --- Derived State ---
-    const incidentCount = sortedIncidents.filter(inc => (inc.status || inc.event_status || 'unacknowledged') !== 'acknowledged').length;
+    // Count ALL incidents from today, regardless of acknowledgment status
+    const incidentCount = sortedIncidents.length;
     const isClear = incidentCount === 0;
 
     const getIncidentType = (incident) => {
@@ -127,6 +128,44 @@ export default function TodayReport({ incidents = [], alerts = [], user }) {
         }
     };
 
+    // --- ACTION: Unacknowledge Incident (Database Update) ---
+    const unacknowledgeIncident = async (incident) => {
+        // Use the incident's database ID if available, otherwise use timestamp as fallback
+        const incidentId = incident.id || incident.log_id;
+        if (!incidentId) {
+            console.error('Cannot unacknowledge incident without ID');
+            setError('Error: Invalid incident ID');
+            return;
+        }
+
+        try {
+            setAcknowledgeLoading(prev => ({ ...prev, [incidentId]: true }));
+            setError(null);
+
+            // Call the backend API to unacknowledge the incident in the database
+            // Assuming there's a PATCH endpoint or similar for updating status
+            const response = await fetchApi(`/events/${incidentId}/unacknowledge`, 'POST');
+            
+            if (response.status === 'success') {
+                // Update the incident in state to reflect unacknowledged status
+                setAllIncidents(prev => 
+                    prev.map(inc => 
+                        (inc.id === incidentId || inc.log_id === incidentId)
+                            ? { ...inc, status: 'unacknowledged', event_status: 'unacknowledged' }
+                            : inc
+                    )
+                );
+            } else {
+                setError('Failed to unacknowledge incident. Please try again.');
+            }
+        } catch (err) {
+            console.error('Error unacknowledging incident:', err);
+            setError('Error unacknowledging incident. Please try again.');
+        } finally {
+            setAcknowledgeLoading(prev => ({ ...prev, [incidentId]: false }));
+        }
+    };
+
     // --- ACTION: Download Incident Log (client-side export) ---
     const downloadIncidentLog = () => {
         setError(null);
@@ -158,10 +197,10 @@ export default function TodayReport({ incidents = [], alerts = [], user }) {
     };
 
     return (
-        <div className="space-y-4 sticky top-2 h-fit">
+        <div className="space-y-4 sticky top-2 h-fit w-full">
 
             {/* 1. REAL-TIME INCIDENT LOG (WebSocket Data) */}
-            <div className="bg-white p-4 rounded-xl shadow-lg border border-gray-200">
+            <div className="bg-white p-4 rounded-xl shadow-lg border border-gray-200 w-full">
                 <h3 className="text-xl font-bold text-gray-800 mb-4 border-b pb-2">Today's Incident Log</h3>
 
                 {isClear ? (
@@ -170,7 +209,7 @@ export default function TodayReport({ incidents = [], alerts = [], user }) {
                         <p className="font-semibold">No incidents recorded today.</p>
                     </div>
                 ) : (
-                    <div className="space-y-2 max-h-96 overflow-y-auto pr-2">
+                    <div className="space-y-3 max-h-96 overflow-y-auto pr-2">
                         {sortedIncidents.map((incident, idx) => {
                             const type = getIncidentType(incident);
                             const time = getIncidentTimestamp(incident);
@@ -189,46 +228,67 @@ export default function TodayReport({ incidents = [], alerts = [], user }) {
                                 'Unknown Location';
 
                             return (
-                                <div key={idx} className={`p-3 rounded-lg border ${isAcknowledged ? 'bg-gray-50 border-gray-300' : 'bg-red-50 border-red-200'}`}>
-                                    <div className="flex items-start justify-between gap-3">
-                                        <div>
-                                            <div className="flex items-center gap-2">
-                                                <FaExclamationTriangle className={isAcknowledged ? 'text-gray-400' : 'text-red-600'} />
+                                <div key={idx} className={`p-4 rounded-lg border transition-all ${isAcknowledged ? 'bg-gray-50 border-gray-200' : 'bg-red-200 border-red-500'}`}>
+                                    {/* Header Section */}
+                                    <div className="flex items-start justify-between gap-4 mb-3">
+                                        <div className="flex-1">
+                                            <div className="flex items-center gap-2 mb-2">
+                                                <FaExclamationTriangle className={`text-lg ${isAcknowledged ? 'text-gray-400' : 'text-red-700'}`} />
                                                 <span className={`font-bold text-base ${isAcknowledged ? 'text-gray-600' : 'text-red-700'}`}>{type}</span>
-                                                <span className="text-xs text-gray-500">@ {time}</span>
                                                 {isAcknowledged && (
-                                                    <span className="text-xs font-semibold text-green-600 flex items-center gap-1">
-                                                        <FaCheck /> Acknowledged
+                                                    <span className="text-xs font-semibold text-green-600 flex items-center gap-1 bg-green-100 px-2 py-1 rounded-full">
+                                                        <FaCheck className="text-xs" /> Acknowledged
                                                     </span>
                                                 )}
                                             </div>
-                                            <div className={`text-xs mt-1 ${isAcknowledged ? 'text-gray-500' : 'text-gray-600'}`}>
-                                                {location}
+                                            <div className={`text-sm mt-1 ${isAcknowledged ? 'text-gray-500' : 'text-gray-600'}`}>
+                                                <span className="font-medium">{location}</span>
+                                                <span className="text-xs text-gray-500 ml-2">@ {time}</span>
                                             </div>
                                         </div>
-                                        <div className="flex flex-col gap-2">
-                                            {snapshotUrl && (
-                                                <a
-                                                    href={snapshotUrl}
-                                                    target="_blank"
-                                                    rel="noopener noreferrer"
-                                                    className="text-xs font-semibold text-red-700 hover:bg-red-200 px-2 py-1 rounded text-center"
-                                                >
-                                                    View
-                                                </a>
-                                            )}
+                                    </div>
+
+                                    {/* Action Buttons Section */}
+                                    <div className="flex gap-2">
+                                        {snapshotUrl && (
+                                            <a
+                                                href={snapshotUrl}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className={`flex-1 text-xs font-semibold text-center px-3 py-2 rounded transition-colors ${
+                                                    isAcknowledged
+                                                        ? 'text-gray-600 bg-gray-200 hover:bg-gray-300'
+                                                        : 'text-gray-700 bg-red-200 hover:bg-gray-300'
+                                                }`}
+                                            >
+                                                View
+                                            </a>
+                                        )}
+                                        {isAcknowledged ? (
+                                            <button
+                                                onClick={() => unacknowledgeIncident(incident)}
+                                                disabled={isLoading}
+                                                className={`flex-1 text-xs font-semibold px-3 py-2 rounded transition-all ${
+                                                    isLoading
+                                                        ? 'bg-gray-300 text-gray-600 cursor-not-allowed opacity-60'
+                                                        : 'bg-gray-200 text-gray-700 hover:bg-gray-300 cursor-pointer'
+                                                }`}
+                                            >
+                                                {isLoading ? 'Updating...' : 'Unacknowledge'}
+                                            </button>
+                                        ) : (
                                             <button
                                                 onClick={() => acknowledgeIncident(incident)}
-                                                disabled={isAcknowledged || isLoading}
-                                                className={`text-xs font-semibold px-2 py-1 rounded transition-all ${
-                                                    isAcknowledged
-                                                        ? 'bg-gray-200 text-gray-600 cursor-default'
-                                                        : 'text-blue-700 hover:bg-blue-200 cursor-pointer'
-                                                } ${isLoading ? 'opacity-60' : ''}`}
+                                                disabled={isLoading}
+                                                className={`flex-1 text-xs font-semibold px-3 py-2 rounded transition-all ${
+                                                    isLoading
+                                                        ? 'bg-green-300 text-green-700 cursor-not-allowed opacity-60'
+                                                        : 'bg-red-500 text-white hover:bg-gray-500 cursor-pointer'
+                                                }`}
                                             >
-                                                {isLoading ? 'Acknowledging...' : isAcknowledged ? 'Acknowledged' : 'Acknowledge'}
+                                                {isLoading ? 'Acknowledging...' : 'Acknowledge'}
                                             </button>
-                                        </div>
+                                        )}
                                     </div>
                                 </div>
                             );
