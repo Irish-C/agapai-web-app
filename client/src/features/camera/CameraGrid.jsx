@@ -91,7 +91,12 @@ export default function CameraGrid() {
     () => cameraList.filter(cam => publishedCameras.has(cam.id)),
     [cameraList, publishedCameras]
   );
-  const focusedCamera = publishedCameraList.find((c) => c.id === focusedCameraId);
+  
+  // Memoize focusedCamera to prevent VideoFeed remounting when incidents change
+  const focusedCamera = useMemo(
+    () => publishedCameraList.find((c) => c.id === focusedCameraId),
+    [publishedCameraList, focusedCameraId]
+  );
 
   const HLS_BASE_URL =
     import.meta.env.VITE_MEDIAMTX_HLS_BASE_URL || 'http://127.0.0.1:8888';
@@ -199,17 +204,20 @@ export default function CameraGrid() {
             {header}
             {!isLoading && publishedCameraList.length > 0 && (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {publishedCameraList.map((camera) => (
-                  <div key={camera.id} className={publishedCameraList.length === 1 ? 'md:col-span-2' : ''}>
-                    <VideoFeed
-                      camId={camera.id}
-                      cameraName={camera.name}
-                      location={camera.location_name || camera.location || camera.loc_name}
-                      isFocused={false}
-                      onFocusChange={setFocusedCameraId}
-                    />
-                  </div>
-                ))}
+                {publishedCameraList.map((camera) => {
+                  const location = camera.location_name || camera.location || camera.loc_name;
+                  return (
+                    <div key={camera.id} className={publishedCameraList.length === 1 ? 'md:col-span-2' : ''}>
+                      <VideoFeed
+                        camId={camera.id}
+                        cameraName={camera.name}
+                        location={location}
+                        isFocused={false}
+                        onFocusChange={setFocusedCameraId}
+                      />
+                    </div>
+                  );
+                })}
               </div>
             )}
             {!isLoading && publishedCameraList.length === 0 && cameraList.length > 0 && (

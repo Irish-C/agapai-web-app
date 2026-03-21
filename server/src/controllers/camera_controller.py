@@ -302,8 +302,8 @@ async def stream_camera_loop(camera_id, rtsp_url):
             # Update previous state for next iteration
             stream_camera_loop._prev_ai_enabled = ai_enabled
             
-            # Debug: Log YOLO condition check every 30 frames
-            if frame_counter % 30 == 0:
+            # Debug: Log YOLO condition check every 600 frames (10x reduction for performance)
+            if frame_counter % 600 == 0:
                 print(f"[stream_camera_loop] Frame {frame_counter}: YOLO_MODEL={YOLO_MODEL is not None}, ai_enabled={ai_enabled}, frame_counter%yolo_skip={frame_counter % yolo_skip}")
             
             if YOLO_MODEL and ai_enabled and (frame_counter % yolo_skip == 0):
@@ -316,15 +316,15 @@ async def stream_camera_loop(camera_id, rtsp_url):
                         r = results[0]
                         num_detections = len(r.boxes) if r.boxes else 0
                         
-                        if frame_counter % 30 == 0:  # Log every 30 frames (~0.5 sec at 60fps)
+                        if frame_counter % 600 == 0:  # Log every 600 frames (~10 sec at 60fps)
                             print(f"[camera_controller] Frame {frame_counter}: YOLO ran, detected {num_detections} object(s)")
                         
                         # Use YOLO's built-in .plot() to draw bounding boxes and cache it
                         cached_annotated_frame = r.plot()
                         frame = cached_annotated_frame
                         
-                        if r.boxes is not None and len(r.boxes) > 0:
-                            print(f"[camera_controller] Detection frame {frame_counter}: {num_detections} boxes plotted")
+                        if r.boxes is not None and len(r.boxes) > 0:  # Removed per-frame logging for performance
+                            # Detections logged above at frame_counter % 600 interval
                             # First: check for person/human detections to drive inactivity logic
                             person_detected = False
                             for box in r.boxes:
@@ -351,10 +351,10 @@ async def stream_camera_loop(camera_id, rtsp_url):
                                 # If a fall is detected, consider that activity as well
                                 last_person_detection = now
                         else:
-                            if frame_counter % 150 == 0:  # Log every 150 frames (~2.5 sec)
+                            if frame_counter % 3000 == 0:  # Log every 3000 frames (~50 sec)
                                 print(f"[camera_controller] Frame {frame_counter}: No objects detected by YOLO")
                     else:
-                        if frame_counter % 150 == 0:
+                        if frame_counter % 3000 == 0:
                             print(f"[camera_controller] Frame {frame_counter}: Empty YOLO results")
 
                 except Exception as e:
@@ -366,11 +366,11 @@ async def stream_camera_loop(camera_id, rtsp_url):
                 # If AI is disabled, use raw frame (don't use old cached annotated frames)
                 if ai_enabled and cached_annotated_frame is not None:
                     frame = cached_annotated_frame
-                    if frame_counter % 60 == 0:  # Log every 60 frames (~1 sec)
+                    if frame_counter % 1200 == 0:  # Log every 1200 frames (~20 sec at 60fps)
                         print(f"[camera_controller] Frame {frame_counter}: Reusing cached annotated frame")
-                elif ai_enabled and frame_counter % 150 == 0:
+                elif ai_enabled and frame_counter % 3000 == 0:
                     print(f"[camera_controller] Frame {frame_counter}: No cached frame available, using raw frame")
-                elif not ai_enabled and frame_counter % 150 == 0:
+                elif not ai_enabled and frame_counter % 3000 == 0:
                     print(f"[camera_controller] Frame {frame_counter}: AI disabled, using raw frame")
             if fall_event_class and (now - last_fall_alert) > fall_alert_cooldown:
                 last_fall_alert = now

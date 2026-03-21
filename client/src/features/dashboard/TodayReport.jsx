@@ -1,7 +1,7 @@
 // src/components/TodayReport.jsx
 import React, { useState, useMemo, useEffect } from 'react';
-import { FaExclamationTriangle, FaCheckCircle, FaDownload, FaFileAlt } from 'react-icons/fa';
-import { fetchReportsData } from '../../services/apiService.js';
+import { FaExclamationTriangle, FaCheckCircle, FaDownload, FaFileAlt, FaCheck } from 'react-icons/fa';
+import { fetchReportsData, fetchApi } from '../../services/apiService.js';
 
 /**
  * Renders the Today's Incident Log, Activity Summary, and Log Downloader sidebar.
@@ -14,6 +14,7 @@ export default function TodayReport({ incidents = [], alerts = [], user }) {
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState(null);
     const [allIncidents, setAllIncidents] = useState([]);
+    const [acknowledgeLoading, setAcknowledgeLoading] = useState({});
 
     // --- STATE: Log Downloader (New) ---
     // Default to today's date in YYYY-MM-DD format
@@ -41,10 +42,6 @@ export default function TodayReport({ incidents = [], alerts = [], user }) {
         fetchTodaysLogs();
     }, []); // Empty dependency = fetch only once on mount 
 
-
-    const incidentCount = allIncidents.length;
-    const isClear = incidentCount === 0;
-
     // --- Helper: sorted incident list for display ---
     const sortedIncidents = useMemo(() => {
         const todayKey = new Date().toISOString().split('T')[0];
@@ -70,6 +67,10 @@ export default function TodayReport({ incidents = [], alerts = [], user }) {
             .sort((a, b) => (b.ts || 0) - (a.ts || 0));
     }, [allIncidents, incidents]);
 
+    // --- Derived State ---
+    const incidentCount = sortedIncidents.filter(inc => (inc.status || inc.event_status || 'unacknowledged') !== 'acknowledged').length;
+    const isClear = incidentCount === 0;
+
     const getIncidentType = (incident) => {
         return (incident.type || incident.event_class || incident.event_type || 'UNKNOWN').toUpperCase();
     };
@@ -87,6 +88,43 @@ export default function TodayReport({ incidents = [], alerts = [], user }) {
     const formatDateDisplay = (dateString) => {
         const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
         return new Date(dateString).toLocaleDateString(undefined, options);
+    };
+
+    // --- ACTION: Acknowledge Incident (Database Update) ---
+    const acknowledgeIncident = async (incident) => {
+        // Use the incident's database ID if available, otherwise use timestamp as fallback
+        const incidentId = incident.id || incident.log_id;
+        if (!incidentId) {
+            console.error('Cannot acknowledge incident without ID');
+            setError('Error: Invalid incident ID');
+            return;
+        }
+
+        try {
+            setAcknowledgeLoading(prev => ({ ...prev, [incidentId]: true }));
+            setError(null);
+
+            // Call the backend API to acknowledge the incident in the database
+            const response = await fetchApi(`/events/${incidentId}/acknowledge`, 'POST');
+            
+            if (response.status === 'success') {
+                // Update the incident in state to reflect acknowledged status
+                setAllIncidents(prev => 
+                    prev.map(inc => 
+                        (inc.id === incidentId || inc.log_id === incidentId)
+                            ? { ...inc, status: 'acknowledged', event_status: 'acknowledged' }
+                            : inc
+                    )
+                );
+            } else {
+                setError('Failed to acknowledge incident. Please try again.');
+            }
+        } catch (err) {
+            console.error('Error acknowledging incident:', err);
+            setError('Error acknowledging incident. Please try again.');
+        } finally {
+            setAcknowledgeLoading(prev => ({ ...prev, [incidentId]: false }));
+        }
     };
 
     // --- ACTION: Download Incident Log (client-side export) ---
@@ -137,6 +175,10 @@ export default function TodayReport({ incidents = [], alerts = [], user }) {
                             const type = getIncidentType(incident);
                             const time = getIncidentTimestamp(incident);
                             const snapshotUrl = getSnapshotUrl(incident);
+                            const incidentId = incident.id || incident.log_id;
+                            const incidentStatus = incident.status || incident.event_status || 'unacknowledged';
+                            const isAcknowledged = incidentStatus === 'acknowledged';
+                            const isLoading = acknowledgeLoading[incidentId];
                             const location =
                                 incident.location ||
                                 incident.location_name ||
@@ -147,28 +189,46 @@ export default function TodayReport({ incidents = [], alerts = [], user }) {
                                 'Unknown Location';
 
                             return (
-                                <div key={idx} className="p-3 bg-red-50 border border-red-200 rounded-lg">
+                                <div key={idx} className={`p-3 rounded-lg border ${isAcknowledged ? 'bg-gray-50 border-gray-300' : 'bg-red-50 border-red-200'}`}>
                                     <div className="flex items-start justify-between gap-3">
                                         <div>
                                             <div className="flex items-center gap-2">
-                                                <FaExclamationTriangle className="text-red-600" />
-                                                <span className="font-bold text-base text-red-700">{type}</span>
+                                                <FaExclamationTriangle className={isAcknowledged ? 'text-gray-400' : 'text-red-600'} />
+                                                <span className={`font-bold text-base ${isAcknowledged ? 'text-gray-600' : 'text-red-700'}`}>{type}</span>
                                                 <span className="text-xs text-gray-500">@ {time}</span>
+                                                {isAcknowledged && (
+                                                    <span className="text-xs font-semibold text-green-600 flex items-center gap-1">
+                                                        <FaCheck /> Acknowledged
+                                                    </span>
+                                                )}
                                             </div>
-                                            <div className="text-xs text-gray-600 mt-1">
+                                            <div className={`text-xs mt-1 ${isAcknowledged ? 'text-gray-500' : 'text-gray-600'}`}>
                                                 {location}
                                             </div>
                                         </div>
-                                        {snapshotUrl && (
-                                            <a
-                                                href={snapshotUrl}
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                className="text-xs font-semibold text-red-700 100 hover:bg-red-200 px-2 py-1 rounded full"
+                                        <div className="flex flex-col gap-2">
+                                            {snapshotUrl && (
+                                                <a
+                                                    href={snapshotUrl}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="text-xs font-semibold text-red-700 hover:bg-red-200 px-2 py-1 rounded text-center"
+                                                >
+                                                    View
+                                                </a>
+                                            )}
+                                            <button
+                                                onClick={() => acknowledgeIncident(incident)}
+                                                disabled={isAcknowledged || isLoading}
+                                                className={`text-xs font-semibold px-2 py-1 rounded transition-all ${
+                                                    isAcknowledged
+                                                        ? 'bg-gray-200 text-gray-600 cursor-default'
+                                                        : 'text-blue-700 hover:bg-blue-200 cursor-pointer'
+                                                } ${isLoading ? 'opacity-60' : ''}`}
                                             >
-                                                View
-                                            </a>
-                                        )}
+                                                {isLoading ? 'Acknowledging...' : isAcknowledged ? 'Acknowledged' : 'Acknowledge'}
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
                             );
@@ -177,15 +237,15 @@ export default function TodayReport({ incidents = [], alerts = [], user }) {
                 )}
             </div>
 
-            {/* 3. LOG PANEL / EXPORT LOGS (New Feature) */}
-            <div className="bg-white p-4 rounded-xl shadow-lg border border-gray-200">
+            {/* 3. LOG PANEL / EXPORT LOGS - COMMENTED OUT */}
+            {/* <div className="bg-white p-4 rounded-xl shadow-lg border border-gray-200">
                 <h3 className="text-xl font-bold text-gray-800 mb-4 flex items-center border-b pb-2">
                     Download Incident Log
                 </h3>
 
                 <div className="space-y-4">
                     {/* Date Selection */}
-                    <div>
+                    {/* <div>
                         <label className="text-xs text-gray-500 mb-1 block font-bold">SELECT DATE</label>
                         <input
                             type="date"
@@ -201,7 +261,7 @@ export default function TodayReport({ incidents = [], alerts = [], user }) {
                     </div>
 
                     {/* Download Button */}
-                    <div>
+                    {/* <div>
                         <label className="text-xs text-gray-500 mb-1 block font-bold">ACTION</label>
                         <button
                             onClick={downloadIncidentLog}
@@ -219,12 +279,12 @@ export default function TodayReport({ incidents = [], alerts = [], user }) {
                     </div>
 
                     {/* Note to the User */}
-                    <div className="p-3 bg-blue-50 border border-blue-200 rounded-md text-xs text-blue-800">
+                    {/* <div className="p-3 bg-blue-50 border border-blue-200 rounded-md text-xs text-blue-800">
                         <strong>Note:</strong> This downloads the incidents currently stored in the app memory (today's session).
                         For a persistent history, use the Reports page (Database logs).
                     </div>
                 </div>
-            </div>
+            </div> */}
         </div>
     );
 }
