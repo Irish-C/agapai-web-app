@@ -229,10 +229,17 @@ export default function TodayReport({ incidents = [], alerts = [], user }) {
 
                             return (
                                 <div key={idx} className={`p-4 rounded-lg border transition-all ${isAcknowledged ? 'bg-gray-50 border-gray-200' : 'bg-red-200 border-red-500'}`}>
-                                    {/* Header Section */}
-                                    <div className="flex items-start justify-between gap-4 mb-3">
+                                    {/* Header Section - Time and Location on First Line */}
+                                    <div className="flex items-start justify-between gap-4 mb-2">
                                         <div className="flex-1">
-                                            <div className="flex items-center gap-2 mb-2">
+                                            {/* Time and Location */}
+                                            <div className={`text-sm font-medium flex items-center gap-3 mb-2 ${isAcknowledged ? 'text-gray-700' : 'text-gray-800'}`}>
+                                                <span className="font-bold">{time}</span>
+                                                <span className="text-xs text-gray-500">•</span>
+                                                <span>{location}</span>
+                                            </div>
+                                            {/* Type of Incident on Second Line */}
+                                            <div className="flex items-center gap-2">
                                                 <FaExclamationTriangle className={`text-lg ${isAcknowledged ? 'text-gray-400' : 'text-red-700'}`} />
                                                 <span className={`font-bold text-base ${isAcknowledged ? 'text-gray-600' : 'text-red-700'}`}>{type}</span>
                                                 {isAcknowledged && (
@@ -240,10 +247,6 @@ export default function TodayReport({ incidents = [], alerts = [], user }) {
                                                         <FaCheck className="text-xs" /> Acknowledged
                                                     </span>
                                                 )}
-                                            </div>
-                                            <div className={`text-sm mt-1 ${isAcknowledged ? 'text-gray-500' : 'text-gray-600'}`}>
-                                                <span className="font-medium">{location}</span>
-                                                <span className="text-xs text-gray-500 ml-2">@ {time}</span>
                                             </div>
                                         </div>
                                     </div>
