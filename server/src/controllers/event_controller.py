@@ -2,6 +2,14 @@ from database import db
 from datetime import datetime, timedelta
 from src.utils.role_utils import normalize_role
 
+
+def _location_label(camera_obj):
+    if camera_obj and getattr(camera_obj, 'location', None) and getattr(camera_obj.location, 'loc_name', None):
+        return camera_obj.location.loc_name
+    if camera_obj and getattr(camera_obj, 'cam_name', None):
+        return camera_obj.cam_name
+    return "Unknown"
+
 async def create_event_logic(data):
     try:
         # 1. Use 'eventlog' (lowercase of model name EventLog)
@@ -90,7 +98,7 @@ async def get_event_logs_logic(filters=None):
             take=limit, # Use the limit here
             where=where_clause,
             order={'timestamp': 'desc'},
-            include={'camera': True, 'event_class': True}
+            include={'camera': {'include': {'location': True}}, 'event_class': True}
         )
         
         # Convert BigInt and DateTime to strings for JSON
@@ -99,7 +107,7 @@ async def get_event_logs_logic(filters=None):
             formatted_data.append({
                 "id": str(log.id),
                 "type": log.event_class.class_name if log.event_class else "Unknown",
-                "location": log.camera.cam_name if log.camera else "Unknown",
+                "location": _location_label(log.camera),
                 "timestamp": log.timestamp.isoformat(),
                 "snapshot_url": log.file_path,
                 "status": log.event_status
@@ -120,7 +128,7 @@ async def get_viewed_event_logs_logic(filters=None):
         logs = await db.eventlog.find_many(
             take=limit, # Use the limit here
             order={'timestamp': 'desc'},
-            include={'camera': True, 'event_class': True}
+            include={'camera': {'include': {'location': True}}, 'event_class': True}
         )
         
         # Convert BigInt and DateTime to strings for JSON
@@ -129,7 +137,7 @@ async def get_viewed_event_logs_logic(filters=None):
             formatted_data.append({
                 "id": str(log.id),
                 "type": log.event_class.class_name if log.event_class else "Unknown",
-                "location": log.camera.cam_name if log.camera else "Unknown",
+                "location": _location_label(log.camera),
                 "timestamp": log.timestamp.isoformat(),
                 "snapshot_url": log.file_path,
                 "status": log.event_status
@@ -198,7 +206,7 @@ async def export_logs_by_date_logic(date_str: str):
                 }
             },
             order={'timestamp': 'desc'},
-            include={'camera': True, 'event_class': True}
+            include={'camera': {'include': {'location': True}}, 'event_class': True}
         )
         
         print(f"[export_logs] Found {len(logs)} events for {date_str}")
@@ -209,7 +217,7 @@ async def export_logs_by_date_logic(date_str: str):
             formatted_data.append({
                 "id": str(log.id),
                 "type": log.event_class.class_name if log.event_class else "Unknown",
-                "location": log.camera.cam_name if log.camera else "Unknown",
+                "location": _location_label(log.camera),
                 "timestamp": log.timestamp.isoformat(),
                 "snapshot_url": log.file_path,
                 "status": log.event_status
@@ -272,7 +280,7 @@ async def get_missed_alerts_logic(timestamp_ms: int):
                 }
             },
             order={'timestamp': 'desc'},  # Newest first
-            include={'camera': True, 'event_class': True}
+            include={'camera': {'include': {'location': True}}, 'event_class': True}
         )
         
         print(f"[get_missed_alerts] Found {len(alerts)} missed alerts")
@@ -283,7 +291,7 @@ async def get_missed_alerts_logic(timestamp_ms: int):
             formatted_alerts.append({
                 'id': str(alert.id),
                 'type': alert.event_class.class_name if alert.event_class else 'unknown',
-                'location': alert.camera.cam_name if alert.camera else 'Unknown',
+                'location': _location_label(alert.camera),
                 'timestamp': alert.timestamp.isoformat(),
                 'snapshot_url': alert.file_path,
                 'status': alert.event_status or 'unacknowledged'

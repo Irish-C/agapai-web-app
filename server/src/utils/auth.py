@@ -51,6 +51,15 @@ async def get_current_user_id(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail='Invalid authentication credentials',
             )
+
+        # Deny access if the account was archived/deleted after token issuance.
+        user = await db.user.find_unique(where={'id': int(user_id)})
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail='Account is inactive or archived',
+            )
+
         return str(user_id)
     except jwt.ExpiredSignatureError:
         raise HTTPException(

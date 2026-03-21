@@ -547,6 +547,10 @@ async def get_cameras_logic():
     cameras = await db.camera.find_many(include={"location": True})
     result = []
     for cam in cameras:
+        # Hide archived cameras from management lists.
+        if (cam.cam_name or '').startswith('[DELETED] '):
+            continue
+
         cam_id = str(cam.id)
         result.append({
             "id": cam_id, # Convert BigInt to string for JSON safety
@@ -613,12 +617,28 @@ async def update_camera_logic(camera_id, camera_data):
 
 async def delete_camera_logic(camera_id):
     try:
+        camera = await db.camera.find_unique(where={"id": int(camera_id)})
+        if not camera:
+            return {"error": "Camera not found"}, 404
+
         # First, unpublish from MediaMTX if published
         await unpublish_camera_from_mediamtx(camera_id)
-        
-        # Then delete from database
-        await db.camera.delete(where={"id": int(camera_id)})
-        return {"status": "success", "message": "Camera deleted and unpublished from MediaMTX"}, 200
+
+        # Archive instead of hard delete so incident history keeps camera linkage.
+        archived_name = camera.cam_name
+        if not (camera.cam_name or '').startswith('[DELETED] '):
+            archived_name = f"[DELETED] {camera.cam_name}"
+
+        await db.camera.update(
+            where={"id": int(camera_id)},
+            data={
+                "cam_name": archived_name,
+                "cam_status": False,
+                "stream_url": f"deleted://camera/{int(camera_id)}"
+            }
+        )
+
+        return {"status": "success", "message": "Camera archived and unpublished from MediaMTX"}, 200
     except Exception as e:
         return {"error": str(e)}, 500
 
