@@ -222,9 +222,9 @@ async def video_feed(camera_id: str | None = None):
                     else:
                         # Send keepalive comment to prevent client timeout when no frames available
                         no_frame_count += 1
-                        if no_frame_count % 10 == 0:  # Every ~330ms (10 * 0.033s)
+                        if no_frame_count % 5 == 0:  # Every ~100ms (5 * 0.020s) for faster detection
                             yield b'--frame\r\nContent-Type: text/plain\r\n\r\nWAITING\r\n'
-                    await asyncio.sleep(0.033)  # ~30fps
+                    await asyncio.sleep(0.020)  # ~50fps for lower latency
                 except Exception as e:
                     print(f"[video_feed] Streaming error: {e}")
                     break
