@@ -7,6 +7,25 @@ function AddCameraForm({ onCameraAdded }) {
   const [streamUrl, setStreamUrl] = useState('');
   const [locationId, setLocationId] = useState('');
 
+  const sanitizeCameraName = (value) => {
+    if (typeof value !== 'string') return '';
+    return value
+      .replace(/[<>`"']/g, '')
+      .replace(/\s{2,}/g, ' ')
+      .trimStart()
+      .slice(0, 80);
+  };
+
+  const sanitizeStreamUrl = (value) => {
+    if (typeof value !== 'string') return '';
+    return value.replace(/[\s\u0000-\u001F\u007F]/g, '').slice(0, 500);
+  };
+
+  const sanitizeLocationId = (value) => {
+    if (value === null || value === undefined) return '';
+    return String(value).replace(/[^0-9]/g, '');
+  };
+
   // 1. Fetch locations on component mount
   useEffect(() => {
     fetch('/api/locations')
@@ -25,11 +44,30 @@ function AddCameraForm({ onCameraAdded }) {
 
   const handleSubmit = (e) => {
     e.preventDefault();
+
+    const sanitizedName = sanitizeCameraName(camName).trim();
+    const sanitizedStreamUrl = sanitizeStreamUrl(streamUrl);
+    const sanitizedLocationId = sanitizeLocationId(locationId);
+
+    if (!sanitizedName) {
+      alert('Camera name is required.');
+      return;
+    }
+
+    if (!sanitizedLocationId) {
+      alert('A valid location is required.');
+      return;
+    }
+
+    if (sanitizedStreamUrl && !/^(rtsp|http|https):\/\//i.test(sanitizedStreamUrl)) {
+      alert('Stream URL must start with rtsp://, http://, or https://');
+      return;
+    }
     
     const newCamera = {
-      cam_name: camName,
-      stream_url: streamUrl,
-      loc_id: parseInt(locationId) // Make sure ID is a number
+      cam_name: sanitizedName,
+      stream_url: sanitizedStreamUrl,
+      loc_id: parseInt(sanitizedLocationId, 10) // Make sure ID is a number
     };
 
     // 2. Send the POST request to your API
@@ -64,7 +102,7 @@ function AddCameraForm({ onCameraAdded }) {
         <input 
           type="text" 
           value={camName}
-          onChange={(e) => setCamName(e.target.value)}
+          onChange={(e) => setCamName(sanitizeCameraName(e.target.value))}
           required 
         />
       </div>
@@ -73,14 +111,14 @@ function AddCameraForm({ onCameraAdded }) {
         <input 
           type="text" 
           value={streamUrl}
-          onChange={(e) => setStreamUrl(e.target.value)}
+          onChange={(e) => setStreamUrl(sanitizeStreamUrl(e.target.value))}
         />
       </div>
       <div>
         <label>Location: </label>
         <select 
           value={locationId} 
-          onChange={(e) => setLocationId(e.target.value)} 
+          onChange={(e) => setLocationId(sanitizeLocationId(e.target.value))} 
           required
         >
           {locations.map(loc => (

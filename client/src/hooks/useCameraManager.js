@@ -7,6 +7,25 @@ export function useCameraManager(onCameraUpdated) {
   const [editingCam, setEditingCam] = useState(null);
   const [newCam, setNewCam] = useState({ name: '', url: '', locId: '' });
 
+  const sanitizeCameraName = (value) => {
+    if (typeof value !== 'string') return '';
+    return value
+      .replace(/[<>`"']/g, '')
+      .replace(/\s{2,}/g, ' ')
+      .trim()
+      .slice(0, 100);
+  };
+
+  const sanitizeStreamUrl = (value) => {
+    if (typeof value !== 'string') return '';
+    return value.replace(/[\s\u0000-\u001F\u007F]/g, '').slice(0, 500);
+  };
+
+  const sanitizeLocationId = (value) => {
+    if (value === null || value === undefined) return '';
+    return String(value).replace(/[^0-9]/g, '');
+  };
+
   const fetchCameras = async () => {
     try {
       const data = await fetchApi('/cameras', 'GET');
@@ -21,8 +40,24 @@ export function useCameraManager(onCameraUpdated) {
 
   const addCamera = async (cameraData) => {
     setMessage({ text: '', type: '' });
+    const sanitizedPayload = {
+      cam_name: sanitizeCameraName(cameraData?.cam_name),
+      stream_url: sanitizeStreamUrl(cameraData?.stream_url || ''),
+      loc_id: parseInt(sanitizeLocationId(cameraData?.loc_id), 10),
+    };
+
+    if (!sanitizedPayload.cam_name) {
+      setMessage({ text: 'Camera name cannot be empty.', type: 'error' });
+      return false;
+    }
+
+    if (!Number.isInteger(sanitizedPayload.loc_id)) {
+      setMessage({ text: 'A valid location is required.', type: 'error' });
+      return false;
+    }
+
     try {
-      const data = await fetchApi('/cameras', 'POST', cameraData);
+      const data = await fetchApi('/cameras', 'POST', sanitizedPayload);
       if (data.status === 'success') {
         setMessage({ text: 'Camera added successfully!', type: 'success' });
         setNewCam({ name: '', url: '', locId: '' });
@@ -39,8 +74,24 @@ export function useCameraManager(onCameraUpdated) {
 
   const updateCamera = async (id, cameraData) => {
     setMessage({ text: '', type: '' });
+    const sanitizedPayload = {
+      cam_name: sanitizeCameraName(cameraData?.cam_name),
+      stream_url: sanitizeStreamUrl(cameraData?.stream_url || ''),
+      loc_id: parseInt(sanitizeLocationId(cameraData?.loc_id), 10),
+    };
+
+    if (!sanitizedPayload.cam_name) {
+      setMessage({ text: 'Camera name cannot be empty.', type: 'error' });
+      return false;
+    }
+
+    if (!Number.isInteger(sanitizedPayload.loc_id)) {
+      setMessage({ text: 'A valid location is required.', type: 'error' });
+      return false;
+    }
+
     try {
-      const data = await fetchApi(`/cameras/${id}`, 'PATCH', cameraData);
+      const data = await fetchApi(`/cameras/${id}`, 'PATCH', sanitizedPayload);
       if (data.status === 'success') {
         setMessage({ text: 'Camera updated successfully!', type: 'success' });
         setEditingCam(null);

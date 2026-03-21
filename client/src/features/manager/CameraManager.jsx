@@ -29,6 +29,34 @@ export default function CameraManager({ locations: initialLocations, onCameraUpd
   const cam = useCameraManager(onCameraUpdated);
   const loc = useLocationManager();
 
+  const sanitizeCameraName = (value) => {
+    if (typeof value !== 'string') return '';
+    return value
+      .replace(/[<>`"']/g, '')
+      .replace(/\s{2,}/g, ' ')
+      .trimStart()
+      .slice(0, 100);
+  };
+
+  const sanitizeStreamUrl = (value) => {
+    if (typeof value !== 'string') return '';
+    return value.replace(/[\s\u0000-\u001F\u007F]/g, '').slice(0, 500);
+  };
+
+  const sanitizeLocationId = (value) => {
+    if (value === null || value === undefined) return '';
+    return String(value).replace(/[^0-9]/g, '');
+  };
+
+  const sanitizeLocationName = (value) => {
+    if (typeof value !== 'string') return '';
+    return value
+      .replace(/[<>`"']/g, '')
+      .replace(/\s{2,}/g, ' ')
+      .trimStart()
+      .slice(0, 100);
+  };
+
   useEffect(() => {
     cam.fetchCameras();
     loc.fetchLocations();
@@ -96,9 +124,9 @@ export default function CameraManager({ locations: initialLocations, onCameraUpd
       {activeTab === 'add' && (
         <form onSubmit={handleAddCamera} className="space-y-4 max-w-lg bg-white p-6 rounded-xl border border-gray-200">
           <h3 className="text-lg font-semibold text-gray-900 mb-4">Add New Camera</h3>
-          <TableInput label="Camera Name" name="name" value={cam.newCam.name} onChange={(e) => cam.setNewCam(p => ({ ...p, [e.target.name]: e.target.value }))} placeholder="e.g., Hallway Camera 1" />
-          <TableInput label="Stream URL" name="url" value={cam.newCam.url} onChange={(e) => cam.setNewCam(p => ({ ...p, [e.target.name]: e.target.value }))} placeholder="rtsp://..." type="url" />
-          <TableInput label="Location" name="locId" value={cam.newCam.locId} onChange={(e) => cam.setNewCam(p => ({ ...p, [e.target.name]: e.target.value }))} options={loc.locations} />
+          <TableInput label="Camera Name" name="name" value={cam.newCam.name} onChange={(e) => cam.setNewCam(p => ({ ...p, [e.target.name]: sanitizeCameraName(e.target.value) }))} placeholder="e.g., Hallway Camera 1" />
+          <TableInput label="Stream URL" name="url" value={cam.newCam.url} onChange={(e) => cam.setNewCam(p => ({ ...p, [e.target.name]: sanitizeStreamUrl(e.target.value) }))} placeholder="rtsp://..." type="url" />
+          <TableInput label="Location" name="locId" value={cam.newCam.locId} onChange={(e) => cam.setNewCam(p => ({ ...p, [e.target.name]: sanitizeLocationId(e.target.value) }))} options={loc.locations} />
           <div className="flex gap-3 pt-6">
             <button type="submit" className="flex-1 bg-green-600 text-white py-3 rounded-xl hover:bg-green-700 font-bold flex items-center justify-center transition-colors">Add Camera</button>
             <button type="button" onClick={() => setActiveTab('list')} className="flex-1 bg-gray-500 text-white py-3 rounded-xl hover:bg-gray-600 font-bold transition-colors">Cancel</button>
@@ -110,7 +138,7 @@ export default function CameraManager({ locations: initialLocations, onCameraUpd
         <>
           <h3 className="text-lg font-semibold text-gray-900 mb-4">Add New Location</h3>
           <form onSubmit={handleAddLocation} className="flex gap-3 mb-6" style={{ maxWidth: '400px' }}>
-            <input type="text" value={loc.newLocName} onChange={(e) => loc.setNewLocName(e.target.value)} className="flex-1 pl-4 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 outline-none transition-all placeholder:text-gray-300 text-base" placeholder="e.g., Main Lobby..." required />
+            <input type="text" value={loc.newLocName} onChange={(e) => loc.setNewLocName(sanitizeLocationName(e.target.value))} className="flex-1 pl-4 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 outline-none transition-all placeholder:text-gray-300 text-base" placeholder="e.g., Main Lobby..." required />
             <button type="submit" className="px-6 py-3 bg-green-600 text-white font-semibold rounded-xl hover:bg-green-700 whitespace-nowrap transition-colors">Add Location</button>
           </form>
           {loc.locations.length === 0

@@ -14,6 +14,11 @@ const initialProfileState = {
 };
 
 export default function AccountSettingsForm({ user }) {
+    const sanitizePassword = (value) => {
+        if (typeof value !== 'string') return '';
+        return value.replace(/[\u0000-\u001F\u007F]/g, '').slice(0, 128);
+    };
+
     // --- State Management ---
     const [profile, setProfile] = useState(() => ({
         ...initialProfileState,
@@ -69,9 +74,12 @@ export default function AccountSettingsForm({ user }) {
         setMessage(null);
         if (!isFormValid) return;
 
+        const sanitizedOldPassword = sanitizePassword(oldPassword);
+        const sanitizedNewPassword = sanitizePassword(newPassword);
+
         setIsLoading(true);
         try {
-            const result = await changePassword(oldPassword, newPassword);
+            const result = await changePassword(sanitizedOldPassword, sanitizedNewPassword);
             if (result.status === 'success') {
                 setMessage({ type: 'success', text: "Password changed! Logging out in..." });
                 
@@ -209,7 +217,7 @@ export default function AccountSettingsForm({ user }) {
                                     label="Current Password" 
                                     id="oldPassword"
                                     value={oldPassword}
-                                    onChange={(e) => setOldPassword(e.target.value)}
+                                    onChange={(e) => setOldPassword(sanitizePassword(e.target.value))}
                                     icon={<FaKey />}
                                     disabled={isLoading || countdown !== null}
                                     placeholder="Enter current password"
@@ -220,7 +228,7 @@ export default function AccountSettingsForm({ user }) {
                                 label="New Password" 
                                 id="newPassword"
                                 value={newPassword}
-                                onChange={(e) => setNewPassword(e.target.value)}
+                                onChange={(e) => setNewPassword(sanitizePassword(e.target.value))}
                                 icon={<FaLock />}
                                 disabled={isLoading || countdown !== null}
                                 showRequirements={true}
@@ -231,7 +239,7 @@ export default function AccountSettingsForm({ user }) {
                                 label="Confirm Password" 
                                 id="confirmPassword"
                                 value={confirmPassword}
-                                onChange={(e) => setConfirmPassword(e.target.value)}
+                                onChange={(e) => setConfirmPassword(sanitizePassword(e.target.value))}
                                 icon={<FaLock />}
                                 disabled={isLoading || countdown !== null}
                                 isMatching={isMatching}

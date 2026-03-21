@@ -3,6 +3,25 @@ import { FaSave } from 'react-icons/fa';
 import { TableInput, ActionButtons } from './FormComponents';
 
 export default function CameraTable({ cameras, locations, editingCam, setEditingCam, publishedCameras, onEdit, onDelete, onPublish, onUpdate }) {
+  const sanitizeCameraName = (value) => {
+    if (typeof value !== 'string') return '';
+    return value
+      .replace(/[<>`"']/g, '')
+      .replace(/\s{2,}/g, ' ')
+      .trimStart()
+      .slice(0, 100);
+  };
+
+  const sanitizeStreamUrl = (value) => {
+    if (typeof value !== 'string') return '';
+    return value.replace(/[\s\u0000-\u001F\u007F]/g, '').slice(0, 500);
+  };
+
+  const sanitizeLocationId = (value) => {
+    if (value === null || value === undefined) return '';
+    return String(value).replace(/[^0-9]/g, '');
+  };
+
   return (
     <table className="w-full border-collapse" style={{ tableLayout: 'fixed' }}>
       <thead>
@@ -40,9 +59,9 @@ export default function CameraTable({ cameras, locations, editingCam, setEditing
                 <td colSpan="4" className="px-4 py-3">
                   <form onSubmit={onUpdate} className="space-y-3 bg-blue-50 p-4 rounded-lg border border-blue-200">
                     <div className="grid grid-cols-3 gap-4">
-                      <TableInput label="Camera Name" name="cam_name" value={editingCam.cam_name} onChange={(e) => setEditingCam(p => ({ ...p, [e.target.name]: e.target.value }))} />
-                      <TableInput label="Stream URL" name="stream_url" value={editingCam.stream_url} onChange={(e) => setEditingCam(p => ({ ...p, [e.target.name]: e.target.value }))} type="url" />
-                      <TableInput label="Location" name="loc_id" value={editingCam.loc_id} onChange={(e) => setEditingCam(p => ({ ...p, [e.target.name]: e.target.value }))} options={locations} />
+                      <TableInput label="Camera Name" name="cam_name" value={editingCam.cam_name} onChange={(e) => setEditingCam(p => ({ ...p, [e.target.name]: sanitizeCameraName(e.target.value) }))} />
+                      <TableInput label="Stream URL" name="stream_url" value={editingCam.stream_url} onChange={(e) => setEditingCam(p => ({ ...p, [e.target.name]: sanitizeStreamUrl(e.target.value) }))} type="url" />
+                      <TableInput label="Location" name="loc_id" value={editingCam.loc_id} onChange={(e) => setEditingCam(p => ({ ...p, [e.target.name]: sanitizeLocationId(e.target.value) }))} options={locations} />
                     </div>
                     <div className="flex gap-2 justify-end">
                       <button type="submit" className="bg-green-600 text-white py-2 px-6 rounded-lg hover:bg-green-700 text-sm font-semibold flex items-center">

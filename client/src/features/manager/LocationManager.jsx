@@ -11,6 +11,15 @@ export default function LocationManager({ onLocationsUpdated }) {
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const [locationToDeleteId, setLocationToDeleteId] = useState(null);
 
+    const sanitizeLocationName = (value) => {
+        if (typeof value !== 'string') return '';
+        return value
+            .replace(/[<>`"']/g, '')
+            .replace(/\s{2,}/g, ' ')
+            .trimStart()
+            .slice(0, 100);
+    };
+
     useEffect(() => {
         fetchLocations();
     }, []);
@@ -33,12 +42,13 @@ export default function LocationManager({ onLocationsUpdated }) {
     const handleAddLocation = async (e) => {
         e.preventDefault();
         setLocMessage({ text: '', type: '' });
-        if (!newLocName.trim()) {
+        const sanitizedName = sanitizeLocationName(newLocName).trim();
+        if (!sanitizedName) {
             setLocMessage({ text: 'Location name cannot be empty.', type: 'error' });
             return;
         }
         try {
-            const data = await fetchApi('/locations', 'POST', { loc_name: newLocName });
+            const data = await fetchApi('/locations', 'POST', { loc_name: sanitizedName });
             if (data.status === 'success') {
                 setLocMessage({ text: 'Location added successfully!', type: 'success' });
                 setNewLocName('');
@@ -58,13 +68,14 @@ export default function LocationManager({ onLocationsUpdated }) {
     const handleUpdateLocation = async (e) => {
         e.preventDefault();
         setLocMessage({ text: '', type: '' });
-        if (!editingLoc.name.trim()) {
+        const sanitizedName = sanitizeLocationName(editingLoc?.name).trim();
+        if (!sanitizedName) {
             setLocMessage({ text: 'Location name cannot be empty.', type: 'error' });
             return;
         }
         try {
             const data = await fetchApi(`/locations/${editingLoc.id}`, 'PATCH', { 
-                loc_name: editingLoc.name 
+                loc_name: sanitizedName 
             });
             if (data.status === 'success') {
                 setLocMessage({ text: 'Location updated successfully!', type: 'success' });
@@ -129,7 +140,7 @@ export default function LocationManager({ onLocationsUpdated }) {
                     <input
                         type="text"
                         value={newLocName}
-                        onChange={(e) => setNewLocName(e.target.value)}
+                        onChange={(e) => setNewLocName(sanitizeLocationName(e.target.value))}
                         className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                         placeholder="e.g., Main Lobby, Dining Hall..."
                         required
@@ -159,7 +170,7 @@ export default function LocationManager({ onLocationsUpdated }) {
                                     <input
                                         type="text"
                                         value={editingLoc.name}
-                                        onChange={(e) => setEditingLoc(prev => ({ ...prev, name: e.target.value }))}
+                                        onChange={(e) => setEditingLoc(prev => ({ ...prev, name: sanitizeLocationName(e.target.value) }))}
                                         className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                                         required
                                     />

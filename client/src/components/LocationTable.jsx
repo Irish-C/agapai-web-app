@@ -2,6 +2,15 @@ import React from 'react';
 import { TableInput, ActionButtons } from './FormComponents';
 
 export default function LocationTable({ locations, editingLoc, setEditingLoc, onEdit, onDelete, onUpdate }) {
+  const sanitizeLocationName = (value) => {
+    if (typeof value !== 'string') return '';
+    return value
+      .replace(/[<>`"']/g, '')
+      .replace(/\s{2,}/g, ' ')
+      .trimStart()
+      .slice(0, 100);
+  };
+
   return (
     <table className="w-full border-collapse" style={{ tableLayout: 'fixed' }}>
       <thead>
@@ -33,7 +42,7 @@ export default function LocationTable({ locations, editingLoc, setEditingLoc, on
               <tr className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-100'}>
                 <td colSpan="2" className="px-4 py-3">
                   <form onSubmit={onUpdate} className="space-y-3 bg-blue-50 p-4 rounded-lg border border-blue-200">
-                    <TableInput label="Location Name" name="name" value={editingLoc.name} onChange={(e) => setEditingLoc(p => ({ ...p, name: e.target.value }))} />
+                    <TableInput label="Location Name" name="name" value={editingLoc.name} onChange={(e) => setEditingLoc(p => ({ ...p, name: sanitizeLocationName(e.target.value) }))} />
                     <div className="flex gap-2 justify-end">
                       <button type="submit" className="bg-green-600 text-white py-2 px-6 rounded-lg hover:bg-green-700 text-sm font-semibold">
                         Save

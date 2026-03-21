@@ -21,6 +21,18 @@ export default function LoginPage() {
 
     const goToLandingPage = () => navigate('/');
 
+    const sanitizeUsername = (value) => {
+        if (typeof value !== 'string') return '';
+        return value
+            .replace(/[^a-zA-Z0-9_.-]/g, '')
+            .slice(0, 50);
+    };
+
+    const sanitizePassword = (value) => {
+        if (typeof value !== 'string') return '';
+        return value.replace(/[\u0000-\u001F\u007F]/g, '').slice(0, 128);
+    };
+
     const handleSubmit = async (e) => {
         e.preventDefault();
         setError('');
@@ -29,7 +41,7 @@ export default function LoginPage() {
         try {
             // This calls the login function in your AuthContext, 
             // which in turn calls loginUser in your apiService.
-            const result = await login(username, password);
+            const result = await login(sanitizeUsername(username), sanitizePassword(password));
             
             if (result.success) {
                 navigate('/dashboard'); 
@@ -99,7 +111,7 @@ export default function LoginPage() {
                                 <input
                                     type="text"
                                     value={username}
-                                    onChange={(e) => setUsername(e.target.value)}
+                                    onChange={(e) => setUsername(sanitizeUsername(e.target.value))}
                                     required
                                     className="w-full bg-slate-950/60 border border-white/10 rounded-xl pl-12 pr-4 py-3 text-white focus:border-teal-400 outline-none transition"
                                     placeholder="Enter username"
@@ -114,7 +126,7 @@ export default function LoginPage() {
                                 <input
                                     type={showPassword ? "text" : "password"}
                                     value={password}
-                                    onChange={(e) => setPassword(e.target.value)}
+                                    onChange={(e) => setPassword(sanitizePassword(e.target.value))}
                                     required
                                     className="w-full bg-slate-950/60 border border-white/10 rounded-xl pl-12 pr-12 py-3 text-white focus:border-teal-400 outline-none transition"
                                     placeholder="********"

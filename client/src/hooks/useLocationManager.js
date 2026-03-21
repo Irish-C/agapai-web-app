@@ -7,6 +7,15 @@ export function useLocationManager() {
   const [editingLoc, setEditingLoc] = useState(null);
   const [newLocName, setNewLocName] = useState('');
 
+  const sanitizeLocationName = (value) => {
+    if (typeof value !== 'string') return '';
+    return value
+      .replace(/[<>`"']/g, '')
+      .replace(/\s{2,}/g, ' ')
+      .trim()
+      .slice(0, 100);
+  };
+
   const fetchLocations = async () => {
     try {
       const data = await fetchApi('/locations', 'GET');
@@ -18,12 +27,13 @@ export function useLocationManager() {
 
   const addLocation = async (name) => {
     setMessage({ text: '', type: '' });
-    if (!name.trim()) {
+    const sanitizedName = sanitizeLocationName(name);
+    if (!sanitizedName) {
       setMessage({ text: 'Location name cannot be empty.', type: 'error' });
       return false;
     }
     try {
-      const data = await fetchApi('/locations', 'POST', { loc_name: name });
+      const data = await fetchApi('/locations', 'POST', { loc_name: sanitizedName });
       if (data.status === 'success') {
         setMessage({ text: 'Location added successfully!', type: 'success' });
         setNewLocName('');
@@ -40,12 +50,13 @@ export function useLocationManager() {
 
   const updateLocation = async (id, name) => {
     setMessage({ text: '', type: '' });
-    if (!name.trim()) {
+    const sanitizedName = sanitizeLocationName(name);
+    if (!sanitizedName) {
       setMessage({ text: 'Location name cannot be empty.', type: 'error' });
       return false;
     }
     try {
-      const data = await fetchApi(`/locations/${id}`, 'PATCH', { loc_name: name });
+      const data = await fetchApi(`/locations/${id}`, 'PATCH', { loc_name: sanitizedName });
       if (data.status === 'success') {
         setMessage({ text: 'Location updated successfully!', type: 'success' });
         setEditingLoc(null);

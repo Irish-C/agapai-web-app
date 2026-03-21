@@ -33,6 +33,62 @@ export default function UserEditModal({ userToEdit, onSave, onClose }) {
     const [message, setMessage] = useState('');
     const [isLoading, setIsLoading] = useState(false);
 
+    const sanitizeName = (value) => {
+        if (typeof value !== 'string') return '';
+        return value
+            .replace(/[^a-zA-Z\s'-]/g, '')
+            .replace(/\s{2,}/g, ' ')
+            .trimStart()
+            .slice(0, 60);
+    };
+
+    const sanitizeUsername = (value) => {
+        if (typeof value !== 'string') return '';
+        return value
+            .replace(/[^a-zA-Z0-9_.-]/g, '')
+            .slice(0, 50);
+    };
+
+    const sanitizeEmail = (value) => {
+        if (typeof value !== 'string') return '';
+        return value
+            .trim()
+            .toLowerCase()
+            .replace(/\s+/g, '')
+            .slice(0, 100);
+    };
+
+    const sanitizePassword = (value) => {
+        if (typeof value !== 'string') return '';
+        return value.replace(/[\u0000-\u001F\u007F]/g, '').slice(0, 128);
+    };
+
+    const sanitizeDate = (value) => {
+        if (typeof value !== 'string') return '';
+        const trimmed = value.trim();
+        return /^\d{4}-\d{2}-\d{2}$/.test(trimmed) ? trimmed : '';
+    };
+
+    const sanitizeFormValue = (name, value) => {
+        switch (name) {
+            case 'firstname':
+            case 'middle_name':
+            case 'lastname':
+                return sanitizeName(value);
+            case 'username':
+                return sanitizeUsername(value);
+            case 'email':
+                return sanitizeEmail(value);
+            case 'birthdate':
+                return sanitizeDate(value);
+            case 'password':
+            case 'confirmPassword':
+                return sanitizePassword(value);
+            default:
+                return value;
+        }
+    };
+
     // 2. Fetch roles from the database on mount
     useEffect(() => {
         const fetchRoles = async () => {
@@ -62,7 +118,7 @@ export default function UserEditModal({ userToEdit, onSave, onClose }) {
 
     const handleChange = (e) => {
         const { name, value } = e.target;
-        setFormData(prev => ({ ...prev, [name]: value }));
+        setFormData(prev => ({ ...prev, [name]: sanitizeFormValue(name, value) }));
     };
 
     const handleFormSubmit = async (e) => {
@@ -87,7 +143,19 @@ export default function UserEditModal({ userToEdit, onSave, onClose }) {
 
         setIsLoading(true);
         
-        onSave(formData)
+        const sanitizedPayload = {
+            ...formData,
+            firstname: sanitizeName(formData.firstname),
+            middle_name: sanitizeName(formData.middle_name),
+            lastname: sanitizeName(formData.lastname),
+            username: sanitizeUsername(formData.username),
+            email: sanitizeEmail(formData.email),
+            birthdate: sanitizeDate(formData.birthdate),
+            password: sanitizePassword(formData.password),
+            confirmPassword: sanitizePassword(formData.confirmPassword),
+        };
+
+        onSave(sanitizedPayload)
             .then(() => {
                 // Success is handled by parent
             })

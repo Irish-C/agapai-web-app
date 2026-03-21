@@ -8,6 +8,8 @@ import {
 import { fetchReportsData, fetchApi } from '../services/apiService';
 
 export default function ReportsPage() {
+    const ALLOWED_LIMITS = [20, 50, 100, 1000];
+
     // --- STATE MANAGEMENT ---
     const [logs, setLogs] = useState([]);
     const [classifications, setClassifications] = useState([]); // Dynamic from DB
@@ -85,6 +87,37 @@ export default function ReportsPage() {
     const visibleClassifications = showAllClassifications ? classifications : classifications.slice(0, 1);
 
     // --- HANDLERS ---
+    const sanitizeSearchInput = (value) => {
+        if (typeof value !== 'string') return '';
+        return value
+            .replace(/[<>`"']/g, '')
+            .replace(/\s{2,}/g, ' ')
+            .slice(0, 100);
+    };
+
+    const sanitizeDateInput = (value) => {
+        if (typeof value !== 'string') return '';
+        const trimmed = value.trim();
+        return /^\d{4}-\d{2}-\d{2}$/.test(trimmed) ? trimmed : '';
+    };
+
+    const sanitizeLimitInput = (value) => {
+        const numeric = Number(value);
+        return ALLOWED_LIMITS.includes(numeric) ? numeric : 100;
+    };
+
+    const sanitizeCsvValue = (value) => {
+        const safeValue = value ?? '';
+        let stringValue = String(safeValue);
+
+        // Prevent CSV formula injection in spreadsheet apps.
+        if (/^[=+\-@\t\r]/.test(stringValue)) {
+            stringValue = `'${stringValue}`;
+        }
+
+        return stringValue.replace(/"/g, '""');
+    };
+
     const toggleFilter = (item, currentArray, setter) => {
         setter(currentArray.includes(item) ? currentArray.filter(i => i !== item) : [...currentArray, item]);
     };
@@ -101,9 +134,7 @@ export default function ReportsPage() {
 
         const headers = ['Timestamp', 'Classification', 'Location', 'Status', 'Acknowledged By', 'Snapshot URL'];
         const escapeCsv = (value) => {
-            const safeValue = value ?? '';
-            const stringValue = String(safeValue).replace(/"/g, '""');
-            return `"${stringValue}"`;
+            return `"${sanitizeCsvValue(value)}"`;
         };
 
         const rows = filteredLogs.map((log) => {
@@ -223,7 +254,7 @@ export default function ReportsPage() {
                             placeholder="Quick search..."
                             className="pl-11 pr-6 py-3 bg-white border border-gray-200 rounded-2xl focus:ring-4 focus:ring-teal-500/10 focus:border-teal-500 outline-none w-full sm:w-72 text-sm font-medium transition-all shadow-sm font-sans"
                             value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
+                            onChange={(e) => setSearchTerm(sanitizeSearchInput(e.target.value))}
                         />
                     </div>
                     <button 
@@ -283,11 +314,11 @@ export default function ReportsPage() {
 
                     <div className="flex flex-wrap items-center gap-4 lg:border-l lg:border-gray-100 lg:pl-8">
                         <div className="flex items-center bg-gray-50 border border-gray-100 rounded-2xl px-2">
-                            <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="p-2 bg-transparent text-xs font-bold text-gray-600 outline-none font-sans" />
+                            <input type="date" value={startDate} onChange={(e) => setStartDate(sanitizeDateInput(e.target.value))} className="p-2 bg-transparent text-xs font-bold text-gray-600 outline-none font-sans" />
                             <span className="text-gray-300">/</span>
-                            <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="p-2 bg-transparent text-xs font-bold text-gray-600 outline-none font-sans" />
+                            <input type="date" value={endDate} onChange={(e) => setEndDate(sanitizeDateInput(e.target.value))} className="p-2 bg-transparent text-xs font-bold text-gray-600 outline-none font-sans" />
                         </div>
-                        <select value={limit} onChange={(e) => setLimit(Number(e.target.value))} className="p-2.5 bg-gray-50 border border-gray-100 rounded-2xl text-xs font-bold text-gray-600 outline-none font-sans">
+                        <select value={limit} onChange={(e) => setLimit(sanitizeLimitInput(e.target.value))} className="p-2.5 bg-gray-50 border border-gray-100 rounded-2xl text-xs font-bold text-gray-600 outline-none font-sans">
                             <option value={20}>20 Rows</option>
                             <option value={50}>50 Rows</option>
                             <option value={100}>100 Rows</option>
