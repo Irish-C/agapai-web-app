@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { FaUsers, FaSpinner, FaArchive } from 'react-icons/fa';
+import { FaUsers, FaSpinner, FaArchive, FaShieldAlt } from 'react-icons/fa';
 import { useUserManager } from '../../hooks/useUserManager.js';
 import UserTable from '../../components/features/manager/UserTable.jsx';
 import UserEditModal from '../modal/UserEditModal.jsx';
@@ -14,6 +14,49 @@ export default function UserManager({ user }) {
     const [userToEdit, setUserToEdit] = useState(null);
     const [userToRestore, setUserToRestore] = useState(null);
     const [isRestoreModalOpen, setIsRestoreModalOpen] = useState(false);
+    const [showRoleOverview, setShowRoleOverview] = useState(false);
+
+    // Role permissions mapping
+    const rolePermissions = {
+        admin: {
+            'Create Users': true,
+            'Edit Users': true,
+            'Archive/Restore Users': true,
+            'Manage Cameras': true,
+            'View Reports': true,
+            'System Settings': true,
+            'View Live Feed': true,
+        },
+        supervisor: {
+            'Create Users': true,
+            'Edit Users': true,
+            'Archive/Restore Users': true,
+            'Manage Cameras': true,
+            'View Reports': true,
+            'System Settings': false,
+            'View Live Feed': true,
+        },
+        guard: {
+            'Create Users': false,
+            'Edit Users': false,
+            'Archive/Restore Users': false,
+            'Manage Cameras': true,
+            'View Reports': true,
+            'System Settings': false,
+            'View Live Feed': true,
+        },
+        caregiver: {
+            'Create Users': false,
+            'Edit Users': false,
+            'Archive/Restore Users': false,
+            'Manage Cameras': false,
+            'View Reports': false,
+            'System Settings': false,
+            'View Live Feed': true,
+        },
+    };
+
+    const allPermissions = ['Create Users', 'Edit Users', 'Archive/Restore Users', 'Manage Cameras', 'View Reports', 'System Settings', 'View Live Feed'];
 
     const {
         users,
@@ -118,7 +161,56 @@ export default function UserManager({ user }) {
                         ))}
                     </select>
                 </div>
+                <button
+                    onClick={() => setShowRoleOverview(prev => !prev)}
+                    className="flex items-center font-bold py-2 px-4 rounded-lg transition duration-150 hover:bg-gray-100 text-gray-700 h-12 hover:text-gray-500"
+                    title="View role permissions"
+                >
+                    {/* <FaShieldAlt className="mr-2" /> */}
+                    Role Overview
+                </button>
             </div>
+
+            {showRoleOverview && (
+                <div className="bg-white rounded-xl shadow-md p-6 mb-6">
+                    <h4 className="text-lg font-bold mb-4 flex items-center text-gray-700">
+                        <FaShieldAlt className="mr-2" />
+                        Role Permissions Overview
+                    </h4>
+                    <div className="overflow-x-auto">
+                        <table className="w-full">
+                            <thead>
+                                <tr className="bg-gray-100">
+                                    <th className="px-4 py-3 text-left font-semibold text-gray-700">Role</th>
+                                    {allPermissions.map(perm => (
+                                        <th key={perm} className="px-4 py-3 text-center font-semibold text-gray-700 text-sm">
+                                            {perm}
+                                        </th>
+                                    ))}
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {roles.map(role => (
+                                    <tr key={role} className="border-b border-gray-200 hover:bg-gray-50">
+                                        <td className="px-4 py-3 font-semibold text-gray-800">
+                                            {displayRole(role)}
+                                        </td>
+                                        {allPermissions.map(perm => (
+                                            <td key={`${role}-${perm}`} className="px-4 py-3 text-center">
+                                                {rolePermissions[role]?.[perm] ? (
+                                                    <span className="text-green-600 font-bold text-lg">✓</span>
+                                                ) : (
+                                                    <span className="text-red-500 font-bold text-lg">✕</span>
+                                                )}
+                                            </td>
+                                        ))}
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            )}
 
             <div className="flex justify-between items-center mb-4">
                 <h3 className="text-xl font-semibold flex items-center">
