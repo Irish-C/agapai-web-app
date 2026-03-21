@@ -16,7 +16,7 @@ from src.controllers.event_controller import (
 router = APIRouter()
 
 @router.post('/events')
-async def create_event(request: Request):
+async def create_event(request: Request, user_id: str = Depends(get_current_user_id)):
     data = await get_sanitized_json(request)
     result, code = await create_event_logic(data)
     return safe_json_response(status_code=code, content=result)
@@ -24,7 +24,7 @@ async def create_event(request: Request):
 # server/src/routes/event_routes.py
 
 @router.get('/event_logs') # Ensure this is exactly '/event_logs'
-async def get_event_logs(request: Request):
+async def get_event_logs(request: Request, user_id: str = Depends(get_current_user_id)):
     params = sanitize_input(dict(request.query_params))
     result, code = await get_event_logs_logic(params)
     return safe_json_response(status_code=code, content=result)
@@ -35,17 +35,17 @@ async def acknowledge_event(log_id: int, user_id: str = Depends(get_current_user
     return safe_json_response(status_code=code, content=result)
 
 @router.post('/events/{log_id}/unacknowledge')
-async def unacknowledge_event(log_id: int):
+async def unacknowledge_event(log_id: int, user_id: str = Depends(get_current_user_id)):
     result, code = await mark_unviewed_logic(log_id)
     return safe_json_response(status_code=code, content=result)
 
 # Add this route to your existing router
 @router.get("/event-types")
-async def get_event_types():
+async def get_event_types(user_id: str = Depends(get_current_user_id)):
     return await get_event_types_logic()
 
 @router.get("/logs/export")
-async def export_logs(date: str):
+async def export_logs(date: str, user_id: str = Depends(get_current_user_id)):
     """Export incident logs for a specific date in JSON format
     
     Query param: date (YYYY-MM-DD format)
@@ -56,7 +56,7 @@ async def export_logs(date: str):
 
 
 @router.get("/alerts/missed/{timestamp_ms}")
-async def get_missed_alerts(timestamp_ms: int):
+async def get_missed_alerts(timestamp_ms: int, user_id: str = Depends(get_current_user_id)):
     """Fetch alerts (YOLO detections) that occurred after a specific timestamp.
     
     Used by frontend after Socket.IO reconnect to sync missed detections.

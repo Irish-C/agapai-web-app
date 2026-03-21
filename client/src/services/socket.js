@@ -107,10 +107,11 @@ function notifyBufferFlush(alerts) {
 async function resubscribeToAllCameras() {
   const cameras = getSubscribedCameras();
   console.log('[SocketIO Reconnect] Re-subscribing to', cameras.length, 'cameras');
+  const authToken = localStorage.getItem('authToken');
   
   for (const cameraId of cameras) {
     try {
-      socket.emit('subscribe_camera', { camera_id: cameraId });
+      socket.emit('subscribe_camera', { camera_id: cameraId, token: authToken });
       await new Promise(resolve => setTimeout(resolve, 50)); // Small delay between subscriptions
     } catch (err) {
       console.error('[SocketIO Reconnect] Failed to resubscribe to camera', cameraId, err);

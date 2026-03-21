@@ -20,6 +20,12 @@ from src.routes.event_routes import router as event_router
 from src.routes.settings_routes import router as settings_router
 from src.routes.location_routes import router as location_router
 from src.utils.input_sanitization import get_sanitized_json, sanitize_input
+from src.utils.auth import get_token_user_id_from_header
+from src.utils.rate_limiter import (
+    enforce_ip_rate_limit,
+    API_GLOBAL_RATE_LIMIT,
+    API_GLOBAL_RATE_WINDOW_SECONDS,
+)
 
 # Import the background stream logic from the camera controller
 from src.controllers.camera_controller import ensure_mediamtx_running, start_camera_processing
@@ -44,7 +50,6 @@ class PrismaJSONResponse(JSONResponse):
 
 # --- 1. LOAD ENVIRONMENT ---
 load_dotenv()
-SECRET_KEY = os.getenv('FLASK_SECRET_KEY', 'default_secret_key')
 
 # --- 2. Socket.IO (ASGI) ---
 socketio_server = socketio.AsyncServer(
@@ -111,6 +116,25 @@ async def bigint_middleware(request, call_next):
     # Skip socket.io routes - they need to pass through unmodified
     if request.url.path.startswith('/socket.io'):
         return await call_next(request)
+
+    # Global API rate limiting (separate stricter rule on /api/login route).
+    if request.url.path.startswith('/api') and request.url.path != '/api/login':
+        allowed, retry_after = await enforce_ip_rate_limit(
+            request=request,
+            namespace='api_global',
+            limit=API_GLOBAL_RATE_LIMIT,
+            window_seconds=API_GLOBAL_RATE_WINDOW_SECONDS,
+        )
+        if not allowed:
+            return JSONResponse(
+                status_code=429,
+                content={
+                    'status': 'error',
+                    'message': 'Rate limit exceeded. Please retry later.',
+                    'retry_after_seconds': retry_after,
+                },
+                headers={'Retry-After': str(retry_after)},
+            )
     
     try:
         content_type = request.headers.get('content-type', '')
@@ -307,6 +331,23 @@ async def disconnect(sid):
 @socketio_server.on('subscribe_camera')
 async def subscribe_camera(sid, data):
     try:
+        token = None
+        if isinstance(data, dict):
+            token = data.get('token')
+
+        user_id = None
+        if token:
+            user_id = get_token_user_id_from_header(f"Bearer {token}")
+
+        if not user_id:
+            environ = socketio_server.get_environ(sid)
+            if environ:
+                user_id = get_token_user_id_from_header(environ.get('HTTP_AUTHORIZATION'))
+
+        if not user_id:
+            await socketio_server.emit('auth_error', {'message': 'Authentication required'}, to=sid)
+            return
+
         camera_id = None
         if isinstance(data, dict):
             camera_id = data.get('camera_id') or data.get('cam_id')
@@ -329,6 +370,23 @@ async def subscribe_camera(sid, data):
 @socketio_server.on('unsubscribe_camera')
 async def unsubscribe_camera(sid, data):
     try:
+        token = None
+        if isinstance(data, dict):
+            token = data.get('token')
+
+        user_id = None
+        if token:
+            user_id = get_token_user_id_from_header(f"Bearer {token}")
+
+        if not user_id:
+            environ = socketio_server.get_environ(sid)
+            if environ:
+                user_id = get_token_user_id_from_header(environ.get('HTTP_AUTHORIZATION'))
+
+        if not user_id:
+            await socketio_server.emit('auth_error', {'message': 'Authentication required'}, to=sid)
+            return
+
         camera_id = None
         if isinstance(data, dict):
             camera_id = data.get('camera_id') or data.get('cam_id')

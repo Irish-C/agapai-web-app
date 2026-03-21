@@ -325,9 +325,10 @@ function VideoFeed({
     
     // Track subscription for auto-resubscribe on reconnect
     addSubscribedCamera(camId);
+    const authToken = localStorage.getItem('authToken');
 
     try {
-      socket.emit('subscribe_camera', { camera_id: camId });
+      socket.emit('subscribe_camera', { camera_id: camId, token: authToken });
     } catch (e) {
       console.warn(`Failed to subscribe to camera ${camId}:`, e);
       subscriptionRef.current = null;
@@ -350,7 +351,7 @@ function VideoFeed({
     return () => {
       // Unsubscribe when component unmounts
       try {
-        socket.emit('unsubscribe_camera', { camera_id: camId });
+        socket.emit('unsubscribe_camera', { camera_id: camId, token: authToken });
       } catch (e) {}
       removeSubscribedCamera(camId);
       socket.off('camera_status', handleCameraStatus);

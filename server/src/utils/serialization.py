@@ -31,7 +31,7 @@ def _normalize_for_json(value):
     return value
 
 
-def safe_json_response(status_code: int, content):
+def safe_json_response(status_code: int, content, headers=None):
     encoded = jsonable_encoder(content)
     normalized = _normalize_for_json(encoded)
-    return JSONResponse(status_code=status_code, content=normalized)
+    return JSONResponse(status_code=status_code, content=normalized, headers=headers)
