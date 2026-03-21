@@ -64,7 +64,7 @@ export default function CameraNotificationSettings() {
                 </div>
                 <label className="relative inline-flex items-center cursor-pointer ml-4">
                     <input type="checkbox" checked={checked} onChange={(e) => onToggle(e.target.checked)} className="sr-only peer" />
-                    <div className={`w-11 h-6 bg-gray-200 transition-all duration-300 ease-smooth peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-400/50 peer-focus:ring-offset-2 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all after:duration-300 after:ease-smooth ${colorClass}`}></div>
+                    <div className={`w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 hover:ring-4 hover:ring-blue-300/40 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all ${colorClass}`}></div>
                 </label>
             </div>
         );
@@ -88,7 +88,7 @@ export default function CameraNotificationSettings() {
                         description="Send email notifications if real-time WebSocket alerts fail"
                         checked={globalSettings.email_fallback}
                         onToggle={(v) => saveGlobalSettings({ email_fallback: v })}
-                        colorClass="peer-checked:bg-blue-500"
+                        colorClass="peer-checked:bg-teal-600"
                     />
 
                     {/* Fall Detection Section */}
