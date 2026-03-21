@@ -66,6 +66,10 @@ export default function CameraGrid() {
 
   // Sync published cameras to backend whenever they change
   useEffect(() => {
+    if (!isConnected) {
+      return;
+    }
+
     const syncPublishedCameras = async () => {
       try {
         const cameras = Array.from(publishedCameras);
@@ -84,7 +88,7 @@ export default function CameraGrid() {
       }
     };
     syncPublishedCameras();
-  }, [publishedCameras]);
+  }, [publishedCameras, isConnected]);
 
   // Memoize publishedCameraList to prevent unnecessary VideoFeed remounts
   const publishedCameraList = useMemo(

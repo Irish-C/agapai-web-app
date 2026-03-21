@@ -9,6 +9,8 @@ from database import db
 import yaml
 import subprocess
 import signal
+import socket
+from urllib.parse import urlsplit, urlunsplit
 from src.utils.redis_pool import RedisConnectionPool
 
 # Get Redis client from singleton pool
@@ -20,6 +22,49 @@ _SERVER_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../'))
 _MTX_BIN = os.path.join(_SERVER_DIR, 'mediamtx')
 _MTX_CONF = os.path.join(_SERVER_DIR, 'mediamtx.yml')
 _MTX_PID = os.path.join(_SERVER_DIR, 'mediamtx.pid')
+
+
+def _is_tcp_listening(host: str, port: int, timeout: float = 0.4) -> bool:
+    try:
+        with socket.create_connection((host, port), timeout=timeout):
+            return True
+    except Exception:
+        return False
+
+
+async def ensure_mediamtx_running() -> bool:
+    """Start MediaMTX if RTSP port is not available.
+
+    Returns True when RTSP listener is available after the check.
+    """
+    if _is_tcp_listening('127.0.0.1', 8554):
+        return True
+
+    if not os.path.exists(_MTX_BIN):
+        print(f"[camera_controller] MediaMTX binary not found at {_MTX_BIN}")
+        return False
+
+    try:
+        proc = subprocess.Popen(
+            [_MTX_BIN, _MTX_CONF],
+            cwd=_SERVER_DIR,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        with open(_MTX_PID, 'w') as pf:
+            pf.write(str(proc.pid))
+
+        # Give MediaMTX a brief moment to bind sockets.
+        await asyncio.sleep(0.8)
+        ok = _is_tcp_listening('127.0.0.1', 8554)
+        if ok:
+            print('[camera_controller] MediaMTX started and listening on :8554')
+        else:
+            print('[camera_controller] MediaMTX start attempted, but :8554 is still unavailable')
+        return ok
+    except Exception as e:
+        print(f"[camera_controller] Failed to start MediaMTX: {e}")
+        return False
 
 # Snapshot storage (for alert snapshots)
 SNAPSHOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../static/snapshots'))
@@ -72,9 +117,41 @@ async def stream_camera_loop(camera_id, rtsp_url):
 
     Only triggers alerts for *falls* and *inactivity* (not general motion).
     """
+    # Normalize local RTSP URLs without explicit port to MediaMTX default 8554.
+    # Example: rtsp://localhost/stream1 -> rtsp://localhost:8554/stream1
+    def normalize_rtsp_url(raw_url: str) -> str:
+        try:
+            parsed = urlsplit(raw_url)
+            if parsed.scheme != 'rtsp':
+                return raw_url
+
+            host = (parsed.hostname or '').lower()
+            if host not in {'localhost', '127.0.0.1', '::1'}:
+                return raw_url
+
+            if parsed.port is not None:
+                return raw_url
+
+            userinfo = ''
+            if parsed.username:
+                userinfo = parsed.username
+                if parsed.password:
+                    userinfo += f":{parsed.password}"
+                userinfo += '@'
+
+            host_for_netloc = parsed.hostname or 'localhost'
+            new_netloc = f"{userinfo}{host_for_netloc}:8554"
+            return urlunsplit((parsed.scheme, new_netloc, parsed.path, parsed.query, parsed.fragment))
+        except Exception:
+            return raw_url
+
+    normalized_url = normalize_rtsp_url(rtsp_url)
+    if normalized_url != rtsp_url:
+        print(f"[stream_camera_loop] Camera {camera_id}: normalized local RTSP URL to {normalized_url}")
+
     # Use TCP transport and small buffer for lower latency and fewer stale frames
     os.environ.setdefault("OPENCV_FFMPEG_CAPTURE_OPTIONS", "rtsp_transport;tcp|timeout;5000000")
-    cap = cv2.VideoCapture(rtsp_url, cv2.CAP_FFMPEG)
+    cap = cv2.VideoCapture(normalized_url, cv2.CAP_FFMPEG)
     try:
         cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
     except Exception:
@@ -230,7 +307,7 @@ async def stream_camera_loop(camera_id, rtsp_url):
                 print(f"[stream_camera_loop] Stream failed for camera {camera_id}. Retrying in 5s...")
                 await emit_camera_status('offline', 'No frames received')
                 await asyncio.sleep(5)
-                cap = cv2.VideoCapture(rtsp_url)
+                cap = cv2.VideoCapture(normalized_url, cv2.CAP_FFMPEG)
                 connection_start_time = time.time()  # Reset timeout when reconnecting
                 continue
 
@@ -256,7 +333,7 @@ async def stream_camera_loop(camera_id, rtsp_url):
                     print(f"[stream_camera_loop] Camera {camera_id} connection timeout ({connection_timeout}s)")
                     await emit_camera_status('error', f'Connection timeout after {int(connection_timeout)}s')
                     await asyncio.sleep(5)
-                    cap = cv2.VideoCapture(rtsp_url)
+                    cap = cv2.VideoCapture(normalized_url, cv2.CAP_FFMPEG)
                     connection_start_time = time.time()  # Reset for next attempt
                     continue
 

@@ -21,8 +21,8 @@ from src.routes.settings_routes import router as settings_router
 from src.routes.location_routes import router as location_router
 from src.utils.input_sanitization import get_sanitized_json, sanitize_input
 
-# Import the background stream logic from your controller
-from src.controllers.camera_controller import start_camera_processing
+# Import the background stream logic from the camera controller
+from src.controllers.camera_controller import ensure_mediamtx_running, start_camera_processing
 
 from fastapi.responses import JSONResponse
 import json
@@ -75,6 +75,14 @@ async def lifespan(app: FastAPI):
     app.state.redis = RedisConnectionPool.get()
     print("[INFO] Connecting to Prisma DB...")
     await db.connect()
+
+    # Ensure local RTSP proxy (MediaMTX) is up before camera loops start.
+    try:
+        mtx_ok = await ensure_mediamtx_running()
+        if not mtx_ok:
+            print("[WARN] MediaMTX is not reachable on :8554; local RTSP proxy streams may fail.")
+    except Exception as e:
+        print(f"[WARN] MediaMTX startup check failed: {e}")
 
     # Start the background camera stream loop (emits frames via Socket.IO)
     # This is what powers the live stream view in the AGAPAI UI.
