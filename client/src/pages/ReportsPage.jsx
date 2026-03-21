@@ -30,6 +30,13 @@ export default function ReportsPage() {
     const [currentPage, setCurrentPage] = useState(1);
     const rowsPerPage = 10;
 
+    const normalizeDateRange = (start, end) => {
+        if (!start || !end) return { start, end };
+        return start <= end
+            ? { start, end }
+            : { start: end, end: start };
+    };
+
     // --- DATA FETCHING ---
     useEffect(() => {
         const loadPageData = async () => {
@@ -37,8 +44,10 @@ export default function ReportsPage() {
                 setIsLoading(true);
                 
                 // Fetch Logs and Classifications in parallel for speed
+                const normalizedRange = normalizeDateRange(startDate, endDate);
+
                 const [logResponse, classResponse] = await Promise.all([
-                    fetchReportsData(limit, startDate, endDate),
+                    fetchReportsData(limit, normalizedRange.start, normalizedRange.end),
                     fetchApi('/event-types', 'GET') // Fetches dynamic types from database
                 ]);
 
@@ -56,7 +65,8 @@ export default function ReportsPage() {
                     ? dataArray.map(log => log.event_class_name || log.type).filter(Boolean)
                     : [];
 
-                setClassifications([...new Set([...dbClassifications, ...logClassifications])]);
+                const mergedClassifications = [...new Set([...dbClassifications, ...logClassifications])];
+                setClassifications(prev => mergedClassifications.length > 0 ? mergedClassifications : prev);
 
                 setCurrentPage(1); 
             } catch (err) {
@@ -126,6 +136,38 @@ export default function ReportsPage() {
 
     const resetFilters = () => {
         setSearchTerm(''); setFilterClass([]); setFilterStatus([]); setStartDate(''); setEndDate('');
+    };
+
+    const handleStartDateChange = (value) => {
+        const nextStart = sanitizeDateInput(value);
+        if (!nextStart) {
+            setStartDate('');
+            return;
+        }
+
+        if (endDate && nextStart > endDate) {
+            setStartDate(endDate);
+            setEndDate(nextStart);
+            return;
+        }
+
+        setStartDate(nextStart);
+    };
+
+    const handleEndDateChange = (value) => {
+        const nextEnd = sanitizeDateInput(value);
+        if (!nextEnd) {
+            setEndDate('');
+            return;
+        }
+
+        if (startDate && nextEnd < startDate) {
+            setEndDate(startDate);
+            setStartDate(nextEnd);
+            return;
+        }
+
+        setEndDate(nextEnd);
     };
 
     const handleGenerateReport = () => {
@@ -316,9 +358,9 @@ export default function ReportsPage() {
 
                     <div className="flex flex-wrap items-center gap-4 lg:border-l lg:border-gray-100 lg:pl-8">
                         <div className="flex items-center bg-gray-50 border border-gray-100 rounded-2xl px-2">
-                            <input type="date" value={startDate} onChange={(e) => setStartDate(sanitizeDateInput(e.target.value))} className="p-2 bg-transparent text-xs font-bold text-gray-600 outline-none font-sans" />
+                            <input type="date" value={startDate} onChange={(e) => handleStartDateChange(e.target.value)} className="p-2 bg-transparent text-xs font-bold text-gray-600 outline-none font-sans" />
                             <span className="text-gray-300">/</span>
-                            <input type="date" value={endDate} onChange={(e) => setEndDate(sanitizeDateInput(e.target.value))} className="p-2 bg-transparent text-xs font-bold text-gray-600 outline-none font-sans" />
+                            <input type="date" value={endDate} onChange={(e) => handleEndDateChange(e.target.value)} className="p-2 bg-transparent text-xs font-bold text-gray-600 outline-none font-sans" />
                         </div>
                         <select value={limit} onChange={(e) => setLimit(sanitizeLimitInput(e.target.value))} className="p-2.5 bg-gray-50 border border-gray-100 rounded-2xl text-xs font-bold text-gray-600 outline-none font-sans">
                             <option value={20}>20 Rows</option>

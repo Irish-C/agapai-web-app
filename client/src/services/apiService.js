@@ -163,6 +163,7 @@ export const fetchReportsData = (limit, startDate, endDate) => {
     const params = new URLSearchParams({ limit });
     if (startDate) params.append('start_date', startDate);
     if (endDate) params.append('end_date', endDate);
+    params.append('tz_offset_minutes', String(new Date().getTimezoneOffset()));
 
     return fetchApi(`/event_logs?${params.toString()}`, 'GET');
 };

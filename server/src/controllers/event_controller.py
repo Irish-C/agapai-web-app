@@ -38,15 +38,9 @@ async def create_event_logic(data):
 
 async def get_event_types_logic():
     try:
-        # Using Prisma to get unique event classifications from your DB
-        # Replace 'event_log' with your actual model name if different
-        types = await db.event_log.find_many(
-            distinct=['event_class_name'],
-            select={'event_class_name': True}
-        )
-        
-        # Format the list for the frontend pills
-        return [{"name": t['event_class_name']} for t in types]
+        # Fetch classifications from EventClass table (source of truth).
+        classes = await db.eventclass.find_many(order={'class_name': 'asc'})
+        return [{"name": c.class_name} for c in classes if getattr(c, 'class_name', None)]
     except Exception as e:
         print(f"Error fetching types: {e}")
         return []
@@ -60,28 +54,35 @@ async def get_event_logs_logic(filters=None):
         if filters:
             start_date = filters.get('start_date')
             end_date = filters.get('end_date')
+            tz_offset_minutes = int(filters.get('tz_offset_minutes', 0) or 0)
 
             if start_date or end_date:
                 timestamp_filter = {}
 
                 if start_date:
-                    start_dt = datetime.strptime(start_date, '%Y-%m-%d').replace(
+                    local_start = datetime.strptime(start_date, '%Y-%m-%d').replace(
                         hour=0,
                         minute=0,
                         second=0,
                         microsecond=0,
                     )
+                    # JS getTimezoneOffset() is minutes to add to local time to get UTC.
+                    start_dt = local_start + timedelta(minutes=tz_offset_minutes)
                     timestamp_filter['gte'] = start_dt
 
                 if end_date:
-                    # Include the full selected end date by filtering to next day (exclusive).
-                    end_dt = datetime.strptime(end_date, '%Y-%m-%d').replace(
+                    # Include full end date in local time, converted to UTC as exclusive upper bound.
+                    local_end = datetime.strptime(end_date, '%Y-%m-%d').replace(
                         hour=0,
                         minute=0,
                         second=0,
                         microsecond=0,
                     ) + timedelta(days=1)
+                    end_dt = local_end + timedelta(minutes=tz_offset_minutes)
                     timestamp_filter['lt'] = end_dt
+
+                if timestamp_filter.get('gte') and timestamp_filter.get('lt') and timestamp_filter['gte'] >= timestamp_filter['lt']:
+                    return {"status": "error", "message": "start_date must be on or before end_date"}, 400
 
                 where_clause['timestamp'] = timestamp_filter
         
@@ -167,17 +168,8 @@ async def mark_unviewed_logic(log_id):
 
 async def get_event_types():
     try:
-        # Fetch unique types/classes from your database using Prisma or SQL
-        # Replace 'event_log' with your actual table name
-        types = await db.event_log.find_many(
-            distinct=['event_class_name'],
-            select={'event_class_name': True}
-        )
-        
-        # Format for the frontend: [{'name': 'Fall'}, {'name': 'Inactivity'}]
-        formatted_types = [{"name": t['event_class_name']} for t in types]
-        
-        return formatted_types
+        classes = await db.eventclass.find_many(order={'class_name': 'asc'})
+        return [{"name": c.class_name} for c in classes if getattr(c, 'class_name', None)]
     except Exception as e:
         print(f"Error fetching types: {e}")
         return []
