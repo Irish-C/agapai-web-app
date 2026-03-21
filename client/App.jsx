@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { AuthContext } from './src/components/AuthContext.jsx';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 
 //image
 import agapai_Bg from './src/assets/bg/gray-bg.png';
@@ -74,9 +74,17 @@ const GlobalAlertModal = ({ alert, onClose }) => {
 export default function App() {
     // Use AuthContext for authentication state
     const { user, token, login, logout } = useContext(AuthContext);
+    const location = useLocation();
 
     const [cameras, setCameras] = useState([]);
     const [currentAlert, setCurrentAlert] = useState(null);
+
+    // Track location and save to localStorage
+    useEffect(() => {
+        if (location.pathname !== '/login' && location.pathname !== '/') {
+            localStorage.setItem('lastPage', location.pathname);
+        }
+    }, [location]);
 
     // --- SOCKET LOGIC ---
     useEffect(() => {
@@ -186,8 +194,8 @@ export default function App() {
                         element={user ? <Settings {...authProps} /> : <Navigate to="/login" replace />}
                     />
 
-                    {/* Fallbacks */}
-                    <Route path="*" element={<Navigate to={user ? "/dashboard" : "/"} replace />} />
+                    {/* Fallbacks - redirect to last saved page or dashboard */}
+                    <Route path="*" element={<Navigate to={user ? (localStorage.getItem('lastPage') || "/dashboard") : "/"} replace />} />
                 </Routes>
             </main>
 
