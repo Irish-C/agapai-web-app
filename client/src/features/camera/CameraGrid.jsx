@@ -3,7 +3,6 @@ import VideoFeed from './VideoFeed.jsx';
 import TodayReport from '../dashboard/TodayReport.jsx';
 import { useCameraSocket } from '../../hooks/useCamera.js';
 import { FaPlug, FaSpinner, FaVideo } from 'react-icons/fa';
-import { FiAlertTriangle } from 'react-icons/fi';
 import { fetchCameraList } from '../../services/apiService.js';
 
 export default function CameraGrid() {

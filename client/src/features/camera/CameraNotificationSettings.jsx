@@ -1,6 +1,6 @@
 // src/components/CameraNotificationSettings.jsx
 import React, { useState, useEffect } from 'react';
-import { FaBell, FaToggleOn, FaEnvelope, FaVideo } from 'react-icons/fa';
+import { FaBell, FaEnvelope, FaVideo } from 'react-icons/fa';
 
 export default function CameraNotificationSettings() {
     // Parent-level state for global settings
@@ -10,6 +10,7 @@ export default function CameraNotificationSettings() {
         emit_inactivity: false,
         persist_inactivity: false,
         ai_enabled: true,
+        email_fallback: true,
     });
 
     useEffect(() => {
@@ -25,6 +26,7 @@ export default function CameraNotificationSettings() {
                         emit_inactivity: data.emit_inactivity === true,
                         persist_inactivity: data.persist_inactivity === true,
                         ai_enabled: data.ai_enabled === true,
+                        email_fallback: data.email_fallback === true,
                     });
                 }
             } catch (e) {
@@ -52,17 +54,17 @@ export default function CameraNotificationSettings() {
         }
     };
 
-    // Reusable ToggleRow component controlled by parent state
-    const ToggleRow = ({ icon, label, checked, onToggle }) => {
+    // Unified toggle component with animation
+    const SettingToggle = ({ label, description, checked, onToggle, colorClass }) => {
         return (
-            <div className="flex items-center justify-between p-3 bg-white border border-gray-50 rounded-lg">
-                <label className="text-gray-700 font-medium flex items-center">
-                    {icon}
-                    <span className="ml-0">{label}</span>
-                </label>
-                <label className="relative inline-flex items-center cursor-pointer">
+            <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-75 transition-colors">
+                <div className="flex-1">
+                    <p className="text-gray-700 font-medium">{label}</p>
+                    <p className="text-xs text-gray-500 mt-1">{description}</p>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer ml-4">
                     <input type="checkbox" checked={checked} onChange={(e) => onToggle(e.target.checked)} className="sr-only peer" />
-                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 peer-focus:ring-offset-2 peer-focus:ring-opacity-75 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-teal-600"></div>
+                    <div className={`w-11 h-6 bg-gray-200 transition-all duration-300 ease-smooth peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-400/50 peer-focus:ring-offset-2 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all after:duration-300 after:ease-smooth ${colorClass}`}></div>
                 </label>
             </div>
         );
@@ -80,31 +82,60 @@ export default function CameraNotificationSettings() {
                 </p>
 
                 <div className="space-y-4">
-                    <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                        <label className="text-gray-700 font-medium flex items-center">
-                            <FaToggleOn className="mr-3 text-2xl text-green-500" />
-                            Enable Real-time Incident Alerts (WebSocket)
-                        </label>
-                        <span className="text-sm text-teal-600 font-semibold">Enabled</span>
+                    {/* Email Fallback */}
+                    <SettingToggle 
+                        label="Email Notification Fallback" 
+                        description="Send email notifications if real-time WebSocket alerts fail"
+                        checked={globalSettings.email_fallback}
+                        onToggle={(v) => saveGlobalSettings({ email_fallback: v })}
+                        colorClass="peer-checked:bg-blue-500"
+                    />
+
+                    {/* Fall Detection Section */}
+                    <div className="mt-6 pt-4 border-t">
+                        <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center">
+                            <span className="text-lg mr-2">🎯</span> Fall Detection Alerts
+                        </h3>
+                        <div className="space-y-3 ml-1">
+                            <SettingToggle 
+                                label="Real-time Alerts (WebSocket)" 
+                                description="Send immediate popup notifications when a fall is detected"
+                                checked={globalSettings.emit_fall}
+                                onToggle={(v) => saveGlobalSettings({ emit_fall: v })}
+                                colorClass="peer-checked:bg-teal-600"
+                            />
+                            <SettingToggle 
+                                label="Save to History (Database)" 
+                                description="Record fall events with snapshots in Reports for later review"
+                                checked={globalSettings.persist_fall}
+                                onToggle={(v) => saveGlobalSettings({ persist_fall: v })}
+                                colorClass="peer-checked:bg-teal-600"
+                            />
+                        </div>
                     </div>
 
-                    <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                        <label className="text-gray-700 font-medium flex items-center">
-                            <FaEnvelope className="mr-3 text-xl text-blue-500" />
-                            Email Notification Fallback
-                        </label>
-                        <label className="relative inline-flex items-center cursor-pointer">
-                            <input type="checkbox" value="" className="sr-only peer" defaultChecked />
-                            <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 peer-focus:ring-offset-2 peer-focus:ring-opacity-75 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-teal-600"></div>
-                        </label>
-                    </div>
-
-                    {/* Per-event notification toggles (moved here) */}
-                    <div className="space-y-2 mt-3">
-                        <ToggleRow icon={null} label="Emit Fall Alerts" checked={globalSettings.emit_fall} onToggle={(v) => saveGlobalSettings({ emit_fall: v })} />
-                        <ToggleRow icon={null} label="Persist Fall Events" checked={globalSettings.persist_fall} onToggle={(v) => saveGlobalSettings({ persist_fall: v })} />
-                        <ToggleRow icon={null} label="Emit Inactivity Alerts" checked={globalSettings.emit_inactivity} onToggle={(v) => saveGlobalSettings({ emit_inactivity: v })} />
-                        <ToggleRow icon={null} label="Persist Inactivity Events" checked={globalSettings.persist_inactivity} onToggle={(v) => saveGlobalSettings({ persist_inactivity: v })} />
+                    {/* Inactivity Detection Section */}
+                    <div className="mt-6 pt-4 border-t">
+                        <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center">
+                            <span className="text-lg mr-2">⏱️</span> Inactivity Detection Alerts
+                        </h3>
+                        <p className="text-xs text-gray-600 mb-3">Triggered when no person detected for 20+ seconds</p>
+                        <div className="space-y-3 ml-1">
+                            <SettingToggle 
+                                label="Real-time Alerts (WebSocket)" 
+                                description="Send immediate notification when inactivity is detected"
+                                checked={globalSettings.emit_inactivity}
+                                onToggle={(v) => saveGlobalSettings({ emit_inactivity: v })}
+                                colorClass="peer-checked:bg-teal-600"
+                            />
+                            <SettingToggle 
+                                label="Save to History (Database)" 
+                                description="Record inactivity events in Reports for later review"
+                                checked={globalSettings.persist_inactivity}
+                                onToggle={(v) => saveGlobalSettings({ persist_inactivity: v })}
+                                colorClass="peer-checked:bg-teal-600"
+                            />
+                        </div>
                     </div>
                 </div>
             </div>
@@ -119,16 +150,19 @@ export default function CameraNotificationSettings() {
                 </p>
                 
                 {/* AI Detection Toggle */}
-                <div className="space-y-3 border-b pb-4 mb-4">
-                    <ToggleRow icon={null} label="Enable AI Detection (YOLO)" checked={globalSettings.ai_enabled} onToggle={(v) => saveGlobalSettings({ ai_enabled: v })} />
-                    <p className="text-xs text-gray-500 ml-0">
-                        {globalSettings.ai_enabled ? '✓ AI detection is ACTIVE - runs YOLO inference every 6 frames' : '✗ AI detection is DISABLED - no YOLO processing, raw video only'}
-                    </p>
-                </div>
-                
-                {/* Placeholder for Per-Camera Settings */}
-                <div className="p-4 bg-blue-50 border border-blue-300 text-blue-800 rounded-lg text-sm">
-                    ℹ️ Per-camera model activation controls will be implemented here.
+                <div className="space-y-3">
+                    <SettingToggle 
+                        label="Enable AI Detection (YOLO)" 
+                        description={globalSettings.ai_enabled ? '✓ AI is ACTIVE - runs YOLO inference every 6 frames' : '✗ AI is DISABLED - no YOLO processing, raw video only'}
+                        checked={globalSettings.ai_enabled}
+                        onToggle={(v) => saveGlobalSettings({ ai_enabled: v })}
+                        colorClass="peer-checked:bg-teal-600"
+                    />
+                    
+                    {/* Placeholder for Per-Camera Settings */}
+                    <div className="p-4 bg-blue-50 border border-blue-300 text-blue-800 rounded-lg text-sm mt-4">
+                        ℹ️ Per-camera model activation controls will be implemented here.
+                    </div>
                 </div>
             </div>
         </div>

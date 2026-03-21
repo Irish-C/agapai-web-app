@@ -288,12 +288,18 @@ async def stream_camera_loop(camera_id, rtsp_url):
             except Exception:
                 ai_enabled_now = True
             
-            # If AI was disabled, clear the cached annotated frame to show raw video
-            ai_enabled = getattr(stream_camera_loop, '_prev_ai_enabled', True)
-            if ai_enabled and not ai_enabled_now:
-                cached_annotated_frame = None
-                print(f"[stream_camera_loop] 🔴 AI DISABLED: Clearing cached annotated frame, switching to raw video")
+            # Get previous AI state (initialize on first run)
+            if not hasattr(stream_camera_loop, '_prev_ai_enabled'):
+                stream_camera_loop._prev_ai_enabled = ai_enabled_now
+            
             ai_enabled = ai_enabled_now
+            
+            # If AI was enabled but is now disabled, clear the cached annotated frame immediately
+            if stream_camera_loop._prev_ai_enabled and not ai_enabled:
+                cached_annotated_frame = None
+                print(f"[stream_camera_loop] 🔴 Frame {frame_counter}: AI DISABLED - clearing cache, switching to raw video")
+            
+            # Update previous state for next iteration
             stream_camera_loop._prev_ai_enabled = ai_enabled
             
             # Debug: Log YOLO condition check every 30 frames
@@ -318,7 +324,7 @@ async def stream_camera_loop(camera_id, rtsp_url):
                         frame = cached_annotated_frame
                         
                         if r.boxes is not None and len(r.boxes) > 0:
-                            print(f"[camera_controller] 🎯 Detection frame {frame_counter}: {num_detections} boxes plotted")
+                            print(f"[camera_controller] Detection frame {frame_counter}: {num_detections} boxes plotted")
                             # First: check for person/human detections to drive inactivity logic
                             person_detected = False
                             for box in r.boxes:
@@ -362,11 +368,10 @@ async def stream_camera_loop(camera_id, rtsp_url):
                     frame = cached_annotated_frame
                     if frame_counter % 60 == 0:  # Log every 60 frames (~1 sec)
                         print(f"[camera_controller] Frame {frame_counter}: Reusing cached annotated frame")
-                elif frame_counter % 150 == 0:
-                    if ai_enabled:
-                        print(f"[camera_controller] Frame {frame_counter}: No cached frame available, using raw frame")
-                    else:
-                        print(f"[camera_controller] Frame {frame_counter}: AI disabled, using raw frame")
+                elif ai_enabled and frame_counter % 150 == 0:
+                    print(f"[camera_controller] Frame {frame_counter}: No cached frame available, using raw frame")
+                elif not ai_enabled and frame_counter % 150 == 0:
+                    print(f"[camera_controller] Frame {frame_counter}: AI disabled, using raw frame")
             if fall_event_class and (now - last_fall_alert) > fall_alert_cooldown:
                 last_fall_alert = now
                 # Check global settings for fall persistence
