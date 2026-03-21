@@ -73,7 +73,7 @@ const GlobalAlertModal = ({ alert, onClose }) => {
 
 export default function App() {
     // Use AuthContext for authentication state
-    const { user, token, login, logout } = useContext(AuthContext);
+    const { user, token, login, logout, isAuthReady } = useContext(AuthContext);
     const location = useLocation();
 
     const [cameras, setCameras] = useState([]);
@@ -173,30 +173,36 @@ export default function App() {
                 className="flex-grow min-h-screen bg-cover bg-center bg-no-repeat bg-fixed"
                 style={{ backgroundImage: `url(${agapai_Bg})` }}
             >
-                <Routes>
-                    <Route path="/" element={<LandingPage />} />
-                    <Route
-                        path="/login"
-                        element={!user ? <LoginPage login={login} /> : <Navigate to="/dashboard" replace />}
-                    />
+                {!isAuthReady ? (
+                    <div className="flex items-center justify-center min-h-screen">
+                        <div className="text-gray-600">Loading...</div>
+                    </div>
+                ) : (
+                    <Routes>
+                        <Route path="/" element={<LandingPage />} />
+                        <Route
+                            path="/login"
+                            element={!user ? <LoginPage login={login} /> : <Navigate to="/dashboard" replace />}
+                        />
 
-                    {/* Protected Routes */}
-                    <Route
-                        path="/dashboard"
-                        element={user ? <MainPage {...authProps} /> : <Navigate to="/login" replace />}
-                    />
-                    <Route
-                        path="/reports"
-                        element={user ? <ReportsPage {...authProps} /> : <Navigate to="/login" replace />}
-                    />
-                    <Route
-                        path="/settings"
-                        element={user ? <Settings {...authProps} /> : <Navigate to="/login" replace />}
-                    />
+                        {/* Protected Routes */}
+                        <Route
+                            path="/dashboard"
+                            element={user ? <MainPage {...authProps} /> : <Navigate to="/login" replace />}
+                        />
+                        <Route
+                            path="/reports"
+                            element={user ? <ReportsPage {...authProps} /> : <Navigate to="/login" replace />}
+                        />
+                        <Route
+                            path="/settings"
+                            element={user ? <Settings {...authProps} /> : <Navigate to="/login" replace />}
+                        />
 
-                    {/* Fallbacks - redirect to last saved page or dashboard */}
-                    <Route path="*" element={<Navigate to={user ? (localStorage.getItem('lastPage') || "/dashboard") : "/"} replace />} />
-                </Routes>
+                        {/* Fallbacks - redirect to last saved page or dashboard */}
+                        <Route path="*" element={<Navigate to={user ? (localStorage.getItem('lastPage') || "/dashboard") : "/"} replace />} />
+                    </Routes>
+                )}
             </main>
 
             {user && <Footer />}

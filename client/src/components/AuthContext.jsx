@@ -5,6 +5,7 @@ export const AuthContext = createContext();
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [token, setToken] = useState(null);
+  const [isAuthReady, setIsAuthReady] = useState(false);
 
   useEffect(() => {
     // Restore from localStorage
@@ -14,6 +15,8 @@ export const AuthProvider = ({ children }) => {
       setUser(JSON.parse(storedUser));
       setToken(storedToken);
     }
+    // Mark auth as ready whether or not user was found
+    setIsAuthReady(true);
   }, []);
 
   const login = async (username, password) => {
@@ -50,7 +53,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, token, login, logout }}>
+    <AuthContext.Provider value={{ user, token, login, logout, isAuthReady }}>
       {children}
     </AuthContext.Provider>
   );
