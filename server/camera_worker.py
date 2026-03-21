@@ -3,10 +3,10 @@ import time
 import cv2
 import asyncio
 import base64
-import redis
 import json
 from ultralytics import YOLO
 from database import db
+from src.utils.redis_pool import RedisConnectionPool
 
 # One-time diagnostic log tracker for camera_frame emits
 FIRST_EMIT_LOGGED: set = set()
@@ -100,7 +100,7 @@ async def stream_camera_loop(camera_id, rtsp_url):
 class CameraWorker:
     def __init__(self, camera_sources):
         self.camera_sources = camera_sources
-        self.redis = redis.Redis(host='localhost', port=6379, db=0)
+        self.redis = RedisConnectionPool.get()
         self.cap = None
         self.frame = None
         self.active_camera_id = None
@@ -127,50 +127,61 @@ class CameraWorker:
 
     async def start(self):
         print("CameraWorker: Background AI worker started.")
+        last_published_check = 0
+        current_cameras = set()
+        
         while True:
             try:
-                # Check Redis for active selection
-                active_id_raw = self.redis.get('active_camera_id')
-                active_id = active_id_raw.decode() if active_id_raw else None
-
-                # If the selection changed
-                if active_id != self.active_camera_id:
-                    self.active_camera_id = active_id
-                    if self.cap:
-                        self.cap.release()
-                        self.cap = None
+                # Check Redis for published cameras (every 5 seconds)
+                now = time.time()
+                if now - last_published_check > 5:
+                    last_published_check = now
+                    published = self.redis.smembers('published_cameras')
+                    published_ids = {cid.decode() if isinstance(cid, bytes) else cid for cid in published}
                     
-                    source = self.camera_sources.get(self.active_camera_id)
+                    if published_ids != current_cameras:
+                        print(f"[CameraWorker] Published cameras updated: {published_ids}")
+                        current_cameras = published_ids
+                
+                # Process all published cameras
+                for camera_id in current_cameras:
+                    source = self.camera_sources.get(camera_id)
+                    if not source or not str(source).strip():
+                        continue
                     
-                    # GUARD: Prevent "Connection Refused" to localhost:554
-                    if source and str(source).strip():
-                        print(f"CameraWorker switching to: {source}")
+                    # Switch to this camera and process frame
+                    if camera_id != self.active_camera_id:
+                        self.active_camera_id = camera_id
+                        if self.cap:
+                            self.cap.release()
+                            self.cap = None
+                        print(f"[CameraWorker] Processing: {camera_id}")
                         self.cap = cv2.VideoCapture(source)
-                    else:
-                        print(f"CameraWorker: No source for ID {active_id}")
+                    
+                    # Capture and detect
+                    if self.cap and self.cap.isOpened():
+                        success, frame = self.cap.read()
+                        if success:
+                            self.frame = frame
+                            
+                            # AI Detection
+                            if self.detect_incident(frame):
+                                await self.send_alert()
+                            
+                            # Save to Redis
+                            _, buffer = cv2.imencode('.jpg', self.frame)
+                            self.redis.set(f"latest_frame_{self.active_camera_id}", buffer.tobytes())
+                        else:
+                            await asyncio.sleep(0.5)
 
-                # If we have an active capture
-                if self.cap and self.cap.isOpened():
-                    success, frame = self.cap.read()
-                    if success:
-                        self.frame = frame
-                        
-                        # AI Detection Trigger
-                        if self.detect_incident(frame):
-                            await self.send_alert()
-
-                        # Save latest frame to Redis
-                        _, buffer = cv2.imencode('.jpg', self.frame)
-                        self.redis.set(f"latest_frame_{self.active_camera_id}", buffer.tobytes())
-                    else:
-                        await asyncio.sleep(0.5)
-
-            except redis.exceptions.ConnectionError:
-                if not getattr(self, '_redis_warned', False):
-                    print("CameraWorker Error: Cannot connect to Redis (localhost:6379)")
-                    self._redis_warned = True
             except Exception as e:
-                print(f"CameraWorker Loop Error: {e}")
+                # Handle Redis connection errors gracefully
+                if 'ConnectionError' in str(type(e).__name__):
+                    if not getattr(self, '_redis_warned', False):
+                        print("CameraWorker Error: Cannot connect to Redis (localhost:6379)")
+                        self._redis_warned = True
+                else:
+                    print(f"CameraWorker Loop Error: {e}")
 
             await asyncio.sleep(0.03)  # ~30 FPS
 

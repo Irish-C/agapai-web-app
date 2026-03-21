@@ -9,10 +9,11 @@ from database import db
 import yaml
 import subprocess
 import signal
-import redis
+from src.utils.redis_pool import RedisConnectionPool
 
-# Initialize Redis connection pool (reused for all cameras)
-_REDIS_CLIENT = redis.Redis(host='localhost', port=6379, db=0, decode_responses=False)
+# Get Redis client from singleton pool
+def get_redis():
+    return RedisConnectionPool.get()
 
 # Helper: server root
 _SERVER_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../'))
@@ -339,39 +340,36 @@ async def stream_camera_loop(camera_id, rtsp_url):
 
             # 2. STORE TO REDIS: For MJPEG streaming (faster than Socket.IO)
             try:
-                _REDIS_CLIENT.set(f'latest_frame_{camera_id}', frame_bytes)
-                _REDIS_CLIENT.set('latest_frame', frame_bytes)  # Fallback
+                r = get_redis()
+                r.set(f'latest_frame_{camera_id}', frame_bytes)
+                r.set('latest_frame', frame_bytes)  # Fallback
             except Exception as e:
                 print(f"[camera_controller] Redis error: {e}")
 
             # 3. EMIT FRAME TO FRONTEND: Also emit via Socket.IO for alerts and status
-            from app import socketio_server
-            frame_base64 = base64.b64encode(frame_bytes).decode('utf-8')
-            payload = {
-                'cam_id': str(camera_id),
-                'frame': frame_base64
-            }
+            # ❌ REMOVED - inefficient duplicate path (base64 + Socket.IO overhead)
+            # Use HTTP MJPEG instead (/video_feed endpoint reads from Redis)
+            # from app import socketio_server
+            # frame_base64 = base64.b64encode(frame_bytes).decode('utf-8')
+            # payload = {'cam_id': str(camera_id), 'frame': frame_base64}
+            # try:
+            #     rooms = getattr(socketio_server.manager, 'rooms', None)
+            #     if isinstance(rooms, dict):
+            #         ns_rooms = rooms.get('/', {})
+            #         members = ns_rooms.get(f'camera_{camera_id}')
+            #         has_listeners = bool(members)
+            #     else:
+            #         has_listeners = True
+            # except Exception:
+            #     has_listeners = True
+            # if has_listeners:
+            #     key = f"cam:{camera_id}"
+            #     if key not in _FIRST_EMIT_LOGGED:
+            #         print(f"[camera_controller] Emitting first camera_frame for {camera_id}")
+            #         _FIRST_EMIT_LOGGED.add(key)
+            #     await socketio_server.emit('camera_frame', payload, room=f'camera_{camera_id}')
 
-            # Check if the room has listeners (manager.rooms structure may vary)
-            try:
-                rooms = getattr(socketio_server.manager, 'rooms', None)
-                if isinstance(rooms, dict):
-                    ns_rooms = rooms.get('/', {})
-                    members = ns_rooms.get(f'camera_{camera_id}')
-                    has_listeners = bool(members)
-                else:
-                    has_listeners = True
-            except Exception:
-                has_listeners = True
-
-            if has_listeners:
-                key = f"cam:{camera_id}"
-                if key not in _FIRST_EMIT_LOGGED:
-                    print(f"[camera_controller] Emitting first camera_frame for {camera_id}")
-                    _FIRST_EMIT_LOGGED.add(key)
-                await socketio_server.emit('camera_frame', payload, room=f'camera_{camera_id}')
-
-            # 3. FPS CONTROL
+            # 4. FPS CONTROL
             await asyncio.sleep(0.0167)  # ~60 FPS
     except asyncio.CancelledError:
         pass

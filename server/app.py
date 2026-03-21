@@ -66,13 +66,13 @@ connected_sids: set = set()
 
 # --- 3. FASTAPI app with lifespan ---
 from contextlib import asynccontextmanager
-import redis
+from src.utils.redis_pool import RedisConnectionPool
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # --- Startup Logic ---
     print("[INFO] Connecting to Redis...")
-    app.state.redis = redis.Redis(host='localhost', port=6379, db=0, decode_responses=False)
+    app.state.redis = RedisConnectionPool.get()
     print("[INFO] Connecting to Prisma DB...")
     await db.connect()
 
@@ -87,7 +87,7 @@ async def lifespan(app: FastAPI):
     yield
     # --- Shutdown Logic ---
     print("[INFO] Closing Redis connection...")
-    app.state.redis.close()
+    RedisConnectionPool.close()
     print("[INFO] Disconnecting Prisma DB...")
     await db.disconnect()
 
@@ -200,7 +200,7 @@ async def video_feed(camera_id: str | None = None):
         if camera_id:
             camera_id = str(camera_id)
         
-        r = redis.Redis(host='localhost', port=6379, db=0)
+        r = RedisConnectionPool.get()
         stream_key = f"latest_frame_{camera_id}" if camera_id else "latest_frame"
         
         # Test Redis connection
@@ -232,6 +232,39 @@ async def video_feed(camera_id: str | None = None):
         return StreamingResponse(generate(), media_type='multipart/x-mixed-replace; boundary=frame')
     except Exception as e:
         print(f"[video_feed] Error initializing stream for camera {camera_id}: {e}")
+        return JSONResponse(status_code=500, content={'error': str(e)})
+
+# --- Published Cameras Sync Endpoints ---
+@app.post('/api/sync_published_cameras')
+async def sync_published_cameras(request: Request):
+    """Sync published cameras from frontend to backend Redis."""
+    try:
+        data = await get_sanitized_json(request)
+        camera_ids = data.get('cameras', [])
+        
+        # Convert to strings and store in Redis set
+        camera_ids_str = [str(cid) for cid in camera_ids]
+        r = RedisConnectionPool.get()
+        
+        # Clear old set and add new one
+        r.delete('published_cameras')
+        if camera_ids_str:
+            r.sadd('published_cameras', *camera_ids_str)
+        
+        print(f"[sync_published_cameras] Updated published cameras: {camera_ids_str}")
+        return {'status': 'success', 'cameras': camera_ids_str}
+    except Exception as e:
+        print(f"[sync_published_cameras] Error: {e}")
+        return JSONResponse(status_code=500, content={'error': str(e)})
+
+@app.get('/api/get_published_cameras')
+async def get_published_cameras():
+    """Get list of published cameras from backend."""
+    try:
+        r = RedisConnectionPool.get()
+        camera_ids = r.smembers('published_cameras')
+        return {'status': 'success', 'cameras': list(camera_ids)}
+    except Exception as e:
         return JSONResponse(status_code=500, content={'error': str(e)})
 
 # --- 7. Snapshot static folder (used for alert snapshots) ---
@@ -281,7 +314,12 @@ async def subscribe_camera(sid, data):
             return
         room = f"camera_{camera_id}"
         await socketio_server.enter_room(sid, room)
-        print(f"Socket.IO subscribe: sid={sid} -> {room}")
+        
+        # ✅ NEW: Set as active camera for AI processing
+        r = RedisConnectionPool.get()
+        r.set('active_camera_id', str(camera_id))
+        
+        print(f"Socket.IO subscribe: sid={sid} -> {room} (AI focus set)")
     except Exception as e:
         print(f"subscribe_camera error: {e}")
 

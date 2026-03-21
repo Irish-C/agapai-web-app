@@ -65,6 +65,28 @@ export default function CameraGrid() {
     return () => window.removeEventListener('storage', handleStorageChange);
   }, []);
 
+  // Sync published cameras to backend whenever they change
+  useEffect(() => {
+    const syncPublishedCameras = async () => {
+      try {
+        const cameras = Array.from(publishedCameras);
+        const response = await fetch('/api/sync_published_cameras', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ cameras })
+        });
+        if (response.ok) {
+          console.log(`[CameraGrid] Synced ${cameras.length} published cameras to backend`);
+        } else {
+          console.error('[CameraGrid] Failed to sync published cameras:', response.status);
+        }
+      } catch (err) {
+        console.error('[CameraGrid] Failed to sync published cameras:', err);
+      }
+    };
+    syncPublishedCameras();
+  }, [publishedCameras]);
+
   // Memoize publishedCameraList to prevent unnecessary VideoFeed remounts
   const publishedCameraList = useMemo(
     () => cameraList.filter(cam => publishedCameras.has(cam.id)),
