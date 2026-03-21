@@ -2,19 +2,19 @@
 
 ## System Overview
 
-Your new Socket.IO reconnection system includes:
-- ✅ **Zombie Connection Detection** (kills hanging connections after 25s)
-- ✅ **Health Check Pings** (every 15s to backend)
-- ✅ **Aggressive Reconnection** (300ms initial retry, 20s max backoff)
-- ✅ **Network Change Detection** (automatic reconnect on WiFi↔LAN switch)
-- ✅ **Manual Force Reconnect** (button appears after 15s disconnect)
-- ✅ **30-Second Logout Grace Period** (prevents orphaned sessions)
+The Socket.IO reconnection system includes:
+- **Zombie Connection Detection** (kills hanging connections after 25s)
+- **Health Check Pings** (every 15s to backend)
+- **Aggressive Reconnection** (300ms initial retry, 20s max backoff)
+- **Network Change Detection** (automatic reconnect on WiFi↔LAN switch)
+- **Manual Force Reconnect** (button appears after 15s disconnect)
+- **30-Second Logout Grace Period** (prevents orphaned sessions)
 
 ---
 
 ## Test Scenarios
 
-### ✅ Test 1: Normal Operation (Health Checks)
+### Test 1: Normal Operation (Health Checks)
 **Duration**: 2 minutes  
 **Prerequisites**: Connected to WiFi/LAN
 
@@ -37,7 +37,7 @@ Your new Socket.IO reconnection system includes:
 
 ---
 
-### ✅ Test 2: WiFi → Ethernet Switch
+### Test 2: WiFi → Ethernet Switch
 **Duration**: 1 minute  
 **Prerequisites**: WiFi connected, ethernet cable plugged in
 
@@ -69,7 +69,7 @@ Your new Socket.IO reconnection system includes:
 
 ---
 
-### ✅ Test 3: Network Offline (Airplane Mode)
+### Test 3: Network Offline (Airplane Mode)
 **Duration**: 1:30 minutes  
 **Prerequisites**: Connected to network
 
@@ -105,7 +105,7 @@ Your new Socket.IO reconnection system includes:
 
 ---
 
-### ✅ Test 4: Zombie Connection Kill
+### Test 4: Zombie Connection Kill
 **Duration**: 3 minutes  
 **Prerequisites**: Connected normally
 
@@ -144,7 +144,7 @@ Your new Socket.IO reconnection system includes:
 
 ---
 
-### ✅ Test 5: Manual Force Reconnect Button
+### Test 5: Manual Force Reconnect Button
 **Duration**: 1 minute  
 **Prerequisites**: Connected
 
@@ -176,7 +176,7 @@ Your new Socket.IO reconnection system includes:
 
 ---
 
-### ✅ Test 6: 30-Second Logout Safety
+### Test 6: 30-Second Logout Safety
 **Duration**: 2 minutes  
 **Prerequisites**: Connected
 
@@ -319,14 +319,14 @@ async def handle_ping(sid, data):
 
 ## Success Indicators
 
-Your reconnection system is working correctly when:
+The reconnection system is operating correctly when:
 
-1. ✅ Health checks show pong every 15s (Test 1)
-2. ✅ WiFi↔LAN switches reconnect in < 15s (Test 2)
-3. ✅ Network offline/online recovers automatically (Test 3)
-4. ✅ Zombie connections killed after 25s (Test 4)
-5. ✅ Manual button works after 15s disconnect (Test 5)
-6. ✅ Logout enforced at 30s timeout (Test 6)
+1. Health checks show pong every 15s (Test 1)
+2. WiFi↔LAN switches reconnect in < 15s (Test 2)
+3. Network offline/online recovers automatically (Test 3)
+4. Zombie connections are killed after 25s (Test 4)
+5. Manual button works after 15s disconnect (Test 5)
+6. Logout is enforced at 30s timeout (Test 6)
 
 ---
 

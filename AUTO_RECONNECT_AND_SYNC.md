@@ -555,17 +555,17 @@ setTimeout(() => {
 
 ## Security & Privacy
 
-✅ **HTTPS/WSS in Production** 
+**HTTPS/WSS in Production**
 - Socket.IO uses WSS (secure websocket) in production
 - REST API calls use HTTPS
 - Auth token included in all requests
 
-✅ **User Auth Required**
+**User Auth Required**
 - Missed alerts endpoint checks authorization token
 - Cannot fetch alerts for unauthorized users
 - Database queries filtered by user context if needed
 
-✅ **Timestamp-Based Windows**
+**Timestamp-Based Windows**
 - Missed alerts fetched only since last sync (prevents re-syncing old data)
 - Prevents replay attacks from old timestamps
 - Timestamps stored server-side (lastSyncTime)
