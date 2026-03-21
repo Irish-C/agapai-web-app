@@ -25,7 +25,7 @@ function MJPEGCanvas({ camId, cameraName, onStatusChange }) {
 
     let retryCount = 0;
     const MAX_RETRIES = 10;
-    const BASE_RETRY_DELAY = 1000; // 1 second
+    const BASE_RETRY_DELAY = 300; // 300ms - faster reconnection attempts
     let componentMounted = true;
 
     const startStreaming = async () => {
@@ -39,13 +39,13 @@ function MJPEGCanvas({ camId, cameraName, onStatusChange }) {
         onStatusChange('connecting');
         console.log(`[MJPEGCanvas] Starting stream for camera ${camId}`);
         
-        // Set a connection timeout of 10 seconds
+        // Set a connection timeout of 5 seconds
         const connectionTimeoutId = setTimeout(() => {
           if (signal.aborted === false) {
-            console.warn(`[MJPEGCanvas] Stream connection timeout after 10s`);
+            console.warn(`[MJPEGCanvas] Stream connection timeout after 5s`);
             abortControllerRef.current?.abort();
           }
-        }, 10000);
+        }, 5000);
 
         const response = await fetch(
           `/video_feed?camera_id=${camId}`,
@@ -140,8 +140,8 @@ function MJPEGCanvas({ camId, cameraName, onStatusChange }) {
         let frameTimeoutId = null;
         let frozenCheckId = null;
         let readerTimeoutId = null;
-        const FRAME_TIMEOUT = 15000; // 15 seconds without ANY data = offline
-        const FROZEN_STATE_TIMEOUT = 6000; // 6 seconds without NEW frames = frozen, try reconnect
+        const FRAME_TIMEOUT = 5000; // 5 seconds without ANY data = offline
+        const FROZEN_STATE_TIMEOUT = 1500; // 1.5 seconds without NEW frames = frozen, try reconnect
         let lastFrameTimestamp = Date.now();
 
         const resetFrameTimeout = () => {
@@ -176,7 +176,7 @@ function MJPEGCanvas({ camId, cameraName, onStatusChange }) {
 
         // Race reader.read() against timeout to interrupt hanging reads
         const readWithTimeout = async (reader) => {
-          const READ_TIMEOUT = 4800; // 4.8 seconds
+          const READ_TIMEOUT = 2000; // 2 seconds
           
           const timeoutPromise = new Promise((_, reject) => {
             const timeoutId = setTimeout(() => {

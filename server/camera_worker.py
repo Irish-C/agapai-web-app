@@ -3,10 +3,10 @@ import time
 import cv2
 import asyncio
 import base64
-import redis
 import json
 from ultralytics import YOLO
 from database import db
+from src.utils.redis_pool import RedisConnectionPool
 
 # One-time diagnostic log tracker for camera_frame emits
 FIRST_EMIT_LOGGED: set = set()
@@ -22,17 +22,14 @@ async def start_camera_processing():
     try:
         active_cameras = await db.camera.find_many(where={'cam_status': True})
         
-        # Build a dictionary for the CameraWorker
-        # Format: {"1": "rtsp://...", "2": "rtsp://..."}
-        camera_sources = {str(cam.id): cam.stream_url for cam in active_cameras}
-        
         # 1. Start the general background loops for all active cameras
         for cam in active_cameras:
             print(f"Starting background stream for: {cam.cam_name}")
             asyncio.create_task(stream_camera_loop(cam.id, cam.stream_url))
         
         # 2. Start the specialized CameraWorker (for AI/Redis processing)
-        worker = CameraWorker(camera_sources)
+        # Note: CameraWorker now fetches URLs dynamically from DB, no caching
+        worker = CameraWorker()
         asyncio.create_task(worker.start())
 
     except Exception as e:
@@ -98,9 +95,8 @@ async def stream_camera_loop(camera_id, rtsp_url):
 # --- THE ROBUST CAMERA WORKER ---
 
 class CameraWorker:
-    def __init__(self, camera_sources):
-        self.camera_sources = camera_sources
-        self.redis = redis.Redis(host='localhost', port=6379, db=0)
+    def __init__(self):
+        self.redis = RedisConnectionPool.get()
         self.cap = None
         self.frame = None
         self.active_camera_id = None
@@ -112,6 +108,7 @@ class CameraWorker:
         self._yolo_skip = 5  # run inference every N frames
         self._yolo_last_alert = 0.0
         self._yolo_alert_cooldown = 2.0  # seconds between alerts
+        self.cached_annotated_frame = None  # Cache annotated frame for smooth rendering
 
         model_path = os.path.join(os.path.dirname(__file__), 'ml', 'yolov11_fin.pt')
         if os.path.exists(model_path):
@@ -125,85 +122,227 @@ class CameraWorker:
         else:
             print(f"[CameraWorker] YOLO model not found at: {model_path}")
 
+    async def get_camera_url(self, camera_id):
+        """Fetch camera URL from database dynamically (no caching)."""
+        try:
+            camera = await db.camera.find_unique(where={"id": int(camera_id)})
+            if camera and camera.stream_url:
+                return camera.stream_url
+            else:
+                print(f"[CameraWorker] Camera {camera_id} not found or has no URL")
+                return None
+        except Exception as e:
+            print(f"[CameraWorker] Error fetching URL for camera {camera_id}: {e}")
+            return None
+
     async def start(self):
+        """Start independent processing tasks for each published camera."""
         print("CameraWorker: Background AI worker started.")
+        
+        # Monitor published cameras and spawn tasks for each
+        active_tasks = {}
+        last_published_check = 0
+        
         while True:
             try:
-                # Check Redis for active selection
-                active_id_raw = self.redis.get('active_camera_id')
-                active_id = active_id_raw.decode() if active_id_raw else None
-
-                # If the selection changed
-                if active_id != self.active_camera_id:
-                    self.active_camera_id = active_id
-                    if self.cap:
-                        self.cap.release()
-                        self.cap = None
+                now = time.time()
+                
+                # Check Redis for published cameras (every 5 seconds)
+                if now - last_published_check > 5:
+                    last_published_check = now
+                    published = self.redis.smembers('published_cameras')
+                    published_ids = {cid.decode() if isinstance(cid, bytes) else cid for cid in published}
                     
-                    source = self.camera_sources.get(self.active_camera_id)
+                    # Remove tasks for unpublished cameras
+                    for camera_id in list(active_tasks.keys()):
+                        if camera_id not in published_ids:
+                            print(f"[CameraWorker] Stopping camera {camera_id}")
+                            active_tasks[camera_id].cancel()
+                            del active_tasks[camera_id]
                     
-                    # GUARD: Prevent "Connection Refused" to localhost:554
-                    if source and str(source).strip():
-                        print(f"CameraWorker switching to: {source}")
-                        self.cap = cv2.VideoCapture(source)
-                    else:
-                        print(f"CameraWorker: No source for ID {active_id}")
-
-                # If we have an active capture
-                if self.cap and self.cap.isOpened():
-                    success, frame = self.cap.read()
-                    if success:
-                        self.frame = frame
-                        
-                        # AI Detection Trigger
-                        if self.detect_incident(frame):
-                            await self.send_alert()
-
-                        # Save latest frame to Redis
-                        _, buffer = cv2.imencode('.jpg', self.frame)
-                        self.redis.set(f"latest_frame_{self.active_camera_id}", buffer.tobytes())
-                    else:
-                        await asyncio.sleep(0.5)
-
-            except redis.exceptions.ConnectionError:
-                if not getattr(self, '_redis_warned', False):
-                    print("CameraWorker Error: Cannot connect to Redis (localhost:6379)")
-                    self._redis_warned = True
+                    # Start tasks for newly published cameras
+                    for camera_id in published_ids:
+                        if camera_id not in active_tasks:
+                            # Fetch URL dynamically from database (not cached)
+                            source = await self.get_camera_url(camera_id)
+                            if source and str(source).strip():
+                                print(f"[CameraWorker] Starting task for camera {camera_id}")
+                                task = asyncio.create_task(self._process_camera(camera_id, source))
+                                active_tasks[camera_id] = task
+                
+                await asyncio.sleep(0.5)  # Check every 500ms
+                
             except Exception as e:
-                print(f"CameraWorker Loop Error: {e}")
+                print(f"CameraWorker supervisor error: {e}")
+                await asyncio.sleep(1)
 
-            await asyncio.sleep(0.03)  # ~30 FPS
+    async def _process_camera(self, camera_id, rtsp_url):
+        """Process a single camera independently with dynamic frame pacing and watchdog timeout."""
+        cap = None
+        yolo_frame_counter = 0
+        cached_annotated = None
+        target_fps = 30  # Target 30 FPS = ~33ms per frame
+        target_frame_time = 1.0 / target_fps
+        last_frame_time = time.time()  # Track last successful frame
+        frame_read_timeout = 5.0  # Timeout for cap.read() to fail (seconds)
+        watchdog_timeout = 5.0  # Force reconnect if no frames for N seconds
+        
+        try:
+            print(f"[CameraWorker-{camera_id}] Connecting to {rtsp_url[:50]}...")
+            cap = cv2.VideoCapture(rtsp_url)
+            cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)  # Minimal buffering
+            
+            frame_count = 0
+            while True:
+                frame_start = time.time()  # Track when frame processing begins
+                
+                if not cap or not cap.isOpened():
+                    print(f"[CameraWorker-{camera_id}] Stream disconnected, reconnecting...")
+                    await asyncio.sleep(2)
+                    cap = cv2.VideoCapture(rtsp_url)
+                    cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+                    last_frame_time = time.time()  # Reset watchdog on reconnect
+                    continue
+                
+                # Watchdog: Force reconnect if no frames for watchdog_timeout seconds
+                time_since_last_frame = time.time() - last_frame_time
+                if time_since_last_frame > watchdog_timeout:
+                    print(f"[CameraWorker-{camera_id}] ⏱️ Watchdog timeout: No frames for {time_since_last_frame:.1f}s, forcing reconnect...")
+                    cap.release()
+                    await asyncio.sleep(2)
+                    cap = cv2.VideoCapture(rtsp_url)
+                    cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+                    last_frame_time = time.time()
+                    continue
+                
+                # Non-blocking read with timeout (run in thread pool to avoid blocking event loop)
+                try:
+                    success, frame = await asyncio.wait_for(
+                        asyncio.to_thread(cap.read),
+                        timeout=frame_read_timeout
+                    )
+                except asyncio.TimeoutError:
+                    print(f"[CameraWorker-{camera_id}] ⏱️ Read timeout ({frame_read_timeout}s), reconnecting...")
+                    cap.release()
+                    await asyncio.sleep(2)
+                    cap = cv2.VideoCapture(rtsp_url)
+                    cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+                    last_frame_time = time.time()
+                    continue
+                
+                if not success or frame is None:
+                    await asyncio.sleep(0.1)
+                    continue
+                
+                # Frame received successfully - update watchdog
+                last_frame_time = time.time()
+                frame_count += 1
+                yolo_frame_counter += 1
+                
+                # Run YOLO only every 5 frames
+                if yolo_frame_counter % 5 == 0 and self.yolo_enabled:
+                    try:
+                        results = self.yolo(frame, conf=0.35, imgsz=640, verbose=False)
+                        if len(results) > 0:
+                            r = results[0]
+                            if r.boxes and len(r.boxes) > 0:
+                                cached_annotated = r.plot()
+                                print(f"[CameraWorker-{camera_id}] 🎯 Detection: {len(r.boxes)} object(s)")
+                            else:
+                                cached_annotated = None
+                    except Exception as e:
+                        print(f"[CameraWorker-{camera_id}] YOLO error: {e}")
+                
+                # Use annotated frame if available
+                output_frame = cached_annotated if cached_annotated is not None else frame
+                
+                # Save to Redis
+                try:
+                    _, buffer = cv2.imencode('.jpg', output_frame, [cv2.IMWRITE_JPEG_QUALITY, 50])
+                    if buffer is not None:
+                        self.redis.set(f"latest_frame_{camera_id}", buffer.tobytes())
+                except Exception as e:
+                    print(f"[CameraWorker-{camera_id}] Frame save error: {e}")
+                
+                # Dynamic sleep: adjust based on actual processing time
+                elapsed = time.time() - frame_start
+                sleep_time = max(0, target_frame_time - elapsed)
+                await asyncio.sleep(sleep_time)
+                
+        except asyncio.CancelledError:
+            print(f"[CameraWorker-{camera_id}] Task cancelled")
+        except Exception as e:
+            print(f"[CameraWorker-{camera_id}] Unexpected error: {e}")
+        finally:
+            if cap:
+                cap.release()
+            print(f"[CameraWorker-{camera_id}] Terminated")
 
     def detect_incident(self, frame):
-        """Detect an incident (motion/object) using YOLO.
-
-        Returns True when a detection is present and cooldown has expired.
+        """Detect incidents using YOLO with frame caching.
+        
+        Runs inference every 5 frames but renders boxes on every frame
+        using cached annotated frame for smooth, continuous playback.
+        
+        Returns annotated frame (with YOLO boxes) and detection flag.
         """
+        detected = False
+        
         if not self.yolo_enabled or self.yolo is None:
-            return False
+            if self._yolo_frame_counter % 150 == 0:  # Log every 5 seconds at 30 FPS
+                print(f"[CameraWorker] YOLO disabled for camera {self.active_camera_id}")
+            return self.cached_annotated_frame if self.cached_annotated_frame is not None else frame, False
 
         self._yolo_frame_counter += 1
-        if self._yolo_frame_counter % self._yolo_skip != 0:
-            return False
-
-        now = time.time()
-        if now - self._yolo_last_alert < self._yolo_alert_cooldown:
-            return False
-
-        try:
-            # Run inference at a smaller resolution for performance.
-            results = self.yolo(frame, conf=0.35, imgsz=640, verbose=False)
-            if len(results) == 0:
-                return False
-            r = results[0]
-            # Trigger on any detection; adjust by class if needed.
-            if r.boxes and len(r.boxes) > 0:
-                self._yolo_last_alert = now
-                return True
-        except Exception as e:
-            print(f"[CameraWorker] YOLO inference error: {e}")
-
-        return False
+        
+        # Log every 150 frames (~5 seconds) to show we're processing
+        if self._yolo_frame_counter % 150 == 0:
+            print(f"[CameraWorker] Frame #{self._yolo_frame_counter}, Camera: {self.active_camera_id}, Skip: {self._yolo_frame_counter % self._yolo_skip}, Cooldown left: {self._yolo_alert_cooldown - (time.time() - self._yolo_last_alert):.1f}s")
+        
+        # Run YOLO inference only every N frames for efficiency
+        will_run_inference = (self._yolo_frame_counter % self._yolo_skip == 0)
+        
+        if will_run_inference:
+            now = time.time()
+            cooldown_remaining = self._yolo_alert_cooldown - (now - self._yolo_last_alert)
+            
+            # Only run inference if alert cooldown has passed
+            if cooldown_remaining <= 0:
+                try:
+                    print(f"[CameraWorker] Running YOLO inference on frame #{self._yolo_frame_counter} for camera {self.active_camera_id}")
+                    # Run inference at 640px for good quality
+                    results = self.yolo(frame, conf=0.35, imgsz=640, verbose=False)
+                    
+                    if len(results) > 0:
+                        r = results[0]
+                        
+                        # Check for detections and cache the annotated frame
+                        if r.boxes and len(r.boxes) > 0:
+                            # Plot immediately and cache the result
+                            self.cached_annotated_frame = r.plot()
+                            self._yolo_last_alert = now
+                            detected = True
+                            print(f"[CameraWorker] 🎯 Detection on camera {self.active_camera_id}: {len(r.boxes)} object(s)")
+                        else:
+                            if self._yolo_frame_counter % 150 == 0:
+                                print(f"[CameraWorker] No objects detected on frame #{self._yolo_frame_counter}")
+                            self.cached_annotated_frame = None
+                    else:
+                        print(f"[CameraWorker] Empty results from YOLO")
+                        self.cached_annotated_frame = None
+                except Exception as e:
+                    print(f"[CameraWorker] YOLO inference error: {e}")
+                    import traceback
+                    traceback.print_exc()
+                    self.cached_annotated_frame = None
+            else:
+                if self._yolo_frame_counter % 150 == 0:
+                    print(f"[CameraWorker] Cooldown active, {cooldown_remaining:.1f}s remaining")
+        
+        # Always use cached annotated frame if available (smooth continuous stream)
+        annotated_frame = self.cached_annotated_frame if self.cached_annotated_frame is not None else frame
+        
+        return annotated_frame, detected
 
     async def send_alert(self):
         from app import socketio_server, connected_sids
