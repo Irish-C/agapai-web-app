@@ -12,6 +12,8 @@ export default function UserManager({ user }) {
     const [sortOrder, setSortOrder] = useState('asc');
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [userToEdit, setUserToEdit] = useState(null);
+    const [userToRestore, setUserToRestore] = useState(null);
+    const [isRestoreModalOpen, setIsRestoreModalOpen] = useState(false);
 
     const {
         users,
@@ -66,9 +68,17 @@ export default function UserManager({ user }) {
         setUserToArchive(null);
     };
 
-    const handleUnarchiveClick = async (userItem) => {
-        const result = await unarchiveUser(userItem.id);
+    const handleUnarchiveClick = (userItem) => {
+        setUserToRestore(userItem);
+        setIsRestoreModalOpen(true);
+    };
+
+    const confirmRestore = async () => {
+        if (!userToRestore) return;
+        setIsRestoreModalOpen(false);
+        const result = await unarchiveUser(userToRestore.id);
         if (!result.success) setError(`Restore failed: ${result.message}`);
+        setUserToRestore(null);
     };
 
     const handleSaveUser = async (formData) => {
@@ -197,6 +207,43 @@ export default function UserManager({ user }) {
                                     className="px-4 py-2 text-sm font-medium rounded-lg text-white bg-yellow-600 hover:bg-yellow-700"
                                 >
                                     Archive User
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {isRestoreModalOpen && userToRestore && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+                    <div className="bg-white rounded-xl shadow-2xl w-full max-w-md">
+                        <div className="p-6 border-b border-gray-200">
+                            <h4 className="text-xl font-bold text-emerald-600 flex items-center">
+                                <FaArchive className="mr-2" /> Confirm User Restoration
+                            </h4>
+                        </div>
+                        <div className="p-6">
+                            <p className="text-gray-700 mb-4">
+                                Are you sure you want to restore user <strong className="font-semibold">{userToRestore.username}</strong>?
+                            </p>
+                            <p className="text-emerald-700 mb-6 font-medium">
+                                The user's account will be reactivated and will regain access to the system.
+                            </p>
+                            <div className="flex justify-end space-x-3">
+                                <button
+                                    onClick={() => {
+                                        setIsRestoreModalOpen(false);
+                                        setUserToRestore(null);
+                                    }}
+                                    className="px-4 py-2 text-sm font-medium rounded-lg border border-gray-300 text-gray-700 bg-white hover:bg-gray-50"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={confirmRestore}
+                                    className="px-4 py-2 text-sm font-medium rounded-lg text-white bg-emerald-600 hover:bg-emerald-700"
+                                >
+                                    Restore User
                                 </button>
                             </div>
                         </div>
