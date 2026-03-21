@@ -10,7 +10,6 @@ export default function CameraNotificationSettings() {
         emit_inactivity: false,
         persist_inactivity: false,
         ai_enabled: true,
-        email_fallback: true,
     });
 
     useEffect(() => {
@@ -26,7 +25,6 @@ export default function CameraNotificationSettings() {
                         emit_inactivity: data.emit_inactivity === true,
                         persist_inactivity: data.persist_inactivity === true,
                         ai_enabled: data.ai_enabled === true,
-                        email_fallback: data.email_fallback === true,
                     });
                 }
             } catch (e) {
@@ -64,7 +62,7 @@ export default function CameraNotificationSettings() {
                 </div>
                 <label className="relative inline-flex items-center cursor-pointer ml-4">
                     <input type="checkbox" checked={checked} onChange={(e) => onToggle(e.target.checked)} className="sr-only peer" />
-                    <div className={`w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 hover:ring-4 hover:ring-blue-300/40 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all ${colorClass}`}></div>
+                    <div className={`w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-offset-2 peer-focus:ring-opacity-75 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all ${colorClass}`}></div>
                 </label>
             </div>
         );
@@ -83,18 +81,21 @@ export default function CameraNotificationSettings() {
 
                 <div className="space-y-4">
                     {/* Email Fallback */}
-                    <SettingToggle 
-                        label="Email Notification Fallback" 
-                        description="Send email notifications if real-time WebSocket alerts fail"
-                        checked={globalSettings.email_fallback}
-                        onToggle={(v) => saveGlobalSettings({ email_fallback: v })}
-                        colorClass="peer-checked:bg-teal-600"
-                    />
+                    <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                        <label className="text-gray-700 font-medium flex items-center">
+                            <FaEnvelope className="mr-3 text-xl text-blue-500" />
+                            Email Notification Fallback
+                        </label>
+                        <label className="relative inline-flex items-center cursor-pointer">
+                            <input type="checkbox" defaultChecked className="sr-only peer" />
+                            <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 peer-focus:ring-offset-2 peer-focus:ring-opacity-75 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-teal-600"></div>
+                        </label>
+                    </div>
 
                     {/* Fall Detection Section */}
                     <div className="mt-6 pt-4 border-t">
                         <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center">
-                            <span className="text-lg mr-2"></span> Fall Detection Alerts
+                            <span className="text-lg mr-2">🎯</span> Fall Detection Alerts
                         </h3>
                         <div className="space-y-3 ml-1">
                             <SettingToggle 
@@ -102,14 +103,14 @@ export default function CameraNotificationSettings() {
                                 description="Send immediate popup notifications when a fall is detected"
                                 checked={globalSettings.emit_fall}
                                 onToggle={(v) => saveGlobalSettings({ emit_fall: v })}
-                                colorClass="peer-checked:bg-teal-600"
+                                colorClass="peer-checked:bg-orange-500"
                             />
                             <SettingToggle 
                                 label="Save to History (Database)" 
                                 description="Record fall events with snapshots in Reports for later review"
                                 checked={globalSettings.persist_fall}
                                 onToggle={(v) => saveGlobalSettings({ persist_fall: v })}
-                                colorClass="peer-checked:bg-teal-600"
+                                colorClass="peer-checked:bg-blue-500"
                             />
                         </div>
                     </div>
@@ -117,7 +118,7 @@ export default function CameraNotificationSettings() {
                     {/* Inactivity Detection Section */}
                     <div className="mt-6 pt-4 border-t">
                         <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center">
-                            <span className="text-lg mr-2"></span> Inactivity Detection Alerts
+                            <span className="text-lg mr-2">⏱️</span> Inactivity Detection Alerts
                         </h3>
                         <p className="text-xs text-gray-600 mb-3">Triggered when no person detected for 20+ seconds</p>
                         <div className="space-y-3 ml-1">
@@ -126,14 +127,14 @@ export default function CameraNotificationSettings() {
                                 description="Send immediate notification when inactivity is detected"
                                 checked={globalSettings.emit_inactivity}
                                 onToggle={(v) => saveGlobalSettings({ emit_inactivity: v })}
-                                colorClass="peer-checked:bg-teal-600"
+                                colorClass="peer-checked:bg-purple-500"
                             />
                             <SettingToggle 
                                 label="Save to History (Database)" 
                                 description="Record inactivity events in Reports for later review"
                                 checked={globalSettings.persist_inactivity}
                                 onToggle={(v) => saveGlobalSettings({ persist_inactivity: v })}
-                                colorClass="peer-checked:bg-teal-600"
+                                colorClass="peer-checked:bg-green-500"
                             />
                         </div>
                     </div>
@@ -161,7 +162,7 @@ export default function CameraNotificationSettings() {
                     
                     {/* Placeholder for Per-Camera Settings */}
                     <div className="p-4 bg-blue-50 border border-blue-300 text-blue-800 rounded-lg text-sm mt-4">
-                        ℹ️ Per-camera model activation controls will be implemented here.
+                        Per-camera model activation controls will be implemented here.
                     </div>
                 </div>
             </div>
