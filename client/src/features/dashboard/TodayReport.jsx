@@ -9,6 +9,29 @@ import { fetchReportsData, fetchApi } from '../../services/apiService.js';
  * Also fetches today's persisted logs from the database.
  */
 export default function TodayReport({ incidents = [], alerts = [], user }) {
+    const getLocalDateKey = (dateInput) => {
+        const date = new Date(dateInput);
+        if (Number.isNaN(date.getTime())) return '';
+
+        const y = date.getFullYear();
+        const m = String(date.getMonth() + 1).padStart(2, '0');
+        const d = String(date.getDate()).padStart(2, '0');
+        return `${y}-${m}-${d}`;
+    };
+
+    const getIncidentEpochMs = (incident) => {
+        const raw = incident?.ts ?? incident?.timestamp;
+        if (raw === null || raw === undefined || raw === '') return 0;
+
+        const numeric = Number(raw);
+        if (!Number.isNaN(numeric)) {
+            // Treat small numeric values as seconds, larger as milliseconds.
+            return numeric < 1e12 ? numeric * 1000 : numeric;
+        }
+
+        const parsed = new Date(raw).getTime();
+        return Number.isNaN(parsed) ? 0 : parsed;
+    };
     
     // --- STATE ---
     const [isLoading, setIsLoading] = useState(false);
@@ -18,7 +41,7 @@ export default function TodayReport({ incidents = [], alerts = [], user }) {
 
     // --- STATE: Log Downloader (New) ---
     // Default to today's date in YYYY-MM-DD format
-    const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+    const [selectedDate, setSelectedDate] = useState(getLocalDateKey(new Date()));
 
     // CONFIGURATION: Replace with your Raspberry Pi's IP Address and the backend port (from picam.py)
     const RPI_BASE_URL = "http://192.168.2.106:4050";
@@ -27,7 +50,7 @@ export default function TodayReport({ incidents = [], alerts = [], user }) {
     useEffect(() => {
         const fetchTodaysLogs = async () => {
             try {
-                const today = new Date().toISOString().split('T')[0];
+                const today = getLocalDateKey(new Date());
                 const response = await fetchReportsData(1000, today, today);
                 const todaysLogs = response.report || response.data || [];
                 
@@ -44,7 +67,7 @@ export default function TodayReport({ incidents = [], alerts = [], user }) {
 
     // --- Helper: sorted incident list for display ---
     const sortedIncidents = useMemo(() => {
-        const todayKey = new Date().toISOString().split('T')[0];
+        const todayKey = getLocalDateKey(new Date());
         
         // Combine database logs + real-time incidents
         const combined = [...allIncidents, ...incidents];
@@ -52,19 +75,19 @@ export default function TodayReport({ incidents = [], alerts = [], user }) {
         // Remove duplicates by timestamp + type
         const unique = Array.from(new Map(
             combined.map(item => {
-                const key = `${item.ts || item.timestamp || 0}-${item.type || item.event_class || 'unknown'}`;
+                const key = `${getIncidentEpochMs(item)}-${item.type || item.event_class || 'unknown'}`;
                 return [key, item];
             })
         ).values());
 
         return (unique || [])
             .filter((inc) => {
-                const ts = inc.ts || inc.timestamp || 0;
+                const ts = getIncidentEpochMs(inc);
                 if (!ts) return false;
-                const dateKey = new Date(ts).toISOString().split('T')[0];
+                const dateKey = getLocalDateKey(ts);
                 return dateKey === todayKey;
             })
-            .sort((a, b) => (b.ts || 0) - (a.ts || 0));
+            .sort((a, b) => getIncidentEpochMs(b) - getIncidentEpochMs(a));
     }, [allIncidents, incidents]);
 
     // --- Derived State ---
@@ -77,7 +100,7 @@ export default function TodayReport({ incidents = [], alerts = [], user }) {
     };
 
     const getIncidentTimestamp = (incident) => {
-        const ts = incident.ts || incident.timestamp || 0;
+        const ts = getIncidentEpochMs(incident);
         return ts ? new Date(ts).toLocaleTimeString() : 'Unknown';
     };
 
@@ -200,7 +223,7 @@ export default function TodayReport({ incidents = [], alerts = [], user }) {
         <div className="space-y-4 sticky top-2 h-fit w-full">
 
             {/* 1. REAL-TIME INCIDENT LOG (WebSocket Data) */}
-            <div className="bg-white p-4 rounded-xl shadow-lg border border-gray-200 w-full">
+            <div className="bg-white p-4 rounded-xl shadow-lg border border-gray-200 w-full min-h-160">
                 <h3 className="text-xl font-bold text-gray-800 mb-4 border-b pb-2">Today's Incident Log</h3>
 
                 {isClear ? (

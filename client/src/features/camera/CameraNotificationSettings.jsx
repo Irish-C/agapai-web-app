@@ -263,7 +263,7 @@ export default function CameraNotificationSettings() {
                         label="Enable AI Detection (YOLO)"
                         description={
                             globalSettings.ai_enabled
-                                ? 'Inference'
+                                ? 'Inference is enabled using YOLO model'
                                 : 'Raw streaming data is used'
                         }
                         checked={globalSettings.ai_enabled}
