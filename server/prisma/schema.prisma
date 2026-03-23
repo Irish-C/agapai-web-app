@@ -19,6 +19,7 @@ model Role {
   users                   User[]
   feature_permissions     CategoryFeaturePermission[] @relation("RoleFeaturePermissions")
   audit_logs_created      FeatureAuditLog[]
+  permission_audit_logs   PermissionAuditLog[]
 
   @@index([parent_role_id])  // For hierarchy lookups
   @@map("roles")
@@ -43,6 +44,7 @@ model User {
   
   feature_permissions_created CategoryFeaturePermission[] @relation("FeaturePermissionCreatedBy")
   feature_audit_logs_created  FeatureAuditLog[] @relation("AuditLogCreatedBy")
+  permission_audit_logs_created PermissionAuditLog[] @relation("PermissionAuditLogCreatedBy")
 
   @@map("users")
 }
@@ -204,4 +206,25 @@ model FeatureAuditLog {
   @@index([feature_id])
   @@index([changed_at])
   @@map("feature_audit_logs")
+}
+
+// Audit log for role permission changes (legacy permission system)
+model PermissionAuditLog {
+  id              BigInt    @id @default(autoincrement())
+  role_id         BigInt
+  role            Role      @relation(fields: [role_id], references: [id], onDelete: Cascade)
+  
+  permission_name String    @db.VarChar(100)  // e.g., "can_edit_users"
+  old_value       Boolean?  // Was it granted before?
+  new_value       Boolean   // Is it granted now?
+  
+  changed_by      BigInt
+  changed_by_user User      @relation("PermissionAuditLogCreatedBy", fields: [changed_by], references: [id])
+  changed_at      DateTime  @default(now())
+  reason          String?   @db.Text
+
+  @@index([role_id])
+  @@index([permission_name])
+  @@index([changed_at])
+  @@map("permission_audit_logs")
 }

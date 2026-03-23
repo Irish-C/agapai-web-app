@@ -5,6 +5,7 @@ All changes are audit logged with optimistic locking support.
 """
 
 from datetime import datetime
+import traceback
 from typing import List, Dict, Optional
 from enum import Enum
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -310,106 +311,116 @@ async def update_single_permission(
     Update a single permission for a role.
     Creates audit log entry automatically.
     """
-    # Validate permission name
-    if permission_name not in ALL_PERMISSIONS:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Invalid permission: {permission_name}"
-        )
-    
-    # Verify role exists
-    role = await db.role.find_unique(where={"id": role_id})
-    
-    if not role:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Role with id {role_id} not found"
-        )
-    
-    # Get superadmin user for logging
-    superadmin_user = await db.user.find_unique(where={"id": superadmin_user_id})
-    
-    # Get current permission state
-    existing = await db.rolepermission.find_unique(
-        where={
-            "role_id_permission_name": {
-                "role_id": role_id,
-                "permission_name": permission_name,
-            }
-        }
-    )
-    
-    old_value = existing.is_granted if existing else DEFAULT_PERMISSIONS.get(role.role_name, {}).get(permission_name)
-    
-    # Skip if no change
-    if old_value == request.is_granted:
-        return {
-            "message": "No change",
-            "role_id": role_id,
-            "permission_name": permission_name,
-            "is_granted": request.is_granted
-        }
-    
-    # Update or create permission record
-    if existing:
-        await db.rolepermission.update(
+    try:
+        # Validate permission name
+        if permission_name not in ALL_PERMISSIONS:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid permission: {permission_name}"
+            )
+
+        # Verify role exists
+        role = await db.role.find_unique(where={"id": role_id})
+
+        if not role:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Role with id {role_id} not found"
+            )
+
+        # Get superadmin user for logging
+        superadmin_user = await db.user.find_unique(where={"id": superadmin_user_id})
+
+        # Get current permission state
+        existing = await db.rolepermission.find_unique(
             where={
                 "role_id_permission_name": {
                     "role_id": role_id,
                     "permission_name": permission_name,
                 }
-            },
-            data={
-                "is_granted": request.is_granted,
-                "updated_at": datetime.utcnow(),
             }
         )
-    else:
-        await db.rolepermission.create(
+
+        old_value = existing.is_granted if existing else DEFAULT_PERMISSIONS.get(role.role_name, {}).get(permission_name)
+
+        # Skip if no change
+        if old_value == request.is_granted:
+            return {
+                "message": "No change",
+                "role_id": role_id,
+                "permission_name": permission_name,
+                "is_granted": request.is_granted
+            }
+
+        # Update or create permission record
+        if existing:
+            await db.rolepermission.update(
+                where={
+                    "role_id_permission_name": {
+                        "role_id": role_id,
+                        "permission_name": permission_name,
+                    }
+                },
+                data={
+                    "is_granted": request.is_granted,
+                    "updated_at": datetime.utcnow(),
+                }
+            )
+        else:
+            await db.rolepermission.create(
+                data={
+                    "role_id": role_id,
+                    "permission_name": permission_name,
+                    "is_granted": request.is_granted,
+                    "created_by": superadmin_user_id,
+                }
+            )
+
+        # Create audit log
+        await db.permissionauditlog.create(
             data={
                 "role_id": role_id,
                 "permission_name": permission_name,
-                "is_granted": request.is_granted,
-                "created_by": superadmin_user_id,
+                "old_value": old_value,
+                "new_value": request.is_granted,
+                "changed_by": superadmin_user_id,
+                "reason": request.reason,
             }
         )
-    
-    # Create audit log
-    await db.permissionauditlog.create(
-        data={
+
+        # Invalidate cache
+        cache = get_permission_cache()
+        cache.invalidate(role_id)
+
+        # Broadcast update to connected clients
+        broadcaster = get_broadcaster()
+        if broadcaster:
+            await broadcaster.broadcast_permission_update(
+                role_id=role_id,
+                role_name=role.role_name,
+                permission_name=permission_name,
+                old_value=old_value,
+                new_value=request.is_granted,
+                changed_by_username=superadmin_user.username if superadmin_user else "System",
+                reason=request.reason,
+            )
+
+        return {
+            "message": "Permission updated successfully",
             "role_id": role_id,
             "permission_name": permission_name,
             "old_value": old_value,
             "new_value": request.is_granted,
-            "changed_by": superadmin_user_id,
-            "reason": request.reason,
         }
-    )
-    
-    # Invalidate cache
-    cache = get_permission_cache()
-    cache.invalidate(role_id)
-    
-    # Broadcast update to connected clients
-    broadcaster = get_broadcaster()
-    if broadcaster:
-        await broadcaster.broadcast_permission_update(
-            role_id=role_id,
-            role_name=role.role_name,
-            permission_name=permission_name,
-            old_value=old_value,
-            new_value=request.is_granted,
-            changed_by_username=superadmin_user.username if superadmin_user else "System",
-            reason=request.reason,
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"[ERROR] Failed to update single permission: {e}")
+        print(traceback.format_exc())
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to update permission: {str(e)}"
         )
-    
-    return {
-        "message": "Permission updated successfully",
-        "role_id": role_id,
-        "permission_name": permission_name,
-        "old_value": old_value,
-        "new_value": request.is_granted,
-    }
 
 
 @router.put("/roles/{role_id}/permissions")
@@ -422,108 +433,118 @@ async def update_bulk_permissions(
     Update multiple permissions for a role in one request.
     More efficient than multiple single-permission updates.
     """
-    # Validate role exists
-    role = await db.role.find_unique(where={"id": role_id})
-    
-    if not role:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Role with id {role_id} not found"
-        )
-    
-    # Get superadmin user for logging
-    superadmin_user = await db.user.find_unique(where={"id": superadmin_user_id})
-    
-    # Validate all permission names
-    invalid_perms = [p for p in request.permissions.keys() if p not in ALL_PERMISSIONS]
-    if invalid_perms:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Invalid permissions: {', '.join(invalid_perms)}"
-        )
-    
-    changes = []
-    
-    # Process each permission update
-    for permission_name, is_granted in request.permissions.items():
-        existing = await db.rolepermission.find_unique(
-            where={
-                "role_id_permission_name": {
-                    "role_id": role_id,
-                    "permission_name": permission_name,
-                }
-            }
-        )
-        
-        old_value = existing.is_granted if existing else DEFAULT_PERMISSIONS.get(role.role_name, {}).get(permission_name)
-        
-        # Skip if no change
-        if old_value == is_granted:
-            continue
-        
-        # Update or create
-        if existing:
-            await db.rolepermission.update(
+    try:
+        # Validate role exists
+        role = await db.role.find_unique(where={"id": role_id})
+
+        if not role:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Role with id {role_id} not found"
+            )
+
+        # Get superadmin user for logging
+        superadmin_user = await db.user.find_unique(where={"id": superadmin_user_id})
+
+        # Validate all permission names
+        invalid_perms = [p for p in request.permissions.keys() if p not in ALL_PERMISSIONS]
+        if invalid_perms:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid permissions: {', '.join(invalid_perms)}"
+            )
+
+        changes = []
+
+        # Process each permission update
+        for permission_name, is_granted in request.permissions.items():
+            existing = await db.rolepermission.find_unique(
                 where={
                     "role_id_permission_name": {
                         "role_id": role_id,
                         "permission_name": permission_name,
                     }
-                },
-                data={
-                    "is_granted": is_granted,
-                    "updated_at": datetime.utcnow(),
                 }
             )
-        else:
-            await db.rolepermission.create(
+
+            old_value = existing.is_granted if existing else DEFAULT_PERMISSIONS.get(role.role_name, {}).get(permission_name)
+
+            # Skip if no change
+            if old_value == is_granted:
+                continue
+
+            # Update or create
+            if existing:
+                await db.rolepermission.update(
+                    where={
+                        "role_id_permission_name": {
+                            "role_id": role_id,
+                            "permission_name": permission_name,
+                        }
+                    },
+                    data={
+                        "is_granted": is_granted,
+                        "updated_at": datetime.utcnow(),
+                    }
+                )
+            else:
+                await db.rolepermission.create(
+                    data={
+                        "role_id": role_id,
+                        "permission_name": permission_name,
+                        "is_granted": is_granted,
+                        "created_by": superadmin_user_id,
+                    }
+                )
+
+            # Create audit log
+            await db.permissionauditlog.create(
                 data={
                     "role_id": role_id,
                     "permission_name": permission_name,
-                    "is_granted": is_granted,
-                    "created_by": superadmin_user_id,
+                    "old_value": old_value,
+                    "new_value": is_granted,
+                    "changed_by": superadmin_user_id,
+                    "reason": request.reason,
                 }
             )
-        
-        # Create audit log
-        await db.permissionauditlog.create(
-            data={
-                "role_id": role_id,
+
+            changes.append({
                 "permission_name": permission_name,
                 "old_value": old_value,
                 "new_value": is_granted,
-                "changed_by": superadmin_user_id,
-                "reason": request.reason,
-            }
+            })
+
+        if changes:
+            # Invalidate cache
+            cache = get_permission_cache()
+            cache.invalidate(role_id)
+
+            # Broadcast bulk update to connected clients
+            broadcaster = get_broadcaster()
+            if broadcaster:
+                await broadcaster.broadcast_bulk_permission_update(
+                    role_id=role_id,
+                    role_name=role.role_name,
+                    update_count=len(changes),
+                    changed_by_username=superadmin_user.username if superadmin_user else "System",
+                    reason=request.reason,
+                )
+
+        return {
+            "message": f"Updated {len(changes)} permissions",
+            "role_id": role_id,
+            "changes": changes,
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"[ERROR] Failed to update bulk permissions: {e}")
+        print(traceback.format_exc())
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to update permissions: {str(e)}"
         )
-        
-        changes.append({
-            "permission_name": permission_name,
-            "old_value": old_value,
-            "new_value": is_granted,
-        })
-    
-    if changes:
-        # Invalidate cache
-        cache = get_permission_cache()
-        cache.invalidate(role_id)
-        
-        # Broadcast bulk update to connected clients
-        broadcaster = get_broadcaster()
-        if broadcaster:
-            await broadcaster.broadcast_bulk_permission_update(
-                role_id=role_id,
-                role_name=role.role_name,
-                update_count=len(changes),
-                changed_by_username=superadmin_user.username if superadmin_user else "System",
-                reason=request.reason,
-            )
-    
-    return {
-        "message": f"Updated {len(changes)} permissions",
-        "role_id": role_id,
-        "changes": changes,
-    }
 
 
 # ============================================================================

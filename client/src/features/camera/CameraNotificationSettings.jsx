@@ -198,7 +198,7 @@ export default function CameraNotificationSettings() {
     }
 
     // Check if user has permission to view notification settings
-    if (!features.view_settings) {
+    if (!hasFeature('view_settings')) {
         return (
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8">
                 <div className="text-center py-8">

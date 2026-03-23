@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { socket } from '../../services/socket';
+import { useUserFeatures } from '../../hooks/useUserFeatures.js';
 import './AuditLogViewer.css';
 
 /**
@@ -8,6 +9,7 @@ import './AuditLogViewer.css';
  * Displays a paginated audit log of all permission changes
  */
 export default function AuditLogViewer() {
+  const { hasFeature } = useUserFeatures();
   // STATE
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -21,9 +23,12 @@ export default function AuditLogViewer() {
   const [message, setMessage] = useState({ type: '', text: '' });
 
   // FETCH LOGS ON MOUNT AND WHEN FILTERS/PAGE CHANGE
+  // Only fetch if user has permission
   useEffect(() => {
-    fetchAuditLogs();
-  }, [page, limit, filters]);
+    if (hasFeature('view_audit_log')) {
+      fetchAuditLogs();
+    }
+  }, [page, limit, filters, hasFeature]);
 
   // LISTEN FOR REAL-TIME AUDIT LOG ENTRIES
   useEffect(() => {
@@ -126,6 +131,21 @@ export default function AuditLogViewer() {
       return <span className="change-badge change-enabled">✓ Enabled</span>;
     }
   };
+
+  // Check if user has permission to view audit logs
+  if (!hasFeature('view_audit_log')) {
+    return (
+      <div className="audit-log-viewer">
+        <div className="alv-header">
+          <h2>Permission Audit Log</h2>
+          <p>Track all changes to role permissions with timestamps and reasons</p>
+        </div>
+        <div className="alv-message alv-message-error">
+          You don't have permission to view the audit log.
+        </div>
+      </div>
+    );
+  }
 
   // RENDER
   return (

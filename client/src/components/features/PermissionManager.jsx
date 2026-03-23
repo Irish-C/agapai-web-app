@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { socket } from '../../services/socket';
+import { useUserFeatures } from '../../hooks/useUserFeatures.js';
 import './PermissionManager.css';
 
 /**
@@ -10,6 +11,7 @@ import './PermissionManager.css';
  * 2. Category permissions (visibility and functions for settings tabs)
  */
 export default function PermissionManager() {
+  const { hasFeature } = useUserFeatures();
   // STATE
   const [roles, setRoles] = useState([]);
   const [selectedRole, setSelectedRole] = useState(null);
@@ -361,6 +363,22 @@ export default function PermissionManager() {
       handleRoleSelect(selectedRole);
     }
   };
+
+  // RENDER
+  // Check if user has permission to configure permissions
+  if (!hasFeature('configure_permissions')) {
+    return (
+      <div className="permission-manager">
+        <div className="pm-header">
+          <h2>Role Permission Manager</h2>
+          <p>Configure which permissions each role has access to</p>
+        </div>
+        <div className="pm-message pm-message-error">
+          You don't have permission to configure role permissions.
+        </div>
+      </div>
+    );
+  }
 
   // RENDER
   const currentRole = roles.find((r) => r.role_id === selectedRole);

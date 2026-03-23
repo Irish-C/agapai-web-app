@@ -2,7 +2,7 @@ import os
 import asyncio
 from dotenv import load_dotenv
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from typing import Any
@@ -10,6 +10,7 @@ from fastapi.staticfiles import StaticFiles
 import socketio
 
 import json
+import traceback
 from fastapi.encoders import jsonable_encoder
 
 from database import db
@@ -128,6 +129,28 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(lifespan=lifespan, default_response_class=PrismaJSONResponse)
 
+ALLOWED_CORS_ORIGINS = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "http://127.0.0.1:5000",
+]
+
+
+def _cors_headers_for_request(request: Request) -> dict:
+    """Return explicit CORS headers for known origins.
+
+    This is used as a fallback on unhandled exceptions so browser clients still
+    receive readable JSON error details instead of masked CORS/network errors.
+    """
+    origin = request.headers.get("origin")
+    if origin in ALLOWED_CORS_ORIGINS:
+        return {
+            "Access-Control-Allow-Origin": origin,
+            "Access-Control-Allow-Credentials": "true",
+            "Vary": "Origin",
+        }
+    return {}
+
 @app.middleware("http")
 async def bigint_middleware(request, call_next):
     # Sanitize incoming JSON bodies so controllers receive cleaned data.
@@ -182,12 +205,24 @@ async def bigint_middleware(request, call_next):
         # Be defensive: do not block requests because sanitization failed.
         pass
 
-    response = await call_next(request)
-    return response
+    try:
+        response = await call_next(request)
+        return response
+    except Exception as e:
+        print(f"[ERROR] Unhandled exception while processing {request.method} {request.url.path}: {e}")
+        print(traceback.format_exc())
+        return JSONResponse(
+            status_code=500,
+            content={
+                "status": "error",
+                "detail": f"Internal server error: {str(e)}",
+            },
+            headers=_cors_headers_for_request(request),
+        )
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173", "http://127.0.0.1:5000"],
+    allow_origins=ALLOWED_CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -220,7 +255,6 @@ async def health_check():
     return {'status': 'ok', 'database_connected': db.is_connected()}
 
 # --- 10. Admin Set Active Camera Endpoint ---
-from fastapi import Request
 @app.post('/api/set_active_camera')
 async def set_active_camera(request: Request):
     data = await get_sanitized_json(request)
