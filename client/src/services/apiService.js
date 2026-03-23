@@ -1,6 +1,7 @@
 // src/services/apiService.js
 
-const BASE_API_URL = 'http://127.0.0.1:5000/api';
+export const API_URL = 'http://127.0.0.1:5000/api';
+const BASE_API_URL = API_URL;
 const AUTH_TOKEN_KEY = 'authToken'; 
 
 /**

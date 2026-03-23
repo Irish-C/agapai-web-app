@@ -88,6 +88,16 @@ async def lifespan(app: FastAPI):
     from src.services.permission_service import initialize_permission_service
     initialize_permission_service()
     
+    # Initialize feature service
+    print("[INFO] Initializing feature service...")
+    from src.services.feature_service import initialize_feature_service
+    initialize_feature_service()
+    
+    # Seed features if needed
+    print("[INFO] Checking feature initialization...")
+    from src.utils.feature_initialization import seed_features_if_needed
+    await seed_features_if_needed()
+    
     # Initialize permission broadcaster
     print("[INFO] Initializing permission broadcaster...")
     from src.services.permission_broadcast import initialize_broadcaster

@@ -13,9 +13,23 @@ import PermissionManager from '../components/features/PermissionManager.jsx';
 import AuditLogViewer from '../components/features/AuditLogViewer.jsx';
 
 export default function Settings({ user }) {
-    const features = useUserFeatures();
+    const { features: userFeatures, hasFeature } = useUserFeatures();
     const isAdmin = normalizeRole(user?.role) === 'admin';
-    const isSuperAdmin = normalizeRole(user?.role) === 'superadmin'; 
+    const isSuperAdmin = normalizeRole(user?.role) === 'superadmin';
+    
+    // Debug logging
+    console.log('[SettingsPage] Component rendered');
+    console.log('[SettingsPage] User role:', user?.role);
+    console.log('[SettingsPage] Features available:', userFeatures);
+    console.log('[SettingsPage] Feature count:', Object.keys(userFeatures || {}).length);
+    console.log('[SettingsPage] Visible features:', Object.entries(userFeatures || {}).filter(([, v]) => v === true).map(([k]) => k).join(', '));
+    console.log('[SettingsPage] view_profile available:', hasFeature('view_profile'));
+    console.log('[SettingsPage] view_settings available:', hasFeature('view_settings'));
+    console.log('[SettingsPage] view_users available:', hasFeature('view_users'));
+    console.log('[SettingsPage] view_cameras available:', hasFeature('view_cameras'));
+    console.log('[SettingsPage] view_locations available:', hasFeature('view_locations'));
+    console.log('[SettingsPage] configure_permissions available:', hasFeature('configure_permissions'));
+    console.log('[SettingsPage] view_audit_log available:', hasFeature('view_audit_log'));
     
     const [activeSection, setActiveSection] = useState('my_account'); 
     const [locations, setLocations] = useState([]);
@@ -38,10 +52,10 @@ export default function Settings({ user }) {
     const navItems = fullNavItems.filter(item => {
         if (item.requiredFeatures) {
             // If requiredFeatures (plural), user needs ANY of those features
-            return item.requiredFeatures.some(feature => features[feature]);
+            return item.requiredFeatures.some(feature => hasFeature(feature));
         } else if (item.requiredFeature) {
             // If requiredFeature (singular), user needs that specific feature
-            return features[item.requiredFeature];
+            return hasFeature(item.requiredFeature);
         }
         return false;
     });
@@ -49,14 +63,14 @@ export default function Settings({ user }) {
     const renderActiveComponent = () => {
         switch (activeSection) {
             case 'my_account':
-                return features.view_profile ? (
+                return hasFeature('view_profile') ? (
                     <AccountSettingsForm user={user} />
                 ) : (
                     <p className="text-red-500">Access Denied: You don't have permission to view your account settings.</p>
                 );
             
             case 'devloc_management':
-                return (features.view_cameras || features.view_locations) ? (
+                return (hasFeature('view_cameras') || hasFeature('view_locations')) ? (
                     <ManagementDashboard 
                         locations={locations} 
                         onLocationsUpdated={handleLocationsUpdate}
@@ -66,28 +80,28 @@ export default function Settings({ user }) {
                 );
 
             case 'notification':
-                return features.view_settings ? (
+                return hasFeature('view_settings') ? (
                     <CameraNotificationSettings />
                 ) : (
                     <p className="text-red-500">Access Denied: You don't have permission to view notification settings.</p>
                 );
             
             case 'user_management': 
-                return features.view_users ? (
+                return hasFeature('view_users') ? (
                     <UserManager user={user} />
                 ) : (
                     <p className="text-red-500">Access Denied: You don't have permission to manage users.</p>
                 );
             
             case 'permissions':
-                return features.configure_permissions ? (
+                return hasFeature('configure_permissions') ? (
                     <PermissionManager />
                 ) : (
                     <p className="text-red-500">Access Denied: You don't have permission to configure permissions.</p>
                 );
             
             case 'audit_log':
-                return features.view_audit_log ? (
+                return hasFeature('view_audit_log') ? (
                     <AuditLogViewer />
                 ) : (
                     <p className="text-red-500">Access Denied: You don't have permission to view audit logs.</p>

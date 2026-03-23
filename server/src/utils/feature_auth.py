@@ -31,10 +31,21 @@ async def get_current_user_with_role(user_id: str = Depends(get_current_user_id)
                 detail='User not found'
             )
         return user
-    except Exception:
+    except ValueError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail='Invalid authentication credentials'
+            detail='Invalid user ID format'
+        )
+    except HTTPException:
+        # Re-raise HTTP exceptions as-is
+        raise
+    except Exception as e:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"Error fetching user with role: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail='Failed to authenticate user'
         )
 
 

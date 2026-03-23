@@ -21,9 +21,12 @@ export const useUserFeatures = () => {
    */
   const hasFeature = (featureKey) => {
     if (!features || typeof features !== 'object') {
+      console.warn(`[useUserFeatures] hasFeature("${featureKey}"): features not loaded`, { features });
       return false;
     }
-    return features[featureKey] === true;
+    const result = features[featureKey] === true;
+    console.debug(`[useUserFeatures] hasFeature("${featureKey}"):`, result, { features });
+    return result;
   };
 
   /**

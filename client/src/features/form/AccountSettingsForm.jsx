@@ -15,7 +15,7 @@ const initialProfileState = {
 };
 
 export default function AccountSettingsForm({ user }) {
-    const features = useUserFeatures();
+    const { features: userFeatures, hasFeature } = useUserFeatures();
     
     const sanitizePassword = (value) => {
         if (typeof value !== 'string') return '';
@@ -156,7 +156,7 @@ export default function AccountSettingsForm({ user }) {
                 {/* --- MAIN CONTENT: SECURITY --- */}
                 <div className="w-full lg:w-2/3">
                     {/* Render password change section only if user has change_password feature */}
-                    {features.change_password ? (
+                    {hasFeature('change_password') ? (
                         <div className="bg-white p-6 lg:p-8 rounded-2xl shadow-sm border border-gray-200">
                             <div className="mb-8">
                                 <h2 className="text-2xl font-bold text-gray-800">Security Settings</h2>

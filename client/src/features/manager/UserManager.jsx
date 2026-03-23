@@ -9,7 +9,7 @@ import UserEditModal from '../modal/UserEditModal.jsx';
 import { displayRole, getRoleColors } from '../../utils/roleUtils.js';
 
 export default function UserManager({ user }) {
-    const features = useUserFeatures();
+    const { features: userFeatures, hasFeature } = useUserFeatures();
     const [searchTerm, setSearchTerm] = useState('');
     const [roleFilter, setRoleFilter] = useState('all');
     const [sortField, setSortField] = useState('username');
@@ -255,7 +255,7 @@ export default function UserManager({ user }) {
                     >
                         <FaArchive className="mr-2" /> {showArchived ? 'Show Active' : 'Archived'}
                     </button>
-                    {!showArchived && features.create_user && (
+                    {!showArchived && hasFeature('create_user') && (
                         <button
                             onClick={handleAddUser}
                             className="flex items-center bg-teal-600 hover:bg-teal-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-150"
@@ -263,7 +263,7 @@ export default function UserManager({ user }) {
                             Add New User
                         </button>
                     )}
-                    {!showArchived && !features.create_user && (
+                    {!showArchived && !hasFeature('create_user') && (
                         <button
                             disabled
                             className="flex items-center bg-gray-300 text-gray-500 font-bold py-2 px-4 rounded-lg shadow-md cursor-not-allowed"

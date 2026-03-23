@@ -15,7 +15,7 @@ export default function UserTable({
     currentUserId,
     emptyMessage = 'No users found.'
 }) {
-    const features = useUserFeatures();
+    const { features: userFeatures, hasFeature } = useUserFeatures();
     const SortHeader = ({ field, label }) => (
         <th
             className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider cursor-pointer select-none ${sortField === field ? 'text-teal-700' : 'text-gray-500'}`}
@@ -67,7 +67,7 @@ export default function UserTable({
                                     const buttons = [];
                                     
                                     // Edit button - requires edit_user feature
-                                    if (features.edit_user) {
+                                    if (hasFeature('edit_user')) {
                                         buttons.push({ 
                                             label: 'Edit', 
                                             onClick: () => onEdit(u), 
@@ -76,7 +76,7 @@ export default function UserTable({
                                     }
                                     
                                     // Archive button - requires archive_user feature and not current user
-                                    if (onArchive && u.id !== currentUserId && features.archive_user) {
+                                    if (onArchive && u.id !== currentUserId && hasFeature('archive_user')) {
                                         buttons.push({ 
                                             label: 'Archive', 
                                             onClick: () => onArchive(u), 
@@ -85,7 +85,7 @@ export default function UserTable({
                                     }
                                     
                                     // Restore button - requires archive_user feature
-                                    if (onUnarchive && features.archive_user) {
+                                    if (onUnarchive && hasFeature('archive_user')) {
                                         buttons.push({ 
                                             label: 'Restore', 
                                             onClick: () => onUnarchive(u), 
@@ -94,7 +94,7 @@ export default function UserTable({
                                     }
                                     
                                     // Show access denied if user lacks both edit and archive permissions
-                                    if (buttons.length === 0 && !features.edit_user && !features.archive_user) {
+                                    if (buttons.length === 0 && !hasFeature('edit_user') && !hasFeature('archive_user')) {
                                         return (
                                             <span className="text-gray-400 text-xs font-medium">
                                                 No permissions

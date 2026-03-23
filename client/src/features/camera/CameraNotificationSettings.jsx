@@ -126,7 +126,7 @@ const SettingsSection = ({ section, globalSettings, onToggle }) => (
 // ============================================================================
 
 export default function CameraNotificationSettings() {
-    const features = useUserFeatures();
+    const { features: userFeatures, hasFeature } = useUserFeatures();
     const [globalSettings, setGlobalSettings] = useState(SETTINGS_DEFAULTS);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState(null);
