@@ -175,9 +175,10 @@ async def get_current_user_features(
         await db.connect()
     
     # Get user's role
-    user_result = await db.query_raw("""
-        SELECT role_id FROM users WHERE id = ?
-    """, int(user_id))
+    user_id_int = int(user_id)
+    user_result = await db.query_raw(f"""
+        SELECT role_id FROM users WHERE id = {user_id_int}
+    """)
     
     if not user_result:
         raise HTTPException(
@@ -188,9 +189,9 @@ async def get_current_user_features(
     role_id = user_result[0]['role_id']
     
     # Get role name for defaults
-    role_result = await db.query_raw("""
-        SELECT role_name FROM roles WHERE id = ?
-    """, role_id)
+    role_result = await db.query_raw(f"""
+        SELECT role_name FROM roles WHERE id = {role_id}
+    """)
     
     if not role_result:
         raise HTTPException(
@@ -211,10 +212,10 @@ async def get_current_user_features(
         feature_id = feature['id']
         
         # Check for override in database
-        perm_result = await db.query_raw("""
+        perm_result = await db.query_raw(f"""
             SELECT is_visible FROM category_feature_permissions 
-            WHERE feature_id = ? AND role_id = ?
-        """, feature_id, role_id)
+            WHERE feature_id = {feature_id} AND role_id = {role_id}
+        """)
         
         if perm_result:
             features[feature_key] = bool(perm_result[0]['is_visible'])
