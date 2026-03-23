@@ -1,16 +1,21 @@
 // src/pages/Settings.jsx
 import React, { useState } from 'react';
-import { FaUserCog, FaCogs, FaBell, FaUsers, FaConnectdevelop} from 'react-icons/fa'; 
+import { FaUserCog, FaCogs, FaBell, FaUsers, FaConnectdevelop, FaLock, FaHistory} from 'react-icons/fa'; 
 
 import { normalizeRole } from '../utils/roleUtils.js';
+import { useUserFeatures } from '../hooks/useUserFeatures.js';
 
 import AccountSettingsForm from '../features/form/AccountSettingsForm.jsx';
 import CameraNotificationSettings from '../features/camera/CameraNotificationSettings.jsx';
 import UserManager from '../features/manager/UserManager.jsx'; 
 import ManagementDashboard from "../features/manager/ManagementDashboard.jsx";
+import PermissionManager from '../components/features/PermissionManager.jsx';
+import AuditLogViewer from '../components/features/AuditLogViewer.jsx';
 
 export default function Settings({ user }) {
-    const isAdmin = normalizeRole(user?.role) === 'admin'; 
+    const features = useUserFeatures();
+    const isAdmin = normalizeRole(user?.role) === 'admin';
+    const isSuperAdmin = normalizeRole(user?.role) === 'superadmin'; 
     
     const [activeSection, setActiveSection] = useState('my_account'); 
     const [locations, setLocations] = useState([]);
@@ -19,38 +24,75 @@ export default function Settings({ user }) {
         setLocations(newLocations);
     };
 
-    // 2. Define the navigation structure with roles
+    // Define the navigation structure with required features
     const fullNavItems = [
-        { id: 'my_account', name: 'My Account', icon: FaUserCog, role: 'all' },
-        { id: 'devloc_management', name: 'Device and Location', icon: FaConnectdevelop, role: 'admin' }, 
-        { id: 'notification', name: 'Notifications', icon: FaBell, role: 'all' },
-        { id: 'user_management', name: 'User Management', icon: FaUsers, role: 'admin' }, 
+        { id: 'my_account', name: 'My Account', icon: FaUserCog, requiredFeature: 'view_profile' },
+        { id: 'devloc_management', name: 'Device and Location', icon: FaConnectdevelop, requiredFeatures: ['view_cameras', 'view_locations'] }, 
+        { id: 'notification', name: 'Notifications', icon: FaBell, requiredFeature: 'view_settings' },
+        { id: 'user_management', name: 'User Management', icon: FaUsers, requiredFeature: 'view_users' },
+        { id: 'permissions', name: 'Role Permissions', icon: FaLock, requiredFeature: 'configure_permissions' },
+        { id: 'audit_log', name: 'Audit Log', icon: FaHistory, requiredFeature: 'view_audit_log' }, 
     ];
     
-    // 3. Filter the navigation items based on the user's role
+    // Filter the navigation items based on the user's features
     const navItems = fullNavItems.filter(item => {
-        return item.role === 'all' || (item.role === 'admin' && isAdmin);
+        if (item.requiredFeatures) {
+            // If requiredFeatures (plural), user needs ANY of those features
+            return item.requiredFeatures.some(feature => features[feature]);
+        } else if (item.requiredFeature) {
+            // If requiredFeature (singular), user needs that specific feature
+            return features[item.requiredFeature];
+        }
+        return false;
     });
 
     const renderActiveComponent = () => {
         switch (activeSection) {
             case 'my_account':
-                return <AccountSettingsForm user={user} />;
+                return features.view_profile ? (
+                    <AccountSettingsForm user={user} />
+                ) : (
+                    <p className="text-red-500">Access Denied: You don't have permission to view your account settings.</p>
+                );
             
             case 'devloc_management':
-                return isAdmin ? (
+                return (features.view_cameras || features.view_locations) ? (
                     <ManagementDashboard 
                         locations={locations} 
                         onLocationsUpdated={handleLocationsUpdate}
                     />
                 ) : (
-                    <p className="text-red-500">Access Denied: You must be an Administrator to manage devices and locations.</p>
+                    <p className="text-red-500">Access Denied: You don't have permission to manage devices and locations.</p>
                 );
 
             case 'notification':
-                return <CameraNotificationSettings />;
+                return features.view_settings ? (
+                    <CameraNotificationSettings />
+                ) : (
+                    <p className="text-red-500">Access Denied: You don't have permission to view notification settings.</p>
+                );
+            
             case 'user_management': 
-                return isAdmin ? <UserManager user={user} /> : <p className="text-red-500">Access Denied: You must be an Administrator to manage users.</p>; 
+                return features.view_users ? (
+                    <UserManager user={user} />
+                ) : (
+                    <p className="text-red-500">Access Denied: You don't have permission to manage users.</p>
+                );
+            
+            case 'permissions':
+                return features.configure_permissions ? (
+                    <PermissionManager />
+                ) : (
+                    <p className="text-red-500">Access Denied: You don't have permission to configure permissions.</p>
+                );
+            
+            case 'audit_log':
+                return features.view_audit_log ? (
+                    <AuditLogViewer />
+                ) : (
+                    <p className="text-red-500">Access Denied: You don't have permission to view audit logs.</p>
+                );
+            
             default:
                 return <div>Please select a setting category.</div>;
         }
@@ -67,11 +109,6 @@ export default function Settings({ user }) {
     return (
         <div className="flex flex-col min-h-screen">
             <main className="flex-grow container mx-auto p-6">
-                {/* <h1 className="text-3xl font-extrabold text-gray-900 flex items-center mb-4">
-                    {/* <FaCogs className="mr-3 text-teal-600" /> */}
-                    {/* Settings
-                </h1> */}
-
                 <div className="flex flex-col lg:flex-row gap-6 bg-white p-4 lg:p-5 rounded-xl shadow-lg border border-gray-200">
                     
                     {/* LEFT: Side Navigation Panel */}

@@ -1,6 +1,7 @@
 // src/components/CameraNotificationSettings.jsx
 import React, { useState, useEffect } from 'react';
 import { FaBell, FaVideo } from 'react-icons/fa';
+import { useUserFeatures } from '../../hooks/useUserFeatures.js';
 import { fetchApi } from '../../services/apiService.js';
 
 // ============================================================================
@@ -125,6 +126,7 @@ const SettingsSection = ({ section, globalSettings, onToggle }) => (
 // ============================================================================
 
 export default function CameraNotificationSettings() {
+    const features = useUserFeatures();
     const [globalSettings, setGlobalSettings] = useState(SETTINGS_DEFAULTS);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState(null);
@@ -191,6 +193,19 @@ export default function CameraNotificationSettings() {
         return (
             <div className="flex items-center justify-center p-6">
                 <p className="text-gray-500">Loading settings...</p>
+            </div>
+        );
+    }
+
+    // Check if user has permission to view notification settings
+    if (!features.view_settings) {
+        return (
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8">
+                <div className="text-center py-8">
+                    <FaBell className="text-gray-300 text-4xl mx-auto mb-3" />
+                    <h3 className="text-lg font-semibold text-gray-700 mb-2">Access Denied</h3>
+                    <p className="text-gray-500">You don't have permission to view notification settings.</p>
+                </div>
             </div>
         );
     }

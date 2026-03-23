@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Request, Depends
 from database import db
 from src.utils.auth import get_current_user_id, require_admin_user_id
+from src.utils.feature_auth import require_feature
 from src.utils.input_sanitization import get_sanitized_json
 from src.utils.serialization import safe_json_response
 
@@ -72,7 +73,10 @@ async def login(request: Request):
     return safe_json_response(status_code=status_code, content=response)
 
 @router.get('/user/profile')
-async def get_user_profile(user_id: str = Depends(get_current_user_id)):
+async def get_user_profile(
+    user_id: str = Depends(get_current_user_id),
+    _: None = Depends(require_feature("view_profile"))
+):
     result, code = await get_profile_logic(user_id)
     return safe_json_response(status_code=code, content=result)
 
@@ -80,6 +84,7 @@ async def get_user_profile(user_id: str = Depends(get_current_user_id)):
 async def list_users(
     request: Request,
     user_id: str = Depends(require_admin_user_id),
+    _: None = Depends(require_feature("view_users")),
 ):
     include_archived = str(request.query_params.get('include_archived', 'false')).lower() == 'true'
     archived_only = str(request.query_params.get('archived_only', 'false')).lower() == 'true'
@@ -87,29 +92,50 @@ async def list_users(
     return safe_json_response(status_code=code, content=result)
 
 @router.post('/users')
-async def create_user(request: Request, user_id: str = Depends(require_admin_user_id)):
+async def create_user(
+    request: Request,
+    user_id: str = Depends(require_admin_user_id),
+    _: None = Depends(require_feature("create_user"))
+):
     data = await get_sanitized_json(request)
     result, code = await create_user_logic(data)
     return safe_json_response(status_code=code, content=result)
 
 @router.patch('/users/{user_id}')
-async def update_user(user_id: int, request: Request, current_user_id: str = Depends(require_admin_user_id)):
+async def update_user(
+    user_id: int,
+    request: Request,
+    current_user_id: str = Depends(require_admin_user_id),
+    _: None = Depends(require_feature("edit_user"))
+):
     data = await get_sanitized_json(request)
     result, code = await update_user_logic(user_id, data)
     return safe_json_response(status_code=code, content=result)
 
 @router.patch('/users/{user_id}/archive')
-async def archive_user(user_id: int, current_user_id: str = Depends(require_admin_user_id)):
+async def archive_user(
+    user_id: int,
+    current_user_id: str = Depends(require_admin_user_id),
+    _: None = Depends(require_feature("archive_user"))
+):
     result, code = await archive_user_logic(user_id)
     return safe_json_response(status_code=code, content=result)
 
 @router.patch('/users/{user_id}/unarchive')
-async def unarchive_user(user_id: int, current_user_id: str = Depends(require_admin_user_id)):
+async def unarchive_user(
+    user_id: int,
+    current_user_id: str = Depends(require_admin_user_id),
+    _: None = Depends(require_feature("archive_user"))
+):
     result, code = await unarchive_user_logic(user_id)
     return safe_json_response(status_code=code, content=result)
 
 @router.post('/users/change-password')
-async def change_password(request: Request, user_id: str = Depends(get_current_user_id)):
+async def change_password(
+    request: Request,
+    user_id: str = Depends(get_current_user_id),
+    _: None = Depends(require_feature("change_password"))
+):
     data = await get_sanitized_json(request)
     old_password = data.get('old_password')
     new_password = data.get('new_password')
@@ -117,7 +143,10 @@ async def change_password(request: Request, user_id: str = Depends(get_current_u
     return safe_json_response(status_code=code, content=result)
 
 @router.get('/roles')
-async def get_roles(user_id: str = Depends(require_admin_user_id)):
+async def get_roles(
+    user_id: str = Depends(require_admin_user_id),
+    _: None = Depends(require_feature("view_users"))
+):
     try:
         # Now 'db' is defined and can be used
         roles = await db.role.find_many()

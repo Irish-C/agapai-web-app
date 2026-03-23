@@ -6,6 +6,7 @@ import {
     FaCalendarAlt, FaEye, FaEyeSlash, FaCheck 
 } from 'react-icons/fa';
 import { fetchUserProfile, changePassword } from '../../services/apiService'; 
+import { useUserFeatures } from '../../hooks/useUserFeatures.js';
 import { normalizeRole, displayRole } from '../../utils/roleUtils.js';
 
 const initialProfileState = { 
@@ -14,6 +15,8 @@ const initialProfileState = {
 };
 
 export default function AccountSettingsForm({ user }) {
+    const features = useUserFeatures();
+    
     const sanitizePassword = (value) => {
         if (typeof value !== 'string') return '';
         return value.replace(/[\u0000-\u001F\u007F]/g, '').slice(0, 128);
@@ -152,11 +155,13 @@ export default function AccountSettingsForm({ user }) {
 
                 {/* --- MAIN CONTENT: SECURITY --- */}
                 <div className="w-full lg:w-2/3">
-                    <div className="bg-white p-6 lg:p-8 rounded-2xl shadow-sm border border-gray-200">
-                        <div className="mb-8">
-                            <h2 className="text-2xl font-bold text-gray-800">Security Settings</h2>
-                            <p className="text-gray-500 mt-1">Keep your account safe by using a strong password.</p>
-                        </div>
+                    {/* Render password change section only if user has change_password feature */}
+                    {features.change_password ? (
+                        <div className="bg-white p-6 lg:p-8 rounded-2xl shadow-sm border border-gray-200">
+                            <div className="mb-8">
+                                <h2 className="text-2xl font-bold text-gray-800">Security Settings</h2>
+                                <p className="text-gray-500 mt-1">Keep your account safe by using a strong password.</p>
+                            </div>
 
                         {message && (
     <div className={`mb-6 p-4 rounded-xl flex items-center justify-between border shadow-sm transition-all duration-300 ${
@@ -261,7 +266,16 @@ export default function AccountSettingsForm({ user }) {
                                 </button>
                             </div>
                         </form>
-                    </div>
+                        </div>
+                    ) : (
+                        <div className="bg-white p-6 lg:p-8 rounded-2xl shadow-sm border border-gray-200">
+                            <div className="text-center py-8">
+                                <FaLock className="text-gray-300 text-4xl mx-auto mb-3" />
+                                <h3 className="text-lg font-semibold text-gray-700 mb-2">Access Denied</h3>
+                                <p className="text-gray-500">You don't have permission to change your password.</p>
+                            </div>
+                        </div>
+                    )}
                 </div>
             </div>
         </div>

@@ -6,7 +6,7 @@ import {
     FaCalendarAlt, FaEye, FaEyeSlash, FaCheck 
 } from 'react-icons/fa';
 import { fetchUserProfile, changePassword } from '../../services/apiService'; 
-import { normalizeRole, displayRole } from '../../utils/roleUtils.js';
+import { normalizeRole, displayRole, getRoleColors } from '../../utils/roleUtils.js';
 
 const initialProfileState = { 
     firstname: '', middle_name: '', lastname: '', 
@@ -125,9 +125,7 @@ export default function AccountSettingsForm({ user }) {
                                 </h2>
                                 <p className="text-sm text-gray-500 italic">@{profile.username}</p>
                                 <div className="mt-3">
-                                    <span className={`inline-block px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${
-                                        normalizeRole(profile.role) === 'admin' ? 'bg-indigo-100 text-indigo-700' : 'bg-teal-100 text-teal-700'
-                                    }`}>
+                                    <span className={`inline-block px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${getRoleColors(profile.role).bg} ${getRoleColors(profile.role).text}`}>
                                         {displayRole(profile.role)}
                                     </span>
                                 </div>

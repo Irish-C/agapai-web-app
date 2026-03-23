@@ -1,7 +1,6 @@
 from database import db
-from werkzeug.security import check_password_hash, generate_password_hash
+import bcrypt
 from src.utils.role_utils import normalize_role
-from database import db
 
 async def login_logic(data):
     # Fetch user AND the associated role record
@@ -13,14 +12,24 @@ async def login_logic(data):
     if user and not getattr(user, 'is_active', True):
         return {"status": "error", "message": "Account does not exist."}, 401
 
-    if user and check_password_hash(user.password, data.get('password')):
-        return {
-            "status": "success", 
-            "user_id": str(user.id), # BigInt string conversion
-            "username": user.username,
-            # Normalize so 'Admin' becomes 'admin' for the frontend
-            "role": normalize_role(user.role.role_name) if user.role else "caregiver",
-        }, 200
+    if user:
+        try:
+            # Use bcrypt directly to verify password
+            password_bytes = data.get('password', '').encode('utf-8')
+            stored_hash = user.password.encode('utf-8') if isinstance(user.password, str) else user.password
+            password_valid = bcrypt.checkpw(password_bytes, stored_hash)
+        except (ValueError, TypeError):
+            # Hash is corrupted or invalid
+            password_valid = False
+        
+        if password_valid:
+            return {
+                "status": "success", 
+                "user_id": str(user.id), # BigInt string conversion
+                "username": user.username,
+                # Normalize so 'Admin' becomes 'admin' for the frontend
+                "role": normalize_role(user.role.role_name) if user.role else "caregiver",
+            }, 200
         
     return {"status": "error", "message": "Invalid credentials"}, 401
 
@@ -93,8 +102,7 @@ async def update_user_logic(user_id, data):
 
         # 3. Handle password if provided
         if data.get('password'):
-            from src.utils.auth import hash_password
-            update_data['password'] = hash_password(data['password'])
+            update_data['password'] = pwd_context.hash(data['password'])
 
         # 4. Execute the update
         await db.user.update(
@@ -132,10 +140,10 @@ async def change_password_logic(user_id, old_password, new_password):
     if not user:
         return {"status": "error", "message": "User not found"}, 404
 
-    if not check_password_hash(user.password, old_password):
+    if not pwd_context.verify(old_password, user.password):
         return {"status": "error", "message": "Old password incorrect"}, 401
 
-    hashed_pw = generate_password_hash(new_password)
+    hashed_pw = pwd_context.hash(new_password)
     await db.user.update(
         where={'id': int(user_id)},
         data={'password': hashed_pw}
@@ -144,7 +152,6 @@ async def change_password_logic(user_id, old_password, new_password):
 
 async def create_user_logic(data):
 
-    from src.utils.auth import hash_password
     try:
         # 1. Map the role string (e.g., 'guard') to the Database ID
         role_record = await db.role.find_unique(
@@ -154,8 +161,8 @@ async def create_user_logic(data):
         if not role_record:
             return {"status": "error", "message": f"Role '{data['role']}' not found."}, 400
 
-        # 2. Use the imported hash_password function
-        hashed_pw = hash_password(data['password'])
+        # 2. Hash the password using passlib
+        hashed_pw = pwd_context.hash(data['password'])
 
         # 3. Create the user in the database
         new_user = await db.user.create(

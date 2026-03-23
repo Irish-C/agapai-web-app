@@ -16,3 +16,21 @@ export function displayRole(role) {
   if (!normalized) return normalized;
   return normalized.charAt(0).toUpperCase() + normalized.slice(1);
 }
+
+/**
+ * Get Tailwind CSS classes for role badge styling.
+ * Returns { bgColor, textColor } object with Tailwind classes
+ */
+export function getRoleColors(role) {
+  const normalized = normalizeRole(role);
+  
+  const colorMap = {
+    'superadmin': { bg: 'bg-yellow-100', text: 'text-yellow-800' },
+    'admin': { bg: 'bg-indigo-100', text: 'text-indigo-800' },
+    'supervisor': { bg: 'bg-blue-100', text: 'text-blue-800' },
+    'guard': { bg: 'bg-green-100', text: 'text-green-800' },
+    'caregiver': { bg: 'bg-purple-100', text: 'text-purple-800' },
+  };
+  
+  return colorMap[normalized] || { bg: 'bg-gray-100', text: 'text-gray-800' };
+}

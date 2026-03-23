@@ -1,11 +1,15 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import axios from 'axios';
 import { FaUsers, FaSpinner, FaArchive, FaShieldAlt } from 'react-icons/fa';
 import { useUserManager } from '../../hooks/useUserManager.js';
+import { useUserFeatures } from '../../hooks/useUserFeatures.js';
+import { socket } from '../../services/socket.js';
 import UserTable from '../../components/features/manager/UserTable.jsx';
 import UserEditModal from '../modal/UserEditModal.jsx';
-import { displayRole } from '../../utils/roleUtils.js';
+import { displayRole, getRoleColors } from '../../utils/roleUtils.js';
 
 export default function UserManager({ user }) {
+    const features = useUserFeatures();
     const [searchTerm, setSearchTerm] = useState('');
     const [roleFilter, setRoleFilter] = useState('all');
     const [sortField, setSortField] = useState('username');
@@ -15,48 +19,8 @@ export default function UserManager({ user }) {
     const [userToRestore, setUserToRestore] = useState(null);
     const [isRestoreModalOpen, setIsRestoreModalOpen] = useState(false);
     const [showRoleOverview, setShowRoleOverview] = useState(false);
-
-    // Role permissions mapping
-    const rolePermissions = {
-        admin: {
-            'Create Users': true,
-            'Edit Users': true,
-            'Archive/Restore Users': true,
-            'Manage Cameras': true,
-            'View Reports': true,
-            'System Settings': true,
-            'View Live Feed': true,
-        },
-        supervisor: {
-            'Create Users': true,
-            'Edit Users': true,
-            'Archive/Restore Users': true,
-            'Manage Cameras': true,
-            'View Reports': true,
-            'System Settings': false,
-            'View Live Feed': true,
-        },
-        guard: {
-            'Create Users': false,
-            'Edit Users': false,
-            'Archive/Restore Users': false,
-            'Manage Cameras': true,
-            'View Reports': true,
-            'System Settings': false,
-            'View Live Feed': true,
-        },
-        caregiver: {
-            'Create Users': false,
-            'Edit Users': false,
-            'Archive/Restore Users': false,
-            'Manage Cameras': false,
-            'View Reports': false,
-            'System Settings': false,
-            'View Live Feed': true,
-        },
-    };
-
-    const allPermissions = ['Create Users', 'Edit Users', 'Archive/Restore Users', 'Manage Cameras', 'View Reports', 'System Settings', 'View Live Feed'];
+    const [rolePermissions, setRolePermissions] = useState({});
+    const [allPermissions, setAllPermissions] = useState([]);
 
     const {
         users,
@@ -74,6 +38,74 @@ export default function UserManager({ user }) {
         saveUser,
         setError,
     } = useUserManager(user);
+
+    // FETCH ROLE PERMISSIONS ON MOUNT
+    useEffect(() => {
+        const fetchRolePermissions = async () => {
+            try {
+                const response = await axios.get('http://127.0.0.1:5000/api/admin/permissions/roles', {
+                    headers: { Authorization: `Bearer ${localStorage.getItem('authToken')}` },
+                });
+                // Build permission matrix from API response (key: role_name, not role_id)
+                const permMatrix = {};
+                const allPerms = new Set();
+                
+                response.data.forEach(role => {
+                    const roleName = role.role_name.toLowerCase();
+                    permMatrix[roleName] = role.permissions;
+                    Object.keys(role.permissions).forEach(perm => allPerms.add(perm));
+                });
+                
+                setRolePermissions(permMatrix);
+                setAllPermissions(Array.from(allPerms).sort());
+            } catch (err) {
+                console.error('Failed to fetch role permissions:', err);
+            }
+        };
+        
+        fetchRolePermissions();
+    }, []);
+
+    // LISTEN FOR PERMISSION/FEATURE CHANGES VIA WEBSOCKET
+    useEffect(() => {
+        const handlePermissionsUpdated = (data) => {
+            console.log('Permissions/Features updated, refreshing role overview');
+            // Refresh the role permissions
+            const fetchRolePermissions = async () => {
+                try {
+                    const response = await axios.get('http://127.0.0.1:5000/api/admin/permissions/roles', {
+                        headers: { Authorization: `Bearer ${localStorage.getItem('authToken')}` },
+                    });
+                    const permMatrix = {};
+                    const allPerms = new Set();
+                    
+                    response.data.forEach(role => {
+                        const roleName = role.role_name.toLowerCase();
+                        permMatrix[roleName] = role.permissions;
+                        Object.keys(role.permissions).forEach(perm => allPerms.add(perm));
+                    });
+                    
+                    setRolePermissions(permMatrix);
+                    setAllPermissions(Array.from(allPerms).sort());
+                } catch (err) {
+                    console.error('Failed to refresh role permissions:', err);
+                }
+            };
+            
+            fetchRolePermissions();
+        };
+        
+        // Listen for both old permissions events and new features events
+        socket.on('permissions_updated', handlePermissionsUpdated);
+        socket.on('permissions_changed', handlePermissionsUpdated);
+        socket.on('features_updated', handlePermissionsUpdated);
+        
+        return () => {
+            socket.off('permissions_updated', handlePermissionsUpdated);
+            socket.off('permissions_changed', handlePermissionsUpdated);
+            socket.off('features_updated', handlePermissionsUpdated);
+        };
+    }, []);
 
     // Sort and filter users
     const sortedFilteredUsers = users
@@ -223,10 +255,19 @@ export default function UserManager({ user }) {
                     >
                         <FaArchive className="mr-2" /> {showArchived ? 'Show Active' : 'Archived'}
                     </button>
-                    {!showArchived && (
+                    {!showArchived && features.create_user && (
                         <button
                             onClick={handleAddUser}
                             className="flex items-center bg-teal-600 hover:bg-teal-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-150"
+                        >
+                            Add New User
+                        </button>
+                    )}
+                    {!showArchived && !features.create_user && (
+                        <button
+                            disabled
+                            className="flex items-center bg-gray-300 text-gray-500 font-bold py-2 px-4 rounded-lg shadow-md cursor-not-allowed"
+                            title="You don't have permission to create users"
                         >
                             Add New User
                         </button>

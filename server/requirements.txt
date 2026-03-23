@@ -1,7 +1,7 @@
 # --- Backend Framework ---
 fastapi
 uvicorn[standard]       # 'standard' includes high-speed loopers like uvloop
-redis
+redis                   # Redis client with async support (redis[asyncio] available)
 
 # --- Database (Prisma) ---
 prisma

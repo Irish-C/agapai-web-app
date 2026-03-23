@@ -9,29 +9,40 @@ datasource db {
 }
 
 model Role {
-  id        BigInt @id @default(autoincrement())
-  role_name String @unique @db.VarChar(50)
-  users     User[]
+  id                      BigInt              @id @default(autoincrement())
+  role_name               String              @unique @db.VarChar(50)
+  description             String?             @db.Text
+  parent_role_id          BigInt?             // For role hierarchy/inheritance
+  parent_role             Role?               @relation("RoleHierarchy", fields: [parent_role_id], references: [id], onDelete: SetNull)
+  child_roles             Role[]              @relation("RoleHierarchy")
+  
+  users                   User[]
+  feature_permissions     CategoryFeaturePermission[] @relation("RoleFeaturePermissions")
+  audit_logs_created      FeatureAuditLog[]
 
+  @@index([parent_role_id])  // For hierarchy lookups
   @@map("roles")
 }
 
 model User {
-  id                BigInt     @id @default(autoincrement())
-  firstname         String     @db.VarChar(100)
-  middle_name       String?    @db.VarChar(100)
-  lastname          String     @db.VarChar(100)
-  birthdate         DateTime
-  email             String     @unique @db.VarChar(255)
-  username          String     @unique @db.VarChar(50)
-  password          String     @db.VarChar(255)
-  is_active         Boolean    @default(true)
-  role_id           BigInt?
-  acknowledged_logs EventLog[]
-  role              Role?      @relation(fields: [role_id], references: [id])
+  id                      BigInt                @id @default(autoincrement())
+  firstname               String                @db.VarChar(100)
+  middle_name             String?               @db.VarChar(100)
+  lastname                String                @db.VarChar(100)
+  birthdate               DateTime
+  email                   String                @unique @db.VarChar(255)
+  username                String                @unique @db.VarChar(50)
+  password                String                @db.VarChar(255)
+  is_active               Boolean               @default(true)
+  role_id                 BigInt?
+  acknowledged_logs       EventLog[]
+  role                    Role?                 @relation(fields: [role_id], references: [id])
   
-  email_notifications Boolean @default(false)
-  alert_threshold     Int     @default(0)
+  email_notifications     Boolean               @default(false)
+  alert_threshold         Int                   @default(0)
+  
+  feature_permissions_created CategoryFeaturePermission[] @relation("FeaturePermissionCreatedBy")
+  feature_audit_logs_created  FeatureAuditLog[] @relation("AuditLogCreatedBy")
 
   @@map("users")
 }
@@ -105,4 +116,92 @@ model EventLog {
   event_class     EventClass? @relation(fields: [event_class_id], references: [id])
 
   @@map("event_logs")
+}
+
+// Settings Categories - defines tabs/sections in Settings page
+model SettingsCategory {
+  id              BigInt    @id @default(autoincrement())
+  category_key    String    @unique @db.VarChar(100) // e.g., "my_account", "user_management"
+  category_name   String    @db.VarChar(150)         // e.g., "My Account", "User Management"
+  description     String?   @db.Text
+  icon_class      String?   @db.VarChar(100)         // e.g., "FaUserCog" for icon display
+  sort_order      Int       @default(0)
+  is_active       Boolean   @default(true)
+  created_at      DateTime  @default(now())
+  updated_at      DateTime  @updatedAt
+
+  // Relations
+  category_features CategoryFeature[]
+
+  @@map("settings_categories")
+}
+
+// Category Features - defines available features/actions within each settings category
+model CategoryFeature {
+  id              BigInt    @id @default(autoincrement())
+  category_id     BigInt
+  category        SettingsCategory @relation(fields: [category_id], references: [id], onDelete: Cascade)
+  
+  feature_key     String    @db.VarChar(100)  // e.g., "add_camera", "archive_user"
+  feature_name    String    @db.VarChar(150)  // e.g., "Add Camera", "Archive User"
+  description     String?   @db.Text
+  
+  is_active       Boolean   @default(true)
+  sort_order      Int       @default(0)
+  
+  created_at      DateTime  @default(now())
+  updated_at      DateTime  @updatedAt
+  
+  feature_permissions CategoryFeaturePermission[]
+
+  @@unique([category_id, feature_key])
+  @@index([category_id])
+  @@map("category_features")
+}
+
+// Category Feature Permissions - controls which roles can see/perform each feature
+model CategoryFeaturePermission {
+  id              BigInt    @id @default(autoincrement())
+  feature_id      BigInt
+  feature         CategoryFeature @relation(fields: [feature_id], references: [id], onDelete: Cascade)
+  role_id         BigInt
+  role            Role      @relation("RoleFeaturePermissions", fields: [role_id], references: [id], onDelete: Cascade)
+  
+  is_visible      Boolean   @default(true)  // Can this role see/access this feature?
+  version         Int       @default(1)     // For optimistic locking
+  
+  created_at      DateTime  @default(now())
+  updated_at      DateTime  @updatedAt
+  created_by      BigInt?
+  created_by_user User?     @relation("FeaturePermissionCreatedBy", fields: [created_by], references: [id])
+
+  @@unique([feature_id, role_id])
+  @@index([role_id])
+  @@index([feature_id])
+  @@index([role_id, feature_id])
+  @@map("category_feature_permissions")
+}
+
+// Audit log for feature permission changes
+model FeatureAuditLog {
+  id              BigInt    @id @default(autoincrement())
+  feature_id      BigInt
+  role_id         BigInt
+  role            Role      @relation(fields: [role_id], references: [id])
+  
+  feature_key     String    @db.VarChar(100)  // e.g., "archive_user"
+  feature_name    String    @db.VarChar(150)  // e.g., "Archive User"
+  
+  old_value       Boolean?  // Was it visible before?
+  new_value       Boolean   // Is it visible now?
+  
+  changed_by      BigInt
+  changed_by_user User      @relation("AuditLogCreatedBy", fields: [changed_by], references: [id])
+  changed_at      DateTime  @default(now())
+  reason          String?   @db.Text
+
+  @@index([role_id])
+  @@index([feature_id])
+  @@index([changed_at])
+  @@map("feature_audit_logs")
 }

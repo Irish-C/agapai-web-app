@@ -1,7 +1,9 @@
 import asyncio
 from datetime import datetime
 from database import db
-from werkzeug.security import generate_password_hash
+from passlib.context import CryptContext
+
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 async def seed_database():
     try:
@@ -10,7 +12,7 @@ async def seed_database():
 
         # ===== 1. SEED ROLES =====
         print("Seeding roles...")
-        role_names = ["admin", "supervisor", "guard", "caregiver"]
+        role_names = ["superadmin", "admin", "supervisor", "guard", "caregiver"]
         created_roles = {}
 
         for name in role_names:
@@ -55,7 +57,7 @@ async def seed_database():
                         'email': u['em'],
                         'birthdate': u['bd'],
                         'username': u['un'],
-                        'password': generate_password_hash(u['pw']),
+                        'password': pwd_context.hash(u['pw']),
                         'role': {'connect': {'id': created_roles[u['r']]}}
                     },
                     'update': {

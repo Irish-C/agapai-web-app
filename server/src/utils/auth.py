@@ -106,10 +106,39 @@ async def require_admin_user_id(user_id: str = Depends(get_current_user_id)) -> 
         )
 
     role_name = normalize_role(user.role.role_name) if user.role else None
-    if role_name != 'admin':
+    if role_name not in ['admin', 'superadmin']:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail='Admin privileges required',
+            detail='Admin or SuperAdmin privileges required',
+        )
+
+    return str(user.id)
+
+
+async def require_superadmin_user_id(user_id: str = Depends(get_current_user_id)) -> str:
+    """Dependency to verify SuperAdmin privileges"""
+    try:
+        user = await db.user.find_unique(
+            where={'id': int(user_id)},
+            include={'role': True},
+        )
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail='Invalid authentication credentials',
+        )
+
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail='Invalid authentication credentials',
+        )
+
+    role_name = normalize_role(user.role.role_name) if user.role else None
+    if role_name != 'superadmin':
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail='SuperAdmin privileges required',
         )
 
     return str(user.id)

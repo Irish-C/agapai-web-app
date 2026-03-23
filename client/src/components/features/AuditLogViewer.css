@@ -1,0 +1,338 @@
+.audit-log-viewer {
+  padding: 20px;
+  background: #f8f9fa;
+  border-radius: 8px;
+}
+
+.alv-header {
+  margin-bottom: 20px;
+}
+
+.alv-header h2 {
+  margin: 0 0 8px 0;
+  font-size: 24px;
+  color: #222;
+}
+
+.alv-header p {
+  margin: 0;
+  color: #666;
+  font-size: 14px;
+}
+
+/* MESSAGE DISPLAY */
+.alv-message {
+  padding: 12px 16px;
+  margin-bottom: 15px;
+  border-radius: 6px;
+  font-size: 14px;
+  animation: slideDown 0.3s ease;
+}
+
+.alv-message-success {
+  background: #d4edda;
+  color: #155724;
+  border: 1px solid #c3e6cb;
+}
+
+.alv-message-error {
+  background: #f8d7da;
+  color: #721c24;
+  border: 1px solid #f5c6cb;
+}
+
+.alv-message-info {
+  background: #d1ecf1;
+  color: #0c5460;
+  border: 1px solid #bee5eb;
+}
+
+/* FILTERS */
+.alv-filters {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 20px;
+  padding: 15px;
+  background: white;
+  border-radius: 6px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  flex-wrap: wrap;
+}
+
+.filter-input,
+.filter-select {
+  padding: 8px 12px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 14px;
+  flex: 1;
+  min-width: 180px;
+}
+
+.filter-input:focus,
+.filter-select:focus {
+  outline: none;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+/* TABLE CONTAINER */
+.alv-table-container {
+  background: white;
+  border-radius: 6px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+  margin-bottom: 20px;
+}
+
+.alv-loading,
+.alv-empty {
+  padding: 40px 20px;
+  text-align: center;
+  color: #999;
+  font-size: 16px;
+}
+
+/* TABLE STYLES */
+.alv-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.alv-table thead {
+  background: #f5f5f5;
+  border-bottom: 2px solid #ddd;
+}
+
+.alv-table th {
+  padding: 12px 16px;
+  text-align: left;
+  font-weight: 600;
+  color: #333;
+  white-space: nowrap;
+}
+
+.alv-table tbody tr {
+  border-bottom: 1px solid #e5e5e5;
+  transition: background-color 0.2s ease;
+}
+
+.alv-table tbody tr:hover {
+  background: #f9f9f9;
+}
+
+.alv-table td {
+  padding: 12px 16px;
+  color: #333;
+}
+
+/* COLUMNS */
+.col-role {
+  width: 120px;
+}
+
+.col-permission {
+  width: 180px;
+  font-weight: 500;
+}
+
+.col-change {
+  width: 140px;
+}
+
+.col-user {
+  width: 140px;
+}
+
+.col-timestamp {
+  width: 160px;
+  font-size: 13px;
+  color: #666;
+}
+
+.col-reason {
+  flex: 1;
+  max-width: 300px;
+}
+
+/* BADGES */
+.badge {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.badge-role {
+  background: #e3f2fd;
+  color: #1976d2;
+}
+
+/* CHANGE BADGES */
+.change-badge {
+  display: inline-block;
+  padding: 6px 12px;
+  border-radius: 4px;
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.change-created {
+  background: #dbeafe;
+  color: #0c4a6e;
+}
+
+.change-enabled {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.change-disabled {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.change-unchanged {
+  background: #f3f4f6;
+  color: #6b7280;
+}
+
+/* REASON COLUMN */
+.reason-text {
+  color: #555;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.reason-empty {
+  color: #bbb;
+  font-style: italic;
+}
+
+/* PAGINATION */
+.alv-pagination {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 15px;
+  padding: 15px;
+  background: white;
+  border-radius: 6px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.page-info {
+  font-size: 14px;
+  color: #666;
+  min-width: 120px;
+  text-align: center;
+}
+
+/* BUTTONS */
+.btn {
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  border: none;
+  transition: all 0.2s ease;
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-outline {
+  background: white;
+  border: 1px solid #ddd;
+  color: #333;
+}
+
+.btn-outline:hover:not(:disabled) {
+  background: #f0f0f0;
+  border-color: #999;
+}
+
+.btn-sm {
+  padding: 6px 12px;
+  font-size: 13px;
+}
+
+/* RESPONSIVE */
+@media (max-width: 1024px) {
+  .alv-table {
+    font-size: 13px;
+  }
+
+  .col-role {
+    width: 100px;
+  }
+
+  .col-permission {
+    width: 140px;
+  }
+
+  .col-user {
+    width: 120px;
+  }
+
+  .col-timestamp {
+    width: 130px;
+  }
+
+  .alv-table th,
+  .alv-table td {
+    padding: 10px 12px;
+  }
+}
+
+@media (max-width: 768px) {
+  .alv-filters {
+    flex-direction: column;
+  }
+
+  .filter-input,
+  .filter-select {
+    min-width: 100%;
+  }
+
+  .alv-table {
+    font-size: 12px;
+    display: block;
+    overflow-x: auto;
+  }
+
+  .alv-table th,
+  .alv-table td {
+    padding: 8px;
+  }
+
+  .col-role,
+  .col-permission,
+  .col-change,
+  .col-user,
+  .col-timestamp {
+    width: auto;
+    min-width: 80px;
+  }
+
+  .alv-pagination {
+    flex-wrap: wrap;
+  }
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

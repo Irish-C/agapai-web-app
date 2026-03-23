@@ -1,6 +1,7 @@
 import React from 'react';
 import { ActionButtons } from '../../FormComponents.jsx';
-import { normalizeRole, displayRole } from '../../../utils/roleUtils.js';
+import { useUserFeatures } from '../../../hooks/useUserFeatures.js';
+import { normalizeRole, displayRole, getRoleColors } from '../../../utils/roleUtils.js';
 
 export default function UserTable({ 
     users, 
@@ -14,6 +15,7 @@ export default function UserTable({
     currentUserId,
     emptyMessage = 'No users found.'
 }) {
+    const features = useUserFeatures();
     const SortHeader = ({ field, label }) => (
         <th
             className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider cursor-pointer select-none ${sortField === field ? 'text-teal-700' : 'text-gray-500'}`}
@@ -56,21 +58,50 @@ export default function UserTable({
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{u.firstname}</td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{u.lastname}</td>
                             <td className="px-6 py-4 whitespace-nowrap">
-                                <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${normalizeRole(u.role) === 'admin' ? 'bg-indigo-100 text-indigo-800' : 'bg-green-100 text-green-800'}`}>
+                                <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getRoleColors(u.role).bg} ${getRoleColors(u.role).text}`}>
                                     {displayRole(u.role)}
                                 </span>
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                                 {(() => {
-                                    const buttons = [
-                                        { label: 'Edit', onClick: () => onEdit(u), className: 'bg-blue-600 text-white text-xs py-1 px-2 rounded hover:bg-blue-700 font-semibold' }
-                                    ];
-                                    if (onArchive && u.id !== currentUserId) {
-                                        buttons.push({ label: 'Archive', onClick: () => onArchive(u), className: 'bg-yellow-600 text-white text-xs py-1 px-2 rounded hover:bg-yellow-700 font-semibold' });
+                                    const buttons = [];
+                                    
+                                    // Edit button - requires edit_user feature
+                                    if (features.edit_user) {
+                                        buttons.push({ 
+                                            label: 'Edit', 
+                                            onClick: () => onEdit(u), 
+                                            className: 'bg-blue-600 text-white text-xs py-1 px-2 rounded hover:bg-blue-700 font-semibold' 
+                                        });
                                     }
-                                    if (onUnarchive) {
-                                        buttons.push({ label: 'Restore', onClick: () => onUnarchive(u), className: 'bg-emerald-600 text-white text-xs py-1 px-2 rounded hover:bg-emerald-700 font-semibold' });
+                                    
+                                    // Archive button - requires archive_user feature and not current user
+                                    if (onArchive && u.id !== currentUserId && features.archive_user) {
+                                        buttons.push({ 
+                                            label: 'Archive', 
+                                            onClick: () => onArchive(u), 
+                                            className: 'bg-yellow-600 text-white text-xs py-1 px-2 rounded hover:bg-yellow-700 font-semibold' 
+                                        });
                                     }
+                                    
+                                    // Restore button - requires archive_user feature
+                                    if (onUnarchive && features.archive_user) {
+                                        buttons.push({ 
+                                            label: 'Restore', 
+                                            onClick: () => onUnarchive(u), 
+                                            className: 'bg-emerald-600 text-white text-xs py-1 px-2 rounded hover:bg-emerald-700 font-semibold' 
+                                        });
+                                    }
+                                    
+                                    // Show access denied if user lacks both edit and archive permissions
+                                    if (buttons.length === 0 && !features.edit_user && !features.archive_user) {
+                                        return (
+                                            <span className="text-gray-400 text-xs font-medium">
+                                                No permissions
+                                            </span>
+                                        );
+                                    }
+                                    
                                     return <ActionButtons buttons={buttons} />;
                                 })()}
                             </td>
