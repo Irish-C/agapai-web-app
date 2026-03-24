@@ -3,9 +3,10 @@ import { FaUsers, FaSpinner, FaArchive, FaShieldAlt } from 'react-icons/fa';
 import { useUserManager } from '../../hooks/useUserManager.js';
 import UserTable from '../../components/features/manager/UserTable.jsx';
 import UserEditModal from '../modal/UserEditModal.jsx';
-import { displayRole } from '../../utils/roleUtils.js';
+import { displayRole, normalizeRole } from '../../utils/roleUtils.js';
+import { ALL_PERMISSIONS, hasPermission } from '../../utils/rolePermissions.js';
 
-export default function UserManager({ user }) {
+export default function UserManager({ user, readOnly = false }) {
     const [searchTerm, setSearchTerm] = useState('');
     const [roleFilter, setRoleFilter] = useState('all');
     const [sortField, setSortField] = useState('username');
@@ -16,47 +17,9 @@ export default function UserManager({ user }) {
     const [isRestoreModalOpen, setIsRestoreModalOpen] = useState(false);
     const [showRoleOverview, setShowRoleOverview] = useState(false);
 
-    // Role permissions mapping
-    const rolePermissions = {
-        admin: {
-            'Create Users': true,
-            'Edit Users': true,
-            'Archive/Restore Users': true,
-            'Manage Cameras': true,
-            'View Reports': true,
-            'System Settings': true,
-            'View Live Feed': true,
-        },
-        supervisor: {
-            'Create Users': true,
-            'Edit Users': true,
-            'Archive/Restore Users': true,
-            'Manage Cameras': true,
-            'View Reports': true,
-            'System Settings': false,
-            'View Live Feed': true,
-        },
-        guard: {
-            'Create Users': false,
-            'Edit Users': false,
-            'Archive/Restore Users': false,
-            'Manage Cameras': true,
-            'View Reports': true,
-            'System Settings': false,
-            'View Live Feed': true,
-        },
-        caregiver: {
-            'Create Users': false,
-            'Edit Users': false,
-            'Archive/Restore Users': false,
-            'Manage Cameras': false,
-            'View Reports': false,
-            'System Settings': false,
-            'View Live Feed': true,
-        },
-    };
-
-    const allPermissions = ['Create Users', 'Edit Users', 'Archive/Restore Users', 'Manage Cameras', 'View Reports', 'System Settings', 'View Live Feed'];
+    const allPermissions = ALL_PERMISSIONS;
+    const currentRole = normalizeRole(user?.role);
+    const isReadOnly = readOnly || currentRole !== 'admin';
 
     const {
         users,
@@ -197,7 +160,7 @@ export default function UserManager({ user }) {
                                         </td>
                                         {allPermissions.map(perm => (
                                             <td key={`${role}-${perm}`} className="px-4 py-3 text-center">
-                                                {rolePermissions[role]?.[perm] ? (
+                                                {hasPermission(role, perm) ? (
                                                     <span className="text-green-600 font-bold text-lg">✓</span>
                                                 ) : (
                                                     <span className="text-red-500 font-bold text-lg">✕</span>
@@ -226,6 +189,7 @@ export default function UserManager({ user }) {
                     {!showArchived && (
                         <button
                             onClick={handleAddUser}
+                            disabled={isReadOnly}
                             className="flex items-center bg-teal-600 hover:bg-teal-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-150"
                         >
                             Add New User
@@ -233,6 +197,12 @@ export default function UserManager({ user }) {
                     )}
                 </div>
             </div>
+
+            {isReadOnly && (
+                <div className="p-3 bg-blue-50 border border-blue-200 text-blue-700 rounded-lg text-sm">
+                    Read-only mode: supervisors can view users but cannot add, edit, archive, or restore accounts.
+                </div>
+            )}
 
             {isLoading && (
                 <div className="text-center p-8 text-gray-500">
@@ -253,15 +223,15 @@ export default function UserManager({ user }) {
                     setSortField={setSortField}
                     sortOrder={sortOrder}
                     setSortOrder={setSortOrder}
-                    onEdit={handleEditUser}
-                    onArchive={showArchived ? undefined : handleArchiveClick}
-                    onUnarchive={showArchived ? handleUnarchiveClick : undefined}
+                    onEdit={isReadOnly ? undefined : handleEditUser}
+                    onArchive={isReadOnly ? undefined : (showArchived ? undefined : handleArchiveClick)}
+                    onUnarchive={isReadOnly ? undefined : (showArchived ? handleUnarchiveClick : undefined)}
                     currentUserId={user?.userId}
                     emptyMessage={showArchived ? 'No archived users found.' : 'No users found. Try adding a new user.'}
                 />
             )}
 
-            {isEditModalOpen && (
+            {!isReadOnly && isEditModalOpen && (
                 <UserEditModal 
                     userToEdit={userToEdit}
                     onSave={handleSaveUser}
@@ -269,7 +239,7 @@ export default function UserManager({ user }) {
                 />
             )}
 
-            {isArchiveModalOpen && userToArchive && (
+            {!isReadOnly && isArchiveModalOpen && userToArchive && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
                     <div className="bg-white rounded-xl shadow-2xl w-full max-w-md">
                         <div className="p-6 border-b border-gray-200">
@@ -306,7 +276,7 @@ export default function UserManager({ user }) {
                 </div>
             )}
 
-            {isRestoreModalOpen && userToRestore && (
+            {!isReadOnly && isRestoreModalOpen && userToRestore && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
                     <div className="bg-white rounded-xl shadow-2xl w-full max-w-md">
                         <div className="p-6 border-b border-gray-200">

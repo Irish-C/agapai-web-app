@@ -62,14 +62,18 @@ export default function UserTable({
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                                 {(() => {
-                                    const buttons = [
-                                        { label: 'Edit', onClick: () => onEdit(u), className: 'bg-blue-600 text-white text-xs py-1 px-2 rounded hover:bg-blue-700 font-semibold' }
-                                    ];
+                                    const buttons = [];
+                                    if (onEdit) {
+                                        buttons.push({ label: 'Edit', onClick: () => onEdit(u), className: 'bg-blue-600 text-white text-xs py-1 px-2 rounded hover:bg-blue-700 font-semibold' });
+                                    }
                                     if (onArchive && u.id !== currentUserId) {
                                         buttons.push({ label: 'Archive', onClick: () => onArchive(u), className: 'bg-yellow-600 text-white text-xs py-1 px-2 rounded hover:bg-yellow-700 font-semibold' });
                                     }
                                     if (onUnarchive) {
                                         buttons.push({ label: 'Restore', onClick: () => onUnarchive(u), className: 'bg-emerald-600 text-white text-xs py-1 px-2 rounded hover:bg-emerald-700 font-semibold' });
+                                    }
+                                    if (buttons.length === 0) {
+                                        return <span className="text-gray-400 text-xs">View only</span>;
                                     }
                                     return <ActionButtons buttons={buttons} />;
                                 })()}
