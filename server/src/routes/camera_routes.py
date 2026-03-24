@@ -12,7 +12,7 @@ from src.controllers.camera_controller import (
     delete_camera_logic
 )
 from src.controllers.camera_controller import publish_camera_to_mediamtx, unpublish_camera_from_mediamtx
-from src.utils.auth import get_current_user_id
+from src.utils.auth import get_current_user_id, require_admin_user_id
 
 router = APIRouter()
 
@@ -28,7 +28,7 @@ async def get_single_camera(camera_id: int, user_id: str = Depends(get_current_u
 
 # NEW: Logic for manually adding a camera via the Management UI
 @router.post('/cameras')
-async def create_camera(camera_data: dict, user_id: str = Depends(get_current_user_id)):
+async def create_camera(camera_data: dict, user_id: str = Depends(require_admin_user_id)):
     camera_data = sanitize_input(camera_data)
     # 1. Save the camera details (Name, RTSP Link, Location) to the database
     result, code = await create_camera_logic(camera_data)
@@ -48,26 +48,26 @@ async def create_camera(camera_data: dict, user_id: str = Depends(get_current_us
 # PATCH endpoint for updating camera details
 from fastapi import Request
 @router.patch('/cameras/{camera_id}')
-async def update_camera(camera_id: int, request: Request, user_id: str = Depends(get_current_user_id)):
+async def update_camera(camera_id: int, request: Request, user_id: str = Depends(require_admin_user_id)):
     camera_data = await get_sanitized_json(request)
     result, code = await update_camera_logic(camera_id, camera_data)
     return safe_json_response(status_code=code, content=result)
 
 @router.delete('/cameras/{camera_id}')
-async def delete_camera(camera_id: int, user_id: str = Depends(get_current_user_id)):
+async def delete_camera(camera_id: int, user_id: str = Depends(require_admin_user_id)):
     result, code = await delete_camera_logic(camera_id)
     return safe_json_response(status_code=code, content=result)
 
 
 @router.post('/cameras/{camera_id}/publish')
-async def publish_camera(camera_id: int, user_id: str = Depends(get_current_user_id)):
+async def publish_camera(camera_id: int, user_id: str = Depends(require_admin_user_id)):
     """Create/update MediaMTX path for camera and restart MediaMTX."""
     result, code = await publish_camera_to_mediamtx(camera_id)
     return safe_json_response(status_code=code, content=result)
 
 
 @router.post('/cameras/{camera_id}/unpublish')
-async def unpublish_camera(camera_id: int, user_id: str = Depends(get_current_user_id)):
+async def unpublish_camera(camera_id: int, user_id: str = Depends(require_admin_user_id)):
     """Remove camera path from MediaMTX and restart MediaMTX."""
     result, code = await unpublish_camera_from_mediamtx(camera_id)
     return safe_json_response(status_code=code, content=result)

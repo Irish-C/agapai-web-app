@@ -11,6 +11,8 @@ import ManagementDashboard from "../features/manager/ManagementDashboard.jsx";
 
 export default function Settings({ user }) {
     const isAdmin = normalizeRole(user?.role) === 'admin'; 
+    const isSupervisor = normalizeRole(user?.role) === 'supervisor';
+    const isGuard = normalizeRole(user?.role) === 'guard';
     
     const [activeSection, setActiveSection] = useState('my_account'); 
     const [locations, setLocations] = useState([]);
@@ -22,14 +24,19 @@ export default function Settings({ user }) {
     // 2. Define the navigation structure with roles
     const fullNavItems = [
         { id: 'my_account', name: 'My Account', icon: FaUserCog, role: 'all' },
-        { id: 'devloc_management', name: 'Device and Location', icon: FaConnectdevelop, role: 'admin' }, 
+        { id: 'devloc_management', name: 'Device and Location', icon: FaConnectdevelop, role: 'admin_supervisor_guard' }, 
         { id: 'notification', name: 'Notifications', icon: FaBell, role: 'all' },
-        { id: 'user_management', name: 'User Management', icon: FaUsers, role: 'admin' }, 
+        { id: 'user_management', name: 'User Management', icon: FaUsers, role: 'admin_or_supervisor' }, 
     ];
     
     // 3. Filter the navigation items based on the user's role
     const navItems = fullNavItems.filter(item => {
-        return item.role === 'all' || (item.role === 'admin' && isAdmin);
+        return (
+            item.role === 'all' ||
+            (item.role === 'admin' && isAdmin) ||
+            (item.role === 'admin_supervisor_guard' && (isAdmin || isSupervisor || isGuard)) ||
+            (item.role === 'admin_or_supervisor' && (isAdmin || isSupervisor))
+        );
     });
 
     const renderActiveComponent = () => {
@@ -38,19 +45,22 @@ export default function Settings({ user }) {
                 return <AccountSettingsForm user={user} />;
             
             case 'devloc_management':
-                return isAdmin ? (
+                return (isAdmin || isSupervisor || isGuard) ? (
                     <ManagementDashboard 
                         locations={locations} 
                         onLocationsUpdated={handleLocationsUpdate}
+                        readOnly={!isAdmin}
                     />
                 ) : (
-                    <p className="text-red-500">Access Denied: You must be an Administrator to manage devices and locations.</p>
+                    <p className="text-red-500">Access Denied: You must be an Administrator, Supervisor, or Guard to view devices and locations.</p>
                 );
 
             case 'notification':
                 return <CameraNotificationSettings />;
             case 'user_management': 
-                return isAdmin ? <UserManager user={user} /> : <p className="text-red-500">Access Denied: You must be an Administrator to manage users.</p>; 
+                return (isAdmin || isSupervisor)
+                    ? <UserManager user={user} readOnly={!isAdmin} />
+                    : <p className="text-red-500">Access Denied: You must be an Administrator or Supervisor to view users.</p>; 
             default:
                 return <div>Please select a setting category.</div>;
         }

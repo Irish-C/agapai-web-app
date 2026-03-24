@@ -5,7 +5,7 @@ import CameraManager from './CameraManager.jsx';
 /**
  * Container component to display CameraManager with integrated LocationManager.
  */
-export default function ManagementDashboard({ locations, onLocationsUpdated }) {
+export default function ManagementDashboard({ locations, onLocationsUpdated, readOnly = false }) {
     
     return (
         <div>
@@ -13,6 +13,7 @@ export default function ManagementDashboard({ locations, onLocationsUpdated }) {
             <CameraManager 
                 locations={locations} 
                 onCameraUpdated={() => { /* Handle camera update */ }}
+                readOnly={readOnly}
             />
         </div>
     );

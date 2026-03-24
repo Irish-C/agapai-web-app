@@ -1,7 +1,7 @@
 import React from 'react';
 import { TableInput, ActionButtons } from './FormComponents';
 
-export default function LocationTable({ locations, editingLoc, setEditingLoc, onEdit, onDelete, onUpdate }) {
+export default function LocationTable({ locations, editingLoc, setEditingLoc, onEdit, onDelete, onUpdate, readOnly = false }) {
   const sanitizeLocationName = (value) => {
     if (typeof value !== 'string') return '';
     return value
@@ -25,20 +25,30 @@ export default function LocationTable({ locations, editingLoc, setEditingLoc, on
             <tr className={`transition-colors ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-100'} hover:bg-gray-200`}>
               <td className="px-4 py-3 text-gray-900 font-semibold w-4/5 truncate">{loc.name}</td>
               <td className="px-4 py-3 w-1/5">
-                {editingLoc?.id === loc.id ? (
-                  <ActionButtons buttons={[
-                    { label: 'Save', onClick: onUpdate, className: 'bg-green-600 text-white text-xs py-1 px-2 rounded hover:bg-green-700 font-semibold' },
-                    { label: 'Cancel', onClick: () => setEditingLoc(null), className: 'bg-gray-500 text-white text-xs py-1 px-2 rounded hover:bg-gray-600 font-semibold' },
-                  ]} />
-                ) : (
-                  <ActionButtons buttons={[
-                    { label: 'Edit', onClick: () => onEdit(loc), className: 'bg-blue-600 text-white text-xs py-1 px-2 rounded hover:bg-blue-700 font-semibold' },
-                    { label: 'Delete', onClick: () => onDelete(loc.id), className: 'bg-red-600 text-white text-xs py-1 px-2 rounded hover:bg-red-700 font-semibold' },
-                  ]} />
-                )}
+                {(() => {
+                  if (readOnly) {
+                    return <span className="text-gray-400 text-xs">View only</span>;
+                  }
+
+                  if (editingLoc?.id === loc.id) {
+                    return (
+                      <ActionButtons buttons={[
+                        { label: 'Save', onClick: onUpdate, className: 'bg-green-600 text-white text-xs py-1 px-2 rounded hover:bg-green-700 font-semibold' },
+                        { label: 'Cancel', onClick: () => setEditingLoc(null), className: 'bg-gray-500 text-white text-xs py-1 px-2 rounded hover:bg-gray-600 font-semibold' },
+                      ]} />
+                    );
+                  }
+
+                  return (
+                    <ActionButtons buttons={[
+                      { label: 'Edit', onClick: () => onEdit(loc), className: 'bg-blue-600 text-white text-xs py-1 px-2 rounded hover:bg-blue-700 font-semibold' },
+                      { label: 'Delete', onClick: () => onDelete(loc.id), className: 'bg-red-600 text-white text-xs py-1 px-2 rounded hover:bg-red-700 font-semibold' },
+                    ]} />
+                  );
+                })()}
               </td>
             </tr>
-            {editingLoc?.id === loc.id && (
+            {!readOnly && editingLoc?.id === loc.id && (
               <tr className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-100'}>
                 <td colSpan="2" className="px-4 py-3">
                   <form onSubmit={onUpdate} className="space-y-3 bg-blue-50 p-4 rounded-lg border border-blue-200">

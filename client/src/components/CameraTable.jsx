@@ -2,7 +2,7 @@ import React from 'react';
 import { FaSave } from 'react-icons/fa';
 import { TableInput, ActionButtons } from './FormComponents';
 
-export default function CameraTable({ cameras, locations, editingCam, setEditingCam, publishedCameras, onEdit, onDelete, onPublish, onUpdate }) {
+export default function CameraTable({ cameras, locations, editingCam, setEditingCam, publishedCameras, onEdit, onDelete, onPublish, onUpdate, readOnly = false }) {
   const sanitizeCameraName = (value) => {
     if (typeof value !== 'string') return '';
     return value
@@ -40,21 +40,31 @@ export default function CameraTable({ cameras, locations, editingCam, setEditing
               <td className="px-4 py-3 text-gray-700 w-1/4 truncate">{cam.location_name || 'Unknown'}</td>
               <td className="px-4 py-3 text-gray-600 text-sm w-3/10 truncate">{cam.stream_url}</td>
               <td className="px-4 py-3 w-1/5">
-                {editingCam?.id === cam.id ? (
-                  <ActionButtons buttons={[
-                    { label: 'Save', onClick: onUpdate, className: 'bg-green-600 text-white text-xs py-1 px-2 rounded hover:bg-green-700 font-semibold' },
-                    { label: 'Cancel', onClick: () => setEditingCam(null), className: 'bg-gray-500 text-white text-xs py-1 px-2 rounded hover:bg-gray-600 font-semibold' },
-                  ]} />
-                ) : (
-                  <ActionButtons buttons={[
-                    { label: 'Edit', onClick: () => onEdit(cam), className: 'bg-blue-600 text-white text-xs py-1 px-2 rounded hover:bg-blue-700 font-semibold disabled:opacity-50', disabled: locations.length === 0 },
-                    { label: 'Delete', onClick: () => onDelete(cam.id), className: 'bg-red-600 text-white text-xs py-1 px-2 rounded hover:bg-red-700 font-semibold' },
-                    { label: publishedCameras.has(cam.id) ? 'Unpublish' : 'Publish', onClick: () => onPublish(cam.id), className: publishedCameras.has(cam.id) ? 'bg-gray-600 text-white text-xs py-1 px-2 rounded hover:bg-gray-700 font-semibold' : 'bg-yellow-600 text-white text-xs py-1 px-2 rounded hover:bg-yellow-700 font-semibold' },
-                  ]} />
-                )}
+                {(() => {
+                  if (readOnly) {
+                    return <span className="text-gray-400 text-xs">View only</span>;
+                  }
+
+                  if (editingCam?.id === cam.id) {
+                    return (
+                      <ActionButtons buttons={[
+                        { label: 'Save', onClick: onUpdate, className: 'bg-green-600 text-white text-xs py-1 px-2 rounded hover:bg-green-700 font-semibold' },
+                        { label: 'Cancel', onClick: () => setEditingCam(null), className: 'bg-gray-500 text-white text-xs py-1 px-2 rounded hover:bg-gray-600 font-semibold' },
+                      ]} />
+                    );
+                  }
+
+                  return (
+                    <ActionButtons buttons={[
+                      { label: 'Edit', onClick: () => onEdit(cam), className: 'bg-blue-600 text-white text-xs py-1 px-2 rounded hover:bg-blue-700 font-semibold disabled:opacity-50', disabled: locations.length === 0 },
+                      { label: 'Delete', onClick: () => onDelete(cam.id), className: 'bg-red-600 text-white text-xs py-1 px-2 rounded hover:bg-red-700 font-semibold' },
+                      { label: publishedCameras.has(cam.id) ? 'Unpublish' : 'Publish', onClick: () => onPublish(cam.id), className: publishedCameras.has(cam.id) ? 'bg-gray-600 text-white text-xs py-1 px-2 rounded hover:bg-gray-700 font-semibold' : 'bg-yellow-600 text-white text-xs py-1 px-2 rounded hover:bg-yellow-700 font-semibold' },
+                    ]} />
+                  );
+                })()}
               </td>
             </tr>
-            {editingCam?.id === cam.id && (
+            {!readOnly && editingCam?.id === cam.id && (
               <tr className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-100'}>
                 <td colSpan="4" className="px-4 py-3">
                   <form onSubmit={onUpdate} className="space-y-3 bg-blue-50 p-4 rounded-lg border border-blue-200">

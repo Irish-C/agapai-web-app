@@ -20,7 +20,7 @@ const ensureSubtype = (url) => {
   return url;
 };
 
-export default function CameraManager({ locations: initialLocations, onCameraUpdated }) {
+export default function CameraManager({ locations: initialLocations, onCameraUpdated, readOnly = false }) {
   const [activeTab, setActiveTab] = useState('list');
   const [publishedCameras, setPublishedCameras] = useLocalStorageSet('publishedCameras');
   const [deleteModal, setDeleteModal] = useState({ open: false, type: '', id: null });
@@ -108,20 +108,25 @@ export default function CameraManager({ locations: initialLocations, onCameraUpd
 
       {cam.message.text && <div className={`mb-6 p-4 border rounded-lg font-medium ${messageClass(cam.message)}`}>{cam.message.text}</div>}
       {loc.message.text && <div className={`mb-6 p-4 border rounded-lg font-medium ${messageClass(loc.message)}`}>{loc.message.text}</div>}
+      {readOnly && (
+        <div className="mb-6 p-4 border rounded-lg font-medium bg-blue-50 border-blue-200 text-blue-700">
+          View-only mode: only administrators can add, edit, delete, or publish cameras and locations.
+        </div>
+      )}
 
       <div className="flex gap-2 mb-12">
         <button onClick={() => setActiveTab('list')} className={tabButtonClass(activeTab === 'list')}>Camera List ({cam.cameras.length})</button>
-        <button onClick={() => setActiveTab('add')} className={tabButtonClass(activeTab === 'add')}>Add Camera</button>
+        {!readOnly && <button onClick={() => setActiveTab('add')} className={tabButtonClass(activeTab === 'add')}>Add Camera</button>}
         <button onClick={() => setActiveTab('locations')} className={tabButtonClass(activeTab === 'locations')}>Locations ({loc.locations.length})</button>
       </div>
 
       {activeTab === 'list' && (
         cam.cameras.length === 0 
           ? <EmptyState Icon={FaCameraRetro} message="No cameras yet. Add a camera from the Add Camera tab." />
-          : <div className="max-h-screen overflow-y-auto pr-2"><CameraTable cameras={cam.cameras} locations={loc.locations} editingCam={cam.editingCam} setEditingCam={cam.setEditingCam} publishedCameras={publishedCameras} onEdit={(c) => cam.setEditingCam({ ...c, cam_name: c.name, stream_url: c.stream_url || '', loc_id: c.location_id || loc.locations[0]?.id })} onDelete={(id) => setDeleteModal({ open: true, type: 'camera', id })} onPublish={(id) => setPublishModal({ open: true, id })} onUpdate={handleUpdateCamera} /></div>
+          : <div className="max-h-screen overflow-y-auto pr-2"><CameraTable cameras={cam.cameras} locations={loc.locations} editingCam={cam.editingCam} setEditingCam={cam.setEditingCam} publishedCameras={publishedCameras} onEdit={(c) => cam.setEditingCam({ ...c, cam_name: c.name, stream_url: c.stream_url || '', loc_id: c.location_id || loc.locations[0]?.id })} onDelete={(id) => setDeleteModal({ open: true, type: 'camera', id })} onPublish={(id) => setPublishModal({ open: true, id })} onUpdate={handleUpdateCamera} readOnly={readOnly} /></div>
       )}
 
-      {activeTab === 'add' && (
+      {!readOnly && activeTab === 'add' && (
         <form onSubmit={handleAddCamera} className="space-y-4 max-w-lg bg-white p-6 rounded-xl border border-gray-200">
           <h3 className="text-lg font-semibold text-gray-900 mb-4">Add New Camera</h3>
           <TableInput label="Camera Name" name="name" value={cam.newCam.name} onChange={(e) => cam.setNewCam(p => ({ ...p, [e.target.name]: sanitizeCameraName(e.target.value) }))} placeholder="e.g., Hallway Camera 1" />
@@ -136,14 +141,18 @@ export default function CameraManager({ locations: initialLocations, onCameraUpd
 
       {activeTab === 'locations' && (
         <>
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Add New Location</h3>
-          <form onSubmit={handleAddLocation} className="flex gap-3 mb-6" style={{ maxWidth: '400px' }}>
-            <input type="text" value={loc.newLocName} onChange={(e) => loc.setNewLocName(sanitizeLocationName(e.target.value))} className="flex-1 pl-4 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 outline-none transition-all placeholder:text-gray-300 text-base" placeholder="e.g., Main Lobby..." required />
-            <button type="submit" className="px-6 py-3 bg-green-600 text-white font-semibold rounded-xl hover:bg-green-700 whitespace-nowrap transition-colors">Add Location</button>
-          </form>
+          {!readOnly && (
+            <>
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Add New Location</h3>
+              <form onSubmit={handleAddLocation} className="flex gap-3 mb-6" style={{ maxWidth: '400px' }}>
+                <input type="text" value={loc.newLocName} onChange={(e) => loc.setNewLocName(sanitizeLocationName(e.target.value))} className="flex-1 pl-4 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 outline-none transition-all placeholder:text-gray-300 text-base" placeholder="e.g., Main Lobby..." required />
+                <button type="submit" className="px-6 py-3 bg-green-600 text-white font-semibold rounded-xl hover:bg-green-700 whitespace-nowrap transition-colors">Add Location</button>
+              </form>
+            </>
+          )}
           {loc.locations.length === 0
             ? <EmptyState Icon={FaMapMarkerAlt} message="No locations yet. Add one above to get started." />
-            : <div className="max-h-screen overflow-y-auto pr-2"><LocationTable locations={loc.locations} editingLoc={loc.editingLoc} setEditingLoc={loc.setEditingLoc} onEdit={(l) => loc.setEditingLoc({ ...l })} onDelete={(id) => setDeleteModal({ open: true, type: 'location', id })} onUpdate={(e) => { e.preventDefault(); loc.updateLocation(loc.editingLoc.id, loc.editingLoc.name); }} /></div>
+            : <div className="max-h-screen overflow-y-auto pr-2"><LocationTable locations={loc.locations} editingLoc={loc.editingLoc} setEditingLoc={loc.setEditingLoc} onEdit={(l) => loc.setEditingLoc({ ...l })} onDelete={(id) => setDeleteModal({ open: true, type: 'location', id })} onUpdate={(e) => { e.preventDefault(); loc.updateLocation(loc.editingLoc.id, loc.editingLoc.name); }} readOnly={readOnly} /></div>
           }
         </>
       )}
