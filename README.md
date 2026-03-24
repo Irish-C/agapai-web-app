@@ -169,6 +169,51 @@ cd ..
 
 See `server/scripts/setup_dev_db.sh` for database user/role setup. You may need `sudo` rights for Postgres if not using Docker.
 
+
+## MediaMTX Streaming Server Setup
+
+MediaMTX is used for RTSP/HLS/WebRTC streaming. You can run it via Docker (recommended for all platforms) or manually (Windows/Linux).
+
+### Option 1: Run MediaMTX with Docker (Recommended)
+
+1. Ensure Docker Desktop is installed and running.
+2. Use the provided `docker-compose.yml`:
+
+	```bash
+	docker compose up -d mediamtx
+	```
+	This will start MediaMTX and expose the necessary ports (RTSP, HLS, WebRTC, etc.).
+3. The config file is mounted from `server/mediamtx.yml`.
+
+### Option 2: Run MediaMTX Manually
+
+#### On Windows:
+1. Download the latest `mediamtx.exe` from the [official releases](https://github.com/bluenviron/mediamtx/releases) or use the included binary in `server/mediamtx.exe`.
+2. Open PowerShell, navigate to the `server` directory:
+	```powershell
+	cd server
+	.\mediamtx.exe mediamtx.yml
+	```
+3. The server will start and use the config in `mediamtx.yml`.
+
+#### On Unix/Mac:
+1. Download the latest `mediamtx` binary from the [official releases](https://github.com/bluenviron/mediamtx/releases) and place it in the `server` directory.
+2. Make it executable:
+	```sh
+	chmod +x mediamtx
+	./mediamtx mediamtx.yml
+	```
+
+### Configuration
+- Edit `server/mediamtx.yml` to add or update camera RTSP sources.
+- Ports (default): 8554 (RTSP), 8888 (HLS), 8889 (WebRTC HTTP), 8189/udp (WebRTC ICE), 1935 (RTMP), 8890/udp (SRT)
+
+### Troubleshooting
+- If you get errors about missing DLLs (Windows), ensure you have the correct binary and run as Administrator if needed.
+- If ports are in use, stop other streaming servers or change the ports in `mediamtx.yml`.
+- For Docker, ensure the ports are not blocked by firewall/antivirus.
+
+---
 ## Quick Start
 
 1. Install all prerequisites and follow the installation steps above.
