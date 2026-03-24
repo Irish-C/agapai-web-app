@@ -275,10 +275,14 @@ pip install -r requirements.txt
 
 The following scripts are now located in `server/test-scripts/`:
 
-- `activate_camera.py`, `clean_and_activate.py`, `quick_check.py`, `update_camera_creds.py`
-- `test_rtsp.py`, `test_rtsp_variants.py`, `init_db.py`, `hash_passwords.py`
 
-These are for diagnostics, database/camera maintenance, or RTSP testing. They are not required for normal app operation.
+These are for diagnostics, database/camera maintenance, RTSP testing, or database sequence resets. They are not required for normal app operation.
+
+**Database Sequence Reset:**
+
+- `reset_sequences_v2.sql` is now in `server/test-scripts/`. Run this SQL script in your PostgreSQL database if you need to reset auto-increment counters after manual data changes or imports.
+
+**Usage:**
 
 **Usage:**
 
@@ -291,12 +295,15 @@ These are for diagnostics, database/camera maintenance, or RTSP testing. They ar
 
 ---
 
+
 ## Additional Documentation
 
 - [APP.md](APP.md): UI and feature overview
 - [AUTO_RECONNECT_AND_SYNC.md](AUTO_RECONNECT_AND_SYNC.md): Realtime architecture
 - [RECONNECT_VERIFICATION.md](RECONNECT_VERIFICATION.md): Implementation checklist
 - [SOCKET_IO_TESTING.md](SOCKET_IO_TESTING.md): QA/testing scenarios
+- [RATE_LIMITING.md](RATE_LIMITING.md): Backend rate limiting configuration (now in project root)
+- [LICENSE](LICENSE): MIT license for the project (now in project root)
 
 1. Create a branch for the change.
 2. Keep scope focused and include tests/manual verification notes.
