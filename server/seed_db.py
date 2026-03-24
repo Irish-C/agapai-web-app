@@ -1,4 +1,5 @@
 import asyncio
+import os
 from datetime import UTC, datetime, timedelta
 from database import db
 from werkzeug.security import generate_password_hash
@@ -7,6 +8,13 @@ async def seed_database():
     try:
         if not db.is_connected():
             await db.connect()
+
+        seed_password = os.getenv('AGAPAI_SEED_PASSWORD')
+        if not seed_password:
+            return {
+                "status": "error",
+                "message": "AGAPAI_SEED_PASSWORD is required for seeding user accounts"
+            }
 
         # ===== 1. SEED ROLES =====
         print("Seeding roles...")
@@ -28,19 +36,19 @@ async def seed_database():
         users_data = [
             {
                 "fn": "Regine", "mn": "A", "ln": "Dahan", "un": "reginedahan", 
-                "em": "reginefaedahan@gmail.com", "pw": "regine321", "r": "admin", "bd": "1990-01-01T00:00:00Z"
+                "em": "reginefaedahan@gmail.com", "r": "admin", "bd": "1990-01-01T00:00:00Z"
             },
             {
                 "fn": "Kath", "mn": "B", "ln": "Nava", "un": "kathnava", 
-                "em": "kthcnava@gmail.com", "pw": "kath321", "r": "supervisor", "bd": "1992-05-15T00:00:00Z"
+                "em": "kthcnava@gmail.com", "r": "supervisor", "bd": "1992-05-15T00:00:00Z"
             },
             {
                 "fn": "Kaye", "mn": "C", "ln": "Casem", "un": "kayecasem", 
-                "em": "kayecasem31@gmail.com", "pw": "kaye321", "r": "guard", "bd": "1995-10-20T00:00:00Z"
+                "em": "kayecasem31@gmail.com", "r": "guard", "bd": "1995-10-20T00:00:00Z"
             },
             {
                 "fn": "Mary", "mn": "D", "ln": "Cam", "un": "marycam", 
-                "em": "maryirish.cammagay@gmail.com", "pw": "mary321", "r": "caregiver", "bd": "1988-12-12T00:00:00Z"
+                "em": "maryirish.cammagay@gmail.com", "r": "caregiver", "bd": "1988-12-12T00:00:00Z"
             }
         ]
 
@@ -55,7 +63,7 @@ async def seed_database():
                         'email': u['em'],
                         'birthdate': u['bd'],
                         'username': u['un'],
-                        'password': generate_password_hash(u['pw']),
+                        'password': generate_password_hash(seed_password),
                         'role': {'connect': {'id': created_roles[u['r']]}}
                     },
                     'update': {
