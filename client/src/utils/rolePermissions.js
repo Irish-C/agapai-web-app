@@ -5,7 +5,9 @@ export const ALL_PERMISSIONS = [
   'Create Users',
   'Edit Users',
   'Archive/Restore Users',
-  'Manage Cameras',
+  'View Users',
+  'View Devices/Locations',
+  'Manage Devices/Locations',
   'View Reports',
   'System Settings',
   'View Live Feed',
@@ -13,15 +15,20 @@ export const ALL_PERMISSIONS = [
 
 // Source-of-truth role capability matrix for Settings > Role Overview.
 // Keep this aligned with backend/frontend authorization:
-// - admin-only user management: server/src/routes/user_routes.py (require_admin_user_id)
+// - user read access: server/src/routes/user_routes.py (require_admin_or_supervisor_user_id)
+// - user writes (create/edit/archive): server/src/routes/user_routes.py (require_admin_user_id)
+// - camera/location reads: server/src/routes/camera_routes.py, server/src/routes/location_routes.py (get_current_user_id)
+// - camera/location writes: server/src/routes/camera_routes.py, server/src/routes/location_routes.py (require_admin_user_id)
 // - admin-only global settings: server/src/routes/settings_routes.py (require_admin_user_id)
-// - authenticated reports/cameras: server/src/routes/event_routes.py, server/src/routes/camera_routes.py
+// - authenticated reports/live feed: server/src/routes/event_routes.py, server/src/routes/camera_routes.py
 export const ROLE_PERMISSIONS = {
   admin: {
     'Create Users': true,
     'Edit Users': true,
     'Archive/Restore Users': true,
-    'Manage Cameras': true,
+    'View Users': true,
+    'View Devices/Locations': true,
+    'Manage Devices/Locations': true,
     'View Reports': true,
     'System Settings': true,
     'View Live Feed': true,
@@ -30,7 +37,9 @@ export const ROLE_PERMISSIONS = {
     'Create Users': false,
     'Edit Users': false,
     'Archive/Restore Users': false,
-    'Manage Cameras': true,
+    'View Users': true,
+    'View Devices/Locations': true,
+    'Manage Devices/Locations': false,
     'View Reports': true,
     'System Settings': false,
     'View Live Feed': true,
@@ -39,7 +48,9 @@ export const ROLE_PERMISSIONS = {
     'Create Users': false,
     'Edit Users': false,
     'Archive/Restore Users': false,
-    'Manage Cameras': true,
+    'View Users': false,
+    'View Devices/Locations': true,
+    'Manage Devices/Locations': false,
     'View Reports': true,
     'System Settings': false,
     'View Live Feed': true,
@@ -48,7 +59,9 @@ export const ROLE_PERMISSIONS = {
     'Create Users': false,
     'Edit Users': false,
     'Archive/Restore Users': false,
-    'Manage Cameras': true,
+    'View Users': false,
+    'View Devices/Locations': false,
+    'Manage Devices/Locations': false,
     'View Reports': true,
     'System Settings': false,
     'View Live Feed': true,
