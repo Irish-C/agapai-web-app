@@ -9,6 +9,17 @@ import { fetchReportsData, fetchApi } from '../../services/apiService.js';
  * Also fetches today's persisted logs from the database.
  */
 export default function TodayReport({ incidents = [], alerts = [], user }) {
+    const getCurrentUsername = () => {
+        try {
+            const rawUser = localStorage.getItem('user');
+            if (!rawUser) return '';
+            const parsedUser = JSON.parse(rawUser);
+            return parsedUser?.username || '';
+        } catch {
+            return '';
+        }
+    };
+
     const getLocalDateKey = (dateInput) => {
         const date = new Date(dateInput);
         if (Number.isNaN(date.getTime())) return '';
@@ -132,11 +143,17 @@ export default function TodayReport({ incidents = [], alerts = [], user }) {
             const response = await fetchApi(`/events/${incidentId}/acknowledge`, 'POST');
             
             if (response.status === 'success') {
+                const currentUsername = getCurrentUsername();
                 // Update the incident in state to reflect acknowledged status
                 setAllIncidents(prev => 
                     prev.map(inc => 
                         (inc.id === incidentId || inc.log_id === incidentId)
-                            ? { ...inc, status: 'acknowledged', event_status: 'acknowledged' }
+                            ? {
+                                ...inc,
+                                status: 'acknowledged',
+                                event_status: 'acknowledged',
+                                acknowledged_by_username: currentUsername || inc.acknowledged_by_username,
+                            }
                             : inc
                     )
                 );
@@ -174,7 +191,12 @@ export default function TodayReport({ incidents = [], alerts = [], user }) {
                 setAllIncidents(prev => 
                     prev.map(inc => 
                         (inc.id === incidentId || inc.log_id === incidentId)
-                            ? { ...inc, status: 'unacknowledged', event_status: 'unacknowledged' }
+                            ? {
+                                ...inc,
+                                status: 'unacknowledged',
+                                event_status: 'unacknowledged',
+                                acknowledged_by_username: null,
+                            }
                             : inc
                     )
                 );
@@ -241,6 +263,9 @@ export default function TodayReport({ incidents = [], alerts = [], user }) {
                             const incidentStatus = incident.status || incident.event_status || 'unacknowledged';
                             const isAcknowledged = incidentStatus === 'acknowledged';
                             const isLoading = acknowledgeLoading[incidentId];
+                            const currentUsername = getCurrentUsername().toLowerCase();
+                            const acknowledgedBy = (incident.acknowledged_by_username || '').toLowerCase();
+                            const canUnacknowledge = !isAcknowledged || !acknowledgedBy || acknowledgedBy === currentUsername;
                             const location =
                                 incident.location ||
                                 incident.location_name ||
@@ -281,7 +306,7 @@ export default function TodayReport({ incidents = [], alerts = [], user }) {
                                                 href={snapshotUrl}
                                                 target="_blank"
                                                 rel="noopener noreferrer"
-                                                className={`flex-1 text-xs font-semibold text-center px-3 py-2 rounded transition-colors ${
+                                                className={`flex-1 inline-flex items-center justify-center text-xs font-semibold px-3 py-2 rounded transition-colors ${
                                                     isAcknowledged
                                                         ? 'text-gray-600 bg-gray-200 hover:bg-gray-300'
                                                         : 'text-gray-700 bg-red-200 hover:bg-gray-300'
@@ -293,14 +318,17 @@ export default function TodayReport({ incidents = [], alerts = [], user }) {
                                         {isAcknowledged ? (
                                             <button
                                                 onClick={() => unacknowledgeIncident(incident)}
-                                                disabled={isLoading}
+                                                disabled={isLoading || !canUnacknowledge}
+                                                title={!canUnacknowledge ? 'Only the user who acknowledged can unacknowledge this event.' : ''}
                                                 className={`flex-1 text-xs font-semibold px-3 py-2 rounded transition-all ${
-                                                    isLoading
+                                                    (isLoading || !canUnacknowledge)
                                                         ? 'bg-gray-300 text-gray-600 cursor-not-allowed opacity-60'
                                                         : 'bg-gray-200 text-gray-700 hover:bg-gray-300 cursor-pointer'
                                                 }`}
                                             >
-                                                {isLoading ? 'Updating...' : 'Unacknowledge'}
+                                                {isLoading
+                                                    ? 'Updating...'
+                                                    : `Acknowledged by ${incident.acknowledged_by_username || 'Unknown User'}`}
                                             </button>
                                         ) : (
                                             <button

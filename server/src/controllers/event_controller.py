@@ -98,7 +98,7 @@ async def get_event_logs_logic(filters=None):
             take=limit, # Use the limit here
             where=where_clause,
             order={'timestamp': 'desc'},
-            include={'camera': {'include': {'location': True}}, 'event_class': True}
+            include={'camera': {'include': {'location': True}}, 'event_class': True, 'acknowledged_by': True}
         )
         
         # Convert BigInt and DateTime to strings for JSON
@@ -110,7 +110,8 @@ async def get_event_logs_logic(filters=None):
                 "location": _location_label(log.camera),
                 "timestamp": log.timestamp.isoformat(),
                 "snapshot_url": log.file_path,
-                "status": log.event_status
+                "status": log.event_status,
+                "acknowledged_by_username": log.acknowledged_by.username if log.acknowledged_by else None
             })
             
         return {"status": "success", "report": formatted_data}, 200
@@ -161,8 +162,19 @@ async def mark_viewed_logic(log_id, user_id):
     except Exception as e:
         return {"status": "error", "message": str(e)}, 500
 
-async def mark_unviewed_logic(log_id):
+async def mark_unviewed_logic(log_id, user_id):
     try:
+        existing_log = await db.eventlog.find_unique(where={'id': int(log_id)})
+        if not existing_log:
+            return {"status": "error", "message": "Event not found"}, 404
+
+        # Only the original acknowledger may unacknowledge this event.
+        if existing_log.ack_by_user_id is None or int(existing_log.ack_by_user_id) != int(user_id):
+            return {
+                "status": "error",
+                "message": "Only the user who acknowledged this event can unacknowledge it"
+            }, 403
+
         await db.eventlog.update(
             where={'id': int(log_id)},
             data={

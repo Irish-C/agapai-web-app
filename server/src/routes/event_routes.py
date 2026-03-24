@@ -36,7 +36,7 @@ async def acknowledge_event(log_id: int, user_id: str = Depends(get_current_user
 
 @router.post('/events/{log_id}/unacknowledge')
 async def unacknowledge_event(log_id: int, user_id: str = Depends(get_current_user_id)):
-    result, code = await mark_unviewed_logic(log_id)
+    result, code = await mark_unviewed_logic(log_id, user_id)
     return safe_json_response(status_code=code, content=result)
 
 # Add this route to your existing router

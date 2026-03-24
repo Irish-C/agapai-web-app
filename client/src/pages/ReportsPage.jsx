@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { 
-    FaFileAlt, FaSpinner, FaExclamationTriangle, FaArrowRight, 
+    FaFileAlt, FaSpinner, FaExclamationTriangle, FaEllipsisV, 
     FaSearch, FaTimes, FaCircle, FaDownload, FaFilter 
 } from 'react-icons/fa';
 import { fetchReportsData, fetchApi } from '../services/apiService';
@@ -25,6 +25,7 @@ export default function ReportsPage() {
     const [filterClass, setFilterClass] = useState([]);
     const [filterStatus, setFilterStatus] = useState([]);
     const [showAllClassifications, setShowAllClassifications] = useState(false);
+    const [rowActionLoading, setRowActionLoading] = useState({});
 
     // Pagination States
     const [currentPage, setCurrentPage] = useState(1);
@@ -186,7 +187,9 @@ export default function ReportsPage() {
             const classification = log.event_class_name || log.type || '';
             const location = log.location || '';
             const status = log.status || '';
-            const acknowledgedBy = log.acknowledged_by_username || 'System';
+            const acknowledgedBy = (log.status || '').toLowerCase() === 'acknowledged'
+                ? (log.acknowledged_by_username || 'Unknown User')
+                : '';
             const snapshotUrl = log.snapshot_url || '';
 
             return [timestamp, classification, location, status, acknowledgedBy, snapshotUrl]
@@ -206,6 +209,63 @@ export default function ReportsPage() {
         link.click();
         document.body.removeChild(link);
         URL.revokeObjectURL(url);
+    };
+
+    const getCurrentUsername = () => {
+        try {
+            const rawUser = localStorage.getItem('user');
+            if (!rawUser) return 'Current User';
+            const parsedUser = JSON.parse(rawUser);
+            return parsedUser?.username || 'Current User';
+        } catch {
+            return 'Current User';
+        }
+    };
+
+    const handleToggleAcknowledge = async (log) => {
+        const logId = log?.id;
+        if (!logId) {
+            setError('Cannot update status: invalid log ID.');
+            return;
+        }
+
+        const currentStatus = (log.status || '').toLowerCase();
+        const currentUser = getCurrentUsername().toLowerCase();
+        const acknowledgedBy = (log.acknowledged_by_username || '').toLowerCase();
+
+        if (currentStatus === 'acknowledged' && acknowledgedBy && acknowledgedBy !== currentUser) {
+            setError('Only the user who acknowledged this event can unacknowledge it.');
+            return;
+        }
+
+        const willAcknowledge = currentStatus !== 'acknowledged';
+        const endpoint = willAcknowledge
+            ? `/events/${logId}/acknowledge`
+            : `/events/${logId}/unacknowledge`;
+
+        try {
+            setRowActionLoading(prev => ({ ...prev, [logId]: true }));
+            setError(null);
+
+            const response = await fetchApi(endpoint, 'POST');
+            if (response?.status !== 'success') {
+                throw new Error(response?.message || 'Status update failed.');
+            }
+
+            setLogs(prevLogs => prevLogs.map(item => {
+                if (String(item.id) !== String(logId)) return item;
+
+                return {
+                    ...item,
+                    status: willAcknowledge ? 'acknowledged' : 'unacknowledged',
+                    acknowledged_by_username: willAcknowledge ? getCurrentUsername() : null,
+                };
+            }));
+        } catch (err) {
+            setError(err.message || 'Failed to update acknowledgment status.');
+        } finally {
+            setRowActionLoading(prev => ({ ...prev, [logId]: false }));
+        }
     };
 
     const renderTableBody = () => {
@@ -235,10 +295,18 @@ export default function ReportsPage() {
         );
 
         return currentRows.map((log) => (
-            <tr key={log.id} className="hover:bg-teal-50/40 transition-all duration-300 group">
+            (() => {
+                const status = (log.status || '').toLowerCase();
+                const currentUser = getCurrentUsername().toLowerCase();
+                const acknowledgedBy = (log.acknowledged_by_username || '').toLowerCase();
+                const canToggle = status !== 'acknowledged' || !acknowledgedBy || acknowledgedBy === currentUser;
+                const isToggleDisabled = !!rowActionLoading[log.id] || !canToggle;
+
+                return (
+            <tr key={log.id} className="hover:bg-gray-50 transition-all duration-300 group">
                 <td className="px-8 py-6 whitespace-nowrap text-sm text-gray-700 font-semibold font-sans">
                     {new Date(log.timestamp).toLocaleDateString()} 
-                    <span className="text-gray-300 ml-2 font-normal font-sans">
+                    <span className="text-gray-500 ml-2 font-normal font-sans">
                         {new Date(log.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
                     </span>
                 </td>
@@ -255,10 +323,28 @@ export default function ReportsPage() {
                     </div>
                 </td>
                 <td className="px-8 py-6 whitespace-nowrap text-xs text-gray-400 italic font-medium font-sans">
-                    {log.acknowledged_by_username || 'System'}
+                    {(log.status || '').toLowerCase() === 'acknowledged'
+                        ? (log.acknowledged_by_username || 'Unknown User')
+                        : ''}
                 </td>
                 <td className="px-8 py-6 whitespace-nowrap text-right">
                     <div className="flex items-center justify-end gap-2">
+                        <button
+                            onClick={() => handleToggleAcknowledge(log)}
+                            disabled={isToggleDisabled}
+                            title={!canToggle ? 'Only the user who acknowledged can unacknowledge this event.' : ''}
+                            className={`px-3 py-2 text-xs font-bold rounded-xl transition ${
+                                isToggleDisabled
+                                    ? 'bg-gray-300 text-gray-600 cursor-not-allowed opacity-60'
+                                    : ((log.status || '').toLowerCase() === 'acknowledged'
+                                        ? 'bg-emerald-600 text-white hover:bg-emerald-700 cursor-pointer'
+                                        : 'bg-amber-500 text-white hover:bg-amber-600 cursor-pointer')
+                            }`}
+                        >
+                            {rowActionLoading[log.id]
+                                ? 'Saving...'
+                                : ((log.status || '').toLowerCase() === 'acknowledged' ? 'Unack' : 'Acknowledge')}
+                        </button>
                         {log.snapshot_url ? (
                             <a
                                 href={log.snapshot_url}
@@ -269,12 +355,18 @@ export default function ReportsPage() {
                                 View
                             </a>
                         ) : null}
-                        <button className="w-10 h-10 flex items-center justify-center rounded-full text-gray-300 group-hover:bg-teal-600 group-hover:text-white group-hover:shadow-lg transition-all">
-                            <FaArrowRight size={14} />
+                        <button
+                            type="button"
+                            aria-label="More actions"
+                            className="w-10 h-10 flex items-center justify-center rounded-full text-gray-400 hover:bg-gray-200 hover:text-gray-700 transition-all"
+                        >
+                            <FaEllipsisV size={14} />
                         </button>
                     </div>
                 </td>
             </tr>
+                );
+            })()
         ));
     };
 
@@ -381,7 +473,8 @@ export default function ReportsPage() {
 
             {/* --- DATA TABLE CARD --- */}
             <div className="bg-white rounded-[2.5rem] shadow-2xl shadow-gray-200/40 border border-gray-100 overflow-hidden">
-                <table className="min-w-full divide-y divide-gray-100 font-sans">
+                <div className="overflow-x-auto">
+                <table className="min-w-[900px] w-full divide-y divide-gray-100 font-sans">
                     <thead className="bg-gray-50/50">
                         <tr>
                             {['Timestamp', 'Classification', 'Location', 'Status', 'Ack. By', 'Action'].map((head) => (
@@ -393,6 +486,7 @@ export default function ReportsPage() {
                         {renderTableBody()}
                     </tbody>
                 </table>
+                </div>
 
                 {/* --- PAGINATION FOOTER --- */}
                 <div className="bg-gray-50/30 px-8 py-5 flex flex-col sm:flex-row items-center justify-between gap-4 border-t border-gray-100 font-sans">
