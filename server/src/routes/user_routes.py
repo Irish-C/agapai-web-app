@@ -1,6 +1,10 @@
 from fastapi import APIRouter, Request, Depends
 from database import db
-from src.utils.auth import get_current_user_id, require_admin_user_id
+from src.utils.auth import (
+    get_current_user_id,
+    require_admin_user_id,
+    require_admin_or_supervisor_user_id,
+)
 from src.utils.input_sanitization import get_sanitized_json
 from src.utils.serialization import safe_json_response
 
@@ -79,7 +83,7 @@ async def get_user_profile(user_id: str = Depends(get_current_user_id)):
 @router.get('/users')
 async def list_users(
     request: Request,
-    user_id: str = Depends(require_admin_user_id),
+    user_id: str = Depends(require_admin_or_supervisor_user_id),
 ):
     include_archived = str(request.query_params.get('include_archived', 'false')).lower() == 'true'
     archived_only = str(request.query_params.get('archived_only', 'false')).lower() == 'true'
@@ -117,7 +121,7 @@ async def change_password(request: Request, user_id: str = Depends(get_current_u
     return safe_json_response(status_code=code, content=result)
 
 @router.get('/roles')
-async def get_roles(user_id: str = Depends(require_admin_user_id)):
+async def get_roles(user_id: str = Depends(require_admin_or_supervisor_user_id)):
     try:
         # Now 'db' is defined and can be used
         roles = await db.role.find_many()
