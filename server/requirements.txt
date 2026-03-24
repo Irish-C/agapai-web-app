@@ -21,4 +21,6 @@ opencv-python-headless  # 'headless' is better for servers/Pi (no GUI needed)
 # --- Security & Utils ---
 passlib[bcrypt]         # REQUIRED for secure password hashing (Prisma/FastAPI)
 python-jose[cryptography] # REQUIRED if you use JWT tokens for AGAPAI login
+PyJWT                   # REQUIRED by src/utils/auth.py (import jwt)
+Werkzeug                # REQUIRED by seed_db.py for generate_password_hash
 requests

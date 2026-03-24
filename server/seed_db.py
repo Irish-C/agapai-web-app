@@ -1,5 +1,5 @@
 import asyncio
-from datetime import datetime
+from datetime import UTC, datetime, timedelta
 from database import db
 from werkzeug.security import generate_password_hash
 
@@ -28,19 +28,19 @@ async def seed_database():
         users_data = [
             {
                 "fn": "Regine", "mn": "A", "ln": "Dahan", "un": "reginedahan", 
-                "em": "regine@agapai.com", "pw": "agapai321", "r": "admin", "bd": "1990-01-01T00:00:00Z"
+                "em": "reginefaedahan@gmail.com", "pw": "regine321", "r": "admin", "bd": "1990-01-01T00:00:00Z"
             },
             {
                 "fn": "Kath", "mn": "B", "ln": "Nava", "un": "kathnava", 
-                "em": "kath@agapai.com", "pw": "kath321", "r": "supervisor", "bd": "1992-05-15T00:00:00Z"
+                "em": "kthcnava@gmail.com", "pw": "kath321", "r": "supervisor", "bd": "1992-05-15T00:00:00Z"
             },
             {
-                "fn": "Kaye", "mn": "C", "ln": "Casem", "un": "kayrecasem", 
-                "em": "kaye@agapai.com", "pw": "kaye321", "r": "guard", "bd": "1995-10-20T00:00:00Z"
+                "fn": "Kaye", "mn": "C", "ln": "Casem", "un": "kayecasem", 
+                "em": "kayecasem31@gmail.com", "pw": "kaye321", "r": "guard", "bd": "1995-10-20T00:00:00Z"
             },
             {
                 "fn": "Mary", "mn": "D", "ln": "Cam", "un": "marycam", 
-                "em": "mary@agapai.com", "pw": "mary321", "r": "caregiver", "bd": "1988-12-12T00:00:00Z"
+                "em": "maryirish.cammagay@gmail.com", "pw": "mary321", "r": "caregiver", "bd": "1988-12-12T00:00:00Z"
             }
         ]
 
@@ -114,6 +114,103 @@ async def seed_database():
                         'loc_id': loc_id
                     }
                 )
+
+        # ===== 6. SEED EVENT LOGS FOR REPORTS =====
+        print("\nSeeding report logs...")
+        existing_logs = await db.eventlog.count()
+        if existing_logs == 0:
+            cameras = await db.camera.find_many()
+            classes = await db.eventclass.find_many()
+            users = await db.user.find_many()
+
+            cam_by_name = {camera.cam_name: camera for camera in cameras}
+            class_by_name = {event_class.class_name: event_class for event_class in classes}
+            user_by_username = {user.username: user for user in users}
+
+            now = datetime.now(UTC)
+            logs_to_seed = [
+                {
+                    'cam_name': 'Main Lobby Camera',
+                    'class_name': 'Forward Fall',
+                    'minutes_ago': 8,
+                    'status': 'unacknowledged',
+                    'ack_user': None,
+                    'snapshot': '/static/snapshots/main-lobby-fall-1.jpg'
+                },
+                {
+                    'cam_name': 'Dining Hall Camera',
+                    'class_name': 'Inactive (medium)',
+                    'minutes_ago': 25,
+                    'status': 'acknowledged',
+                    'ack_user': 'kathnava',
+                    'snapshot': '/static/snapshots/dining-hall-inactive-1.jpg'
+                },
+                {
+                    'cam_name': 'Sebastian Camera',
+                    'class_name': 'Side Fall',
+                    'minutes_ago': 42,
+                    'status': 'acknowledged',
+                    'ack_user': 'reginedahan',
+                    'snapshot': '/static/snapshots/sebastian-side-fall-1.jpg'
+                },
+                {
+                    'cam_name': 'Emmanuel Camera',
+                    'class_name': 'Backward Fall',
+                    'minutes_ago': 71,
+                    'status': 'unacknowledged',
+                    'ack_user': None,
+                    'snapshot': '/static/snapshots/emmanuel-backward-fall-1.jpg'
+                },
+                {
+                    'cam_name': 'Rose of Lima Camera',
+                    'class_name': 'Inactive (critical)',
+                    'minutes_ago': 95,
+                    'status': 'acknowledged',
+                    'ack_user': 'marycam',
+                    'snapshot': '/static/snapshots/rose-of-lima-inactive-critical-1.jpg'
+                },
+                {
+                    'cam_name': 'Gabriel Camera',
+                    'class_name': 'Inactive (low)',
+                    'minutes_ago': 130,
+                    'status': 'unacknowledged',
+                    'ack_user': None,
+                    'snapshot': '/static/snapshots/gabriel-inactive-low-1.jpg'
+                },
+                {
+                    'cam_name': 'Charbel Camera',
+                    'class_name': 'Inactive (high)',
+                    'minutes_ago': 180,
+                    'status': 'acknowledged',
+                    'ack_user': 'kathnava',
+                    'snapshot': '/static/snapshots/charbel-inactive-high-1.jpg'
+                },
+            ]
+
+            created_count = 0
+            for item in logs_to_seed:
+                camera = cam_by_name.get(item['cam_name'])
+                event_class = class_by_name.get(item['class_name'])
+                ack_user = user_by_username.get(item['ack_user']) if item['ack_user'] else None
+
+                if not camera or not event_class:
+                    continue
+
+                await db.eventlog.create(
+                    data={
+                        'timestamp': now - timedelta(minutes=item['minutes_ago']),
+                        'event_status': item['status'],
+                        'file_path': item['snapshot'],
+                        'cam_id': camera.id,
+                        'event_class_id': event_class.id,
+                        'ack_by_user_id': ack_user.id if ack_user else None,
+                    }
+                )
+                created_count += 1
+
+            print(f" ✓ Seeded {created_count} report logs.")
+        else:
+            print(f" ✓ Report logs already exist: {existing_logs}")
         
         print("\n✅ Database seeding completed successfully!")
         return {"status": "success", "message": "Database seeded completely"}

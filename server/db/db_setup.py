@@ -1,5 +1,31 @@
 import os
+import sys
 from dotenv import load_dotenv
+
+
+def _prefer_project_venv_site_packages() -> None:
+	"""Prioritize local venv packages when script is run outside that venv.
+
+	This prevents using an outdated global Prisma client package, which can
+	cause schema mismatch errors during commands like `python3 seed_db.py`.
+	"""
+	if os.environ.get('VIRTUAL_ENV'):
+		return
+
+	server_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+	pyver = f"python{sys.version_info.major}.{sys.version_info.minor}"
+	candidates = [
+		os.path.join(server_root, 'venv', 'lib', pyver, 'site-packages'),
+		os.path.join(server_root, 'venv', 'lib64', pyver, 'site-packages'),
+	]
+
+	for path in candidates:
+		if os.path.isdir(path) and path not in sys.path:
+			sys.path.insert(0, path)
+
+
+_prefer_project_venv_site_packages()
+
 from prisma import Prisma, register
 
 # 1. Load the environment variables from .env
