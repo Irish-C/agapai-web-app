@@ -270,6 +270,27 @@ pip install -r requirements.txt
 
 ## Contribution
 
+
+## Test & Utility Scripts
+
+The following scripts are now located in `server/test-scripts/`:
+
+- `activate_camera.py`, `clean_and_activate.py`, `quick_check.py`, `update_camera_creds.py`
+- `test_rtsp.py`, `test_rtsp_variants.py`, `init_db.py`, `hash_passwords.py`
+
+These are for diagnostics, database/camera maintenance, or RTSP testing. They are not required for normal app operation.
+
+**Usage:**
+
+1. Open a terminal in `server/test-scripts/`.
+2. Activate your virtual environment if needed.
+3. Run the script, e.g.:
+	```powershell
+	python activate_camera.py
+	```
+
+---
+
 ## Additional Documentation
 
 - [APP.md](APP.md): UI and feature overview
