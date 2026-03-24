@@ -6,7 +6,7 @@ All changes are audit logged with optimistic locking support.
 
 from datetime import datetime
 import traceback
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Any
 from enum import Enum
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, validator
@@ -44,6 +44,82 @@ CATEGORY_FUNCTION_MAP = {
     "category_permissions": [AllowedFunctionEnum.READ, AllowedFunctionEnum.WRITE],
     "audit_log": [AllowedFunctionEnum.READ],
 }
+
+
+async def _get_role_permission(role_id: int, permission_name: str) -> Optional[Dict[str, Any]]:
+    role_id_int = int(role_id)
+    permission_name_escaped = permission_name.replace("'", "''")
+    rows = await db.query_raw(
+        f"""
+        SELECT id, role_id, permission_name, is_granted
+        FROM role_permissions
+        WHERE role_id = {role_id_int} AND permission_name = '{permission_name_escaped}'
+        LIMIT 1
+        """,
+    )
+    return rows[0] if rows else None
+
+
+async def _list_role_permissions(role_id: int) -> List[Dict[str, Any]]:
+    role_id_int = int(role_id)
+    return await db.query_raw(
+        f"""
+        SELECT id, role_id, permission_name, is_granted
+        FROM role_permissions
+        WHERE role_id = {role_id_int}
+        """,
+    )
+
+
+async def _upsert_role_permission(
+    role_id: int,
+    permission_name: str,
+    is_granted: bool,
+    created_by: int,
+) -> None:
+    existing = await _get_role_permission(role_id, permission_name)
+    if existing:
+        is_granted_sql = "TRUE" if is_granted else "FALSE"
+        perm_id = int(existing["id"])
+        await db.query_raw(
+            f"""
+            UPDATE role_permissions
+            SET is_granted = {is_granted_sql}, updated_at = CURRENT_TIMESTAMP
+            WHERE id = {perm_id}
+            """,
+        )
+    else:
+        role_id_int = int(role_id)
+        created_by_int = int(created_by)
+        permission_name_escaped = permission_name.replace("'", "''")
+        is_granted_sql = "TRUE" if is_granted else "FALSE"
+        await db.query_raw(
+            f"""
+            INSERT INTO role_permissions (role_id, permission_name, is_granted, created_by, updated_at)
+            VALUES ({role_id_int}, '{permission_name_escaped}', {is_granted_sql}, {created_by_int}, CURRENT_TIMESTAMP)
+            """,
+        )
+
+
+async def _delete_role_permission(role_id: int, permission_name: str) -> None:
+    role_id_int = int(role_id)
+    permission_name_escaped = permission_name.replace("'", "''")
+    await db.query_raw(
+        f"""
+        DELETE FROM role_permissions
+        WHERE role_id = {role_id_int} AND permission_name = '{permission_name_escaped}'
+        """,
+    )
+
+
+async def _delete_all_role_permissions(role_id: int) -> None:
+    role_id_int = int(role_id)
+    await db.query_raw(
+        f"""
+        DELETE FROM role_permissions
+        WHERE role_id = {role_id_int}
+        """,
+    )
 
 
 # ============================================================================
@@ -335,16 +411,9 @@ async def update_single_permission(
         superadmin_user = await db.user.find_unique(where={"id": superadmin_user_id})
 
         # Get current permission state
-        existing = await db.rolepermission.find_unique(
-            where={
-                "role_id_permission_name": {
-                    "role_id": role_id,
-                    "permission_name": permission_name,
-                }
-            }
-        )
+        existing = await _get_role_permission(role_id, permission_name)
 
-        old_value = existing.is_granted if existing else DEFAULT_PERMISSIONS.get(role.role_name, {}).get(permission_name)
+        old_value = existing["is_granted"] if existing else DEFAULT_PERMISSIONS.get(role.role_name, {}).get(permission_name)
 
         # Skip if no change
         if old_value == request.is_granted:
@@ -356,28 +425,12 @@ async def update_single_permission(
             }
 
         # Update or create permission record
-        if existing:
-            await db.rolepermission.update(
-                where={
-                    "role_id_permission_name": {
-                        "role_id": role_id,
-                        "permission_name": permission_name,
-                    }
-                },
-                data={
-                    "is_granted": request.is_granted,
-                    "updated_at": datetime.utcnow(),
-                }
-            )
-        else:
-            await db.rolepermission.create(
-                data={
-                    "role_id": role_id,
-                    "permission_name": permission_name,
-                    "is_granted": request.is_granted,
-                    "created_by": superadmin_user_id,
-                }
-            )
+        await _upsert_role_permission(
+            role_id=role_id,
+            permission_name=permission_name,
+            is_granted=request.is_granted,
+            created_by=superadmin_user_id,
+        )
 
         # Create audit log
         await db.permissionauditlog.create(
@@ -461,44 +514,21 @@ async def update_bulk_permissions(
 
         # Process each permission update
         for permission_name, is_granted in request.permissions.items():
-            existing = await db.rolepermission.find_unique(
-                where={
-                    "role_id_permission_name": {
-                        "role_id": role_id,
-                        "permission_name": permission_name,
-                    }
-                }
-            )
+            existing = await _get_role_permission(role_id, permission_name)
 
-            old_value = existing.is_granted if existing else DEFAULT_PERMISSIONS.get(role.role_name, {}).get(permission_name)
+            old_value = existing["is_granted"] if existing else DEFAULT_PERMISSIONS.get(role.role_name, {}).get(permission_name)
 
             # Skip if no change
             if old_value == is_granted:
                 continue
 
             # Update or create
-            if existing:
-                await db.rolepermission.update(
-                    where={
-                        "role_id_permission_name": {
-                            "role_id": role_id,
-                            "permission_name": permission_name,
-                        }
-                    },
-                    data={
-                        "is_granted": is_granted,
-                        "updated_at": datetime.utcnow(),
-                    }
-                )
-            else:
-                await db.rolepermission.create(
-                    data={
-                        "role_id": role_id,
-                        "permission_name": permission_name,
-                        "is_granted": is_granted,
-                        "created_by": superadmin_user_id,
-                    }
-                )
+            await _upsert_role_permission(
+                role_id=role_id,
+                permission_name=permission_name,
+                is_granted=is_granted,
+                created_by=superadmin_user_id,
+            )
 
             # Create audit log
             await db.permissionauditlog.create(
@@ -581,14 +611,7 @@ async def reset_single_permission(
         )
     
     # Find and check existing override
-    existing = await db.rolepermission.find_unique(
-        where={
-            "role_id_permission_name": {
-                "role_id": role_id,
-                "permission_name": permission_name,
-            }
-        }
-    )
+    existing = await _get_role_permission(role_id, permission_name)
     
     if not existing:
         return {
@@ -599,17 +622,10 @@ async def reset_single_permission(
     
     # Get default value
     default_value = DEFAULT_PERMISSIONS.get(role.role_name, {}).get(permission_name, False)
-    old_value = existing.is_granted
+    old_value = existing["is_granted"]
     
     # Delete override
-    await db.rolepermission.delete(
-        where={
-            "role_id_permission_name": {
-                "role_id": role_id,
-                "permission_name": permission_name,
-            }
-        }
-    )
+    await _delete_role_permission(role_id, permission_name)
     
     # Create audit log for reset
     await db.permissionauditlog.create(
@@ -657,9 +673,7 @@ async def reset_all_permissions(
     superadmin_user = await db.user.find_unique(where={"id": superadmin_user_id})
     
     # Get all overrides for this role
-    overrides = await db.rolepermission.find_many(
-        where={"role_id": role_id}
-    )
+    overrides = await _list_role_permissions(role_id)
     
     if not overrides:
         return {
@@ -670,13 +684,13 @@ async def reset_all_permissions(
     # Create audit logs for each reset
     defaults = DEFAULT_PERMISSIONS.get(role.role_name, {})
     for override in overrides:
-        default_value = defaults.get(override.permission_name, False)
+        default_value = defaults.get(override["permission_name"], False)
         
         await db.permissionauditlog.create(
             data={
                 "role_id": role_id,
-                "permission_name": override.permission_name,
-                "old_value": override.is_granted,
+                "permission_name": override["permission_name"],
+                "old_value": override["is_granted"],
                 "new_value": default_value,
                 "changed_by": superadmin_user_id,
                 "reason": "Reset all permissions to code defaults",
@@ -684,9 +698,7 @@ async def reset_all_permissions(
         )
     
     # Delete all overrides
-    await db.rolepermission.delete_many(
-        where={"role_id": role_id}
-    )
+    await _delete_all_role_permissions(role_id)
     
     # Invalidate cache
     cache = get_permission_cache()
@@ -1011,62 +1023,49 @@ async def copy_role_permissions(
         )
     
     # Get source permissions with eager loading
-    source_perms = await db.rolepermission.find_many(
-        where={"role_id": source_role_id}
-    )
+    source_perms = await _list_role_permissions(source_role_id)
     
     # Get target's current permissions
     target_perms_map = {}
-    existing_targets = await db.rolepermission.find_many(
-        where={"role_id": target_role_id}
-    )
+    existing_targets = await _list_role_permissions(target_role_id)
     for tp in existing_targets:
-        target_perms_map[tp.permission_name] = tp
+        target_perms_map[tp["permission_name"]] = tp
     
     changes = []
     
     # Copy permissions
     for src_perm in source_perms:
-        existing_target = target_perms_map.get(src_perm.permission_name)
-        old_value = existing_target.is_granted if existing_target else DEFAULT_PERMISSIONS.get(
+        permission_name = src_perm["permission_name"]
+        new_value = src_perm["is_granted"]
+        existing_target = target_perms_map.get(permission_name)
+        old_value = existing_target["is_granted"] if existing_target else DEFAULT_PERMISSIONS.get(
             target_role.role_name, {}
-        ).get(src_perm.permission_name, False)
-        
-        if existing_target:
-            await db.rolepermission.update(
-                where={"id": existing_target.id},
-                data={
-                    "is_granted": src_perm.is_granted,
-                    "updated_at": datetime.utcnow(),
-                }
-            )
-        else:
-            await db.rolepermission.create(
-                data={
-                    "role_id": target_role_id,
-                    "permission_name": src_perm.permission_name,
-                    "is_granted": src_perm.is_granted,
-                    "created_by": superadmin_user_id,
-                }
-            )
+        ).get(permission_name, False)
+
+        await _upsert_role_permission(
+            role_id=target_role_id,
+            permission_name=permission_name,
+            is_granted=new_value,
+            created_by=superadmin_user_id,
+        )
         
         # Create audit log
-        if old_value != src_perm.is_granted:
+        if old_value != new_value:
             await db.permissionauditlog.create(
                 data={
                     "role_id": target_role_id,
-                    "permission_name": src_perm.permission_name,
+                    "permission_name": permission_name,
                     "old_value": old_value,
-                    "new_value": src_perm.is_granted,
+                    "new_value": new_value,
                     "changed_by": superadmin_user_id,
                     "reason": f"Copied from {source_role.role_name}: {request.reason}",
                 }
             )
             
             changes.append({
-                "permission_name": src_perm.permission_name,
+                "permission_name": permission_name,
                 "old_value": old_value,
-                "new_value": src_perm.is_granted,
+                "new_value": new_value,
             })
     
     # Invalidate cache
@@ -1135,33 +1134,15 @@ async def undo_permission_change(
         )
     
     # Find or create permission record
-    existing = await db.rolepermission.find_unique(
-        where={
-            "role_id_permission_name": {
-                "role_id": audit_log.role_id,
-                "permission_name": audit_log.permission_name,
-            }
-        }
-    )
+    existing = await _get_role_permission(audit_log.role_id, audit_log.permission_name)
     
     # Undo by setting permission back to old_value
-    if existing:
-        await db.rolepermission.update(
-            where={"id": existing.id},
-            data={
-                "is_granted": audit_log.old_value,
-                "updated_at": datetime.utcnow(),
-            }
-        )
-    else:
-        await db.rolepermission.create(
-            data={
-                "role_id": audit_log.role_id,
-                "permission_name": audit_log.permission_name,
-                "is_granted": audit_log.old_value,
-                "created_by": superadmin_user_id,
-            }
-        )
+    await _upsert_role_permission(
+        role_id=audit_log.role_id,
+        permission_name=audit_log.permission_name,
+        is_granted=audit_log.old_value,
+        created_by=superadmin_user_id,
+    )
     
     # Create new audit log for the undo
     await db.permissionauditlog.create(
@@ -1221,15 +1202,13 @@ async def get_role_permissions_with_versions(
         )
     
     # Get all permissions with versions
-    perms = await db.rolepermission.find_many(
-        where={"role_id": role_id}
-    )
+    perms = await _list_role_permissions(role_id)
     
     perms_with_versions = {}
     for perm in perms:
-        perms_with_versions[perm.permission_name] = {
-            "is_granted": perm.is_granted,
-            "version": perm.version,
+        perms_with_versions[perm["permission_name"]] = {
+            "is_granted": perm["is_granted"],
+            "version": 1,
         }
     
     return {

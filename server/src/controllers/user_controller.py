@@ -2,6 +2,18 @@ from database import db
 import bcrypt
 from src.utils.role_utils import normalize_role
 
+
+def _hash_password(password: str) -> str:
+    return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt(rounds=12)).decode('utf-8')
+
+
+def _verify_password(plain_password: str, stored_hash: str) -> bool:
+    try:
+        hash_bytes = stored_hash.encode('utf-8') if isinstance(stored_hash, str) else stored_hash
+        return bcrypt.checkpw(plain_password.encode('utf-8'), hash_bytes)
+    except (ValueError, TypeError):
+        return False
+
 async def login_logic(data):
     # Fetch user AND the associated role record
     user = await db.user.find_unique(
@@ -13,14 +25,7 @@ async def login_logic(data):
         return {"status": "error", "message": "Account does not exist."}, 401
 
     if user:
-        try:
-            # Use bcrypt directly to verify password
-            password_bytes = data.get('password', '').encode('utf-8')
-            stored_hash = user.password.encode('utf-8') if isinstance(user.password, str) else user.password
-            password_valid = bcrypt.checkpw(password_bytes, stored_hash)
-        except (ValueError, TypeError):
-            # Hash is corrupted or invalid
-            password_valid = False
+        password_valid = _verify_password(data.get('password', ''), user.password)
         
         if password_valid:
             return {
@@ -102,7 +107,7 @@ async def update_user_logic(user_id, data):
 
         # 3. Handle password if provided
         if data.get('password'):
-            update_data['password'] = pwd_context.hash(data['password'])
+            update_data['password'] = _hash_password(data['password'])
 
         # 4. Execute the update
         await db.user.update(
@@ -140,10 +145,10 @@ async def change_password_logic(user_id, old_password, new_password):
     if not user:
         return {"status": "error", "message": "User not found"}, 404
 
-    if not pwd_context.verify(old_password, user.password):
+    if not _verify_password(old_password, user.password):
         return {"status": "error", "message": "Old password incorrect"}, 401
 
-    hashed_pw = pwd_context.hash(new_password)
+    hashed_pw = _hash_password(new_password)
     await db.user.update(
         where={'id': int(user_id)},
         data={'password': hashed_pw}
@@ -161,8 +166,8 @@ async def create_user_logic(data):
         if not role_record:
             return {"status": "error", "message": f"Role '{data['role']}' not found."}, 400
 
-        # 2. Hash the password using passlib
-        hashed_pw = pwd_context.hash(data['password'])
+        # 2. Hash the password
+        hashed_pw = _hash_password(data['password'])
 
         # 3. Create the user in the database
         new_user = await db.user.create(
@@ -186,36 +191,4 @@ async def create_user_logic(data):
 
     except Exception as e:
         print(f"❌ Backend Error: {e}")
-        return {"status": "error", "message": str(e)}, 500
-    try:
-        # 1. Find the Role object by its name (e.g., 'caregiver')
-        role_record = await db.role.find_unique(
-            where={'role_name': data['role']}
-        )
-
-        if not role_record:
-            return {"status": "error", "message": f"Role '{data['role']}' not found."}, 400
-
-        # 2. Hash the password before saving
-        hashed_pw = hash_password(data['password'])
-
-        # 3. Create the user using the found role_id
-        new_user = await db.user.create(
-            data={
-                'firstname': data['firstname'],
-                'lastname': data['lastname'],
-                'username': data['username'],
-                'password': hashed_pw,
-                'role_id': role_record.id # Linking via the ID from the DB
-            }
-        )
-
-        return {
-            "status": "success", 
-            "message": "User created successfully",
-            "user_id": str(new_user.id)
-        }, 201
-
-    except Exception as e:
-        print(f"Error creating user: {e}")
         return {"status": "error", "message": str(e)}, 500

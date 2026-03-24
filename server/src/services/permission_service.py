@@ -77,16 +77,11 @@ class PermissionCache:
         Eager loading used to minimize database queries.
         """
         try:
-            # EAGER LOADING: Get role with related permission overrides in single query
+            # EAGER LOADING: Role model currently supports hierarchy via parent_role.
             role = await db.role.find_unique(
                 where={"id": role_id},
                 include={
-                    "permission_overrides": True,
-                    "parent_role": {
-                        "include": {
-                            "permission_overrides": True
-                        }
-                    }
+                    "parent_role": True
                 }
             )
             
@@ -104,21 +99,31 @@ class PermissionCache:
                 parent_permissions = DEFAULT_PERMISSIONS.get(
                     role.parent_role.role_name, {}
                 ).copy()
-                
-                # Apply parent's database overrides
-                if role.parent_role.permission_overrides:
-                    for perm in role.parent_role.permission_overrides:
-                        parent_permissions[perm.permission_name] = perm.is_granted
-                
+
+                parent_overrides = await db.query_raw(
+                    f"""
+                    SELECT permission_name, is_granted
+                    FROM role_permissions
+                    WHERE role_id = {int(role.parent_role.id)}
+                    """,
+                )
+                for perm in parent_overrides:
+                    parent_permissions[perm["permission_name"]] = perm["is_granted"]
+
                 # Start with inherited permissions
                 merged_permissions = parent_permissions.copy()
                 logger.debug(f"Role {role.role_name} inheriting from parent {role.parent_role.role_name}")
-            
-            # Apply this role's database overrides (override parent and defaults)
-            if role.permission_overrides:
-                for perm in role.permission_overrides:
-                    merged_permissions[perm.permission_name] = perm.is_granted
-            
+
+            role_overrides = await db.query_raw(
+                f"""
+                SELECT permission_name, is_granted
+                FROM role_permissions
+                WHERE role_id = {int(role_id)}
+                """,
+            )
+            for perm in role_overrides:
+                merged_permissions[perm["permission_name"]] = perm["is_granted"]
+
             return merged_permissions
             
         except Exception as e:
