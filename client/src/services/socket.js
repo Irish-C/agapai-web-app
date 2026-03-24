@@ -29,6 +29,20 @@ const subscriptionState = {
 // Callbacks for when buffer is flushed
 let onBufferFlushCallbacks = [];
 
+function getStoredAuthToken() {
+  const directToken = localStorage.getItem('authToken');
+  if (directToken) return directToken;
+
+  try {
+    const rawUser = localStorage.getItem('user');
+    if (!rawUser) return null;
+    const parsedUser = JSON.parse(rawUser);
+    return parsedUser?.token || null;
+  } catch {
+    return null;
+  }
+}
+
 export const socket = io(SOCKET_URL, {
   transports,
   upgrade: false,
@@ -107,7 +121,7 @@ function notifyBufferFlush(alerts) {
 async function resubscribeToAllCameras() {
   const cameras = getSubscribedCameras();
   console.log('[SocketIO Reconnect] Re-subscribing to', cameras.length, 'cameras');
-  const authToken = localStorage.getItem('authToken');
+  const authToken = getStoredAuthToken();
   
   for (const cameraId of cameras) {
     try {
@@ -126,17 +140,27 @@ async function fetchMissedAlerts() {
   try {
     const lastSync = subscriptionState.lastSyncTime;
     console.log('[SocketIO Reconnect] Fetching alerts since', new Date(lastSync).toISOString());
+    const authToken = getStoredAuthToken();
+
+    if (!authToken) {
+      console.warn('[SocketIO Reconnect] Skipping missed-alert sync: no auth token available');
+      subscriptionState.lastSyncTime = Date.now();
+      return [];
+    }
     
     const response = await fetch(`${SOCKET_URL}/api/alerts/missed/${lastSync}`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
-        // Include auth token if available
-        ...(localStorage.getItem('authToken') && {
-          'Authorization': `Bearer ${localStorage.getItem('authToken')}`
-        })
+        'Authorization': `Bearer ${authToken}`
       }
     });
+
+    if (response.status === 401) {
+      console.warn('[SocketIO Reconnect] Missed-alert sync unauthorized (401). Skipping until next authenticated reconnect.');
+      subscriptionState.lastSyncTime = Date.now();
+      return [];
+    }
     
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}`);
