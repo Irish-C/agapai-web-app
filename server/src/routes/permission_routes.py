@@ -12,7 +12,8 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, validator
 
 from database import db
-from src.utils.auth import require_superadmin_user_id
+from src.utils.auth import require_superadmin_user_id, get_current_user_id
+from src.utils.feature_auth import require_feature
 from src.services.permission_service import (
     get_permission_cache,
     get_permission_checker,
@@ -204,7 +205,8 @@ async def get_role_permissions(
 
 @router.get("/roles", response_model=List[RolePermissionsResponse])
 async def get_all_roles_permissions(
-    superadmin_user_id: int = Depends(require_superadmin_user_id),
+    user_id: int = Depends(get_current_user_id),
+    _: None = Depends(require_feature("view_permissions")),
 ) -> List[RolePermissionsResponse]:
     """
     Get all permissions for all roles.
@@ -235,7 +237,8 @@ async def get_permission_audit_log(
     permission_name: Optional[str] = None,
     limit: int = 100,
     offset: int = 0,
-    superadmin_user_id: int = Depends(require_superadmin_user_id),
+    user_id: int = Depends(get_current_user_id),
+    _: None = Depends(require_feature("view_audit_log")),
 ) -> List[AuditLogResponse]:
     """
     Get permission change audit log.

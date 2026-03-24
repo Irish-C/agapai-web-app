@@ -28,7 +28,7 @@ export default function AuditLogViewer() {
     if (hasFeature('view_audit_log')) {
       fetchAuditLogs();
     }
-  }, [page, limit, filters, hasFeature]);
+  }, [page, limit, filters]);
 
   // LISTEN FOR REAL-TIME AUDIT LOG ENTRIES
   useEffect(() => {
