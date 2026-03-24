@@ -140,6 +140,9 @@ export default function UserManager({ user, readOnly = false }) {
                         <FaShieldAlt className="mr-2" />
                         Role Permissions Overview
                     </h4>
+                    <p className="text-xs text-gray-500 mb-4">
+                        Read-only access is shown as view permissions enabled and matching manage/edit permissions disabled.
+                    </p>
                     <div className="overflow-x-auto">
                         <table className="w-full">
                             <thead>

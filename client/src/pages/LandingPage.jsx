@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { contactSupport } from '../services/apiService';
 import { Link } from 'react-router-dom';
 import { FaSignInAlt, FaVideo, FaChartLine, FaEnvelope, FaShieldAlt, FaChevronRight, FaTimes } from 'react-icons/fa'; 
 import agapaiLogo from '../assets/logo/agapai-logo.png';
@@ -6,6 +7,12 @@ import filter_bg from '../assets/bg/filter-bg.png';
 
 export default function LandingPage() {
     const [isContactPanelOpen, setIsContactPanelOpen] = useState(false);
+    const [contactName, setContactName] = useState("");
+    const [contactEmail, setContactEmail] = useState("");
+    const [contactMessage, setContactMessage] = useState("");
+    const [contactStatus, setContactStatus] = useState("");
+    const [showFeatures, setShowFeatures] = useState(false);
+    const [showAbout, setShowAbout] = useState(false);
 
     return (
         <div className="h-screen w-full flex flex-col bg-[#0f172a] text-slate-200 font-sans selection:bg-teal-400/30 overflow-hidden relative">
@@ -39,28 +46,64 @@ export default function LandingPage() {
                         </button>
                     </div>
 
-                    <form className="space-y-6">
+                    <form className="space-y-6" onSubmit={async (e) => {
+                        e.preventDefault();
+                        setContactStatus("");
+                        try {
+                            await contactSupport({ name: contactName, email: contactEmail, message: contactMessage });
+                            setContactStatus("Message sent successfully!");
+                            setContactName("");
+                            setContactEmail("");
+                            setContactMessage("");
+                        } catch (err) {
+                            setContactStatus("Failed to send message. Please try again later.");
+                        }
+                    }}>
                         <div>
                             <label className="block text-sm font-medium text-slate-400 mb-2">Full Name</label>
-                            <input type="text" className="w-full bg-slate-800 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-teal-300/50 transition-colors" placeholder="John Doe" />
+                            <input
+                                type="text"
+                                className="w-full bg-slate-800 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-teal-300/50 transition-colors"
+                                placeholder="John Doe"
+                                value={contactName}
+                                onChange={e => setContactName(e.target.value)}
+                                required
+                            />
                         </div>
                         <div>
                             <label className="block text-sm font-medium text-slate-400 mb-2">Email Address</label>
-                            <input type="email" className="w-full bg-slate-800 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-teal-300/50 transition-colors" placeholder="john@example.com" />
+                            <input
+                                type="email"
+                                className="w-full bg-slate-800 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-teal-300/50 transition-colors"
+                                placeholder="john@example.com"
+                                value={contactEmail}
+                                onChange={e => setContactEmail(e.target.value)}
+                                required
+                            />
                         </div>
                         <div>
                             <label className="block text-sm font-medium text-slate-400 mb-2">Message</label>
-                            <textarea rows="4" className="w-full bg-slate-800 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-teal-300/50 transition-colors" placeholder="How can we help you?"></textarea>
+                            <textarea
+                                rows="4"
+                                className="w-full bg-slate-800 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-teal-300/50 transition-colors"
+                                placeholder="How can we help you?"
+                                value={contactMessage}
+                                onChange={e => setContactMessage(e.target.value)}
+                                required
+                            ></textarea>
                         </div>
                         <button type="submit" className="w-full py-4 bg-teal-500 hover:bg-teal-300 text-slate-950 font-bold rounded-xl transition-all shadow-lg shadow-teal-500/20">
                             Send Message
                         </button>
+                        {contactStatus && (
+                            <div className="text-center mt-2 text-sm font-medium text-teal-400">{contactStatus}</div>
+                        )}
                     </form>
 
                     <div className="mt-auto pt-8 border-t border-white/5">
                         <p className="text-sm text-slate-500 text-center">
                             Or email us directly at <br />
-                            <span className="text-violet-400 font-medium">support@agapai.ai</span>
+                            <span className="text-violet-400 font-medium">w4makeithappen@gmail.com</span>
                         </p>
                     </div>
                 </div>
@@ -76,8 +119,8 @@ export default function LandingPage() {
                 </div>
                 
                 <div className="hidden md:flex items-center gap-8 text-sm font-medium text-slate-400">
-                    <a href="#features" className="hover:text-teal-300 transition-colors">Features</a>
-                    <a href="#about" className="hover:text-violet-400 transition-colors">About</a>
+                    <button onClick={() => setShowFeatures(true)} className="hover:text-teal-300 transition-colors">Features</button>
+                    <button onClick={() => setShowAbout(true)} className="hover:text-violet-400 transition-colors">About</button>
                     <button 
                         onClick={() => setIsContactPanelOpen(true)}
                         className="px-5 py-2 rounded-full bg-white/5 border border-white/10 hover:bg-white/10 transition-all text-white"
@@ -166,6 +209,33 @@ export default function LandingPage() {
 
                 </div>
             </main>
+
+            {/* --- FEATURES MODAL --- */}
+            {showFeatures && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm">
+                    <div className="bg-slate-900 rounded-2xl p-8 max-w-md w-full shadow-2xl border border-teal-400/30 relative">
+                        <button onClick={() => setShowFeatures(false)} className="absolute top-4 right-4 text-slate-400 hover:text-white"><FaTimes size={24} /></button>
+                        <h2 className="text-2xl font-bold text-teal-300 mb-4">Features</h2>
+                        <ul className="space-y-3 text-base text-slate-200">
+                            <li>Real-time monitoring for falls and inactivity</li>
+                            <li>Instant alerts to staff for emergencies</li>
+                            <li>Comprehensive reporting and history logs</li>
+                            <li>Secure and private data handling</li>
+                        </ul>
+                    </div>
+                </div>
+            )}
+
+            {/* --- ABOUT MODAL --- */}
+            {showAbout && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm">
+                    <div className="bg-slate-900 rounded-2xl p-8 max-w-md w-full shadow-2xl border border-violet-400/30 relative">
+                        <button onClick={() => setShowAbout(false)} className="absolute top-4 right-4 text-slate-400 hover:text-white"><FaTimes size={24} /></button>
+                        <h2 className="text-2xl font-bold text-violet-300 mb-4">About</h2>
+                        <p className="text-base text-slate-200">This system provides intelligent, vision-based monitoring for elderly care, ensuring safety and peace of mind for families and staff. Developed as a thesis project by PUP Engineering students.</p>
+                    </div>
+                </div>
+            )}
 
             {/* --- FOOTER --- */}
             <footer className="relative z-10 border-t border-white/5 bg-slate-950/50 backdrop-blur-md shrink-0">

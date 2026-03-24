@@ -19,6 +19,7 @@ from src.routes.camera_routes import router as camera_router
 from src.routes.event_routes import router as event_router
 from src.routes.settings_routes import router as settings_router
 from src.routes.location_routes import router as location_router
+from src.routes.contact_routes import router as contact_router
 from src.utils.input_sanitization import get_sanitized_json, sanitize_input
 from src.utils.auth import get_token_user_id_from_header
 from src.utils.rate_limiter import (
@@ -175,6 +176,7 @@ app.include_router(camera_router, prefix='/api')
 app.include_router(event_router, prefix='/api')
 app.include_router(settings_router, prefix='/api')
 app.include_router(location_router, prefix='/api')
+app.include_router(contact_router, prefix="/api")
 
 # --- 4. DB lifecycle + Camera Startup ---
 # Startup/shutdown handled by lifespan above

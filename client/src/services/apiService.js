@@ -1,3 +1,7 @@
+// --- CONTACT SUPPORT SERVICE ---
+export const contactSupport = (data) => {
+    return fetchApi('/contact', 'POST', data);
+};
 // src/services/apiService.js
 
 const BASE_API_URL = 'http://127.0.0.1:5000/api';
