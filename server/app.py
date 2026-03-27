@@ -1,7 +1,7 @@
 import os
 import asyncio
 from dotenv import load_dotenv
-
+from pathlib import Path
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
@@ -50,7 +50,13 @@ class PrismaJSONResponse(JSONResponse):
         return json.dumps(content).encode("utf-8")
 
 # --- 1. LOAD ENVIRONMENT ---
-load_dotenv()
+# load_dotenv(dotenv_path="server/.env")
+env_path = Path(__file__).parent / ".env"
+load_dotenv(dotenv_path=env_path)
+
+# DEBUG: This will tell us exactly what Python found
+print(f"DEBUG: Looking for .env at: {env_path}")
+print(f"DEBUG: DATABASE_URL is: {os.getenv('DATABASE_URL')}")
 
 # --- 2. Socket.IO (ASGI) ---
 socketio_server = socketio.AsyncServer(
