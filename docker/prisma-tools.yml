@@ -1,0 +1,30 @@
+version: "3.8"
+services:
+  prisma-tools:
+    image: python:3.11-slim
+    networks:
+      - default
+    volumes:
+      - ./:/work
+    working_dir: /work
+    entrypoint: ["bash","-lc"]
+    command: >
+      apt-get update -qq && \
+      apt-get install -y curl ca-certificates gnupg build-essential --no-install-recommends && \
+      curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
+      apt-get install -y nodejs --no-install-recommends && \
+      pip install --no-cache-dir prisma-client-py && \
+      if [ -z "$PRISMA_CMD" ]; then \
+        npx prisma generate --schema=server/prisma/schema.prisma; \
+      else \
+        npx $PRISMA_CMD --schema=server/prisma/schema.prisma; \
+      fi
+    environment:
+      - PRISMA_CMD=
+    depends_on:
+      - postgres
+
+networks:
+  default:
+    external: true
+    name: agapai-web-app_default

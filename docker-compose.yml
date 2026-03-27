@@ -1,0 +1,66 @@
+services:
+  postgres:
+    image: postgres:15
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: agapai143
+      POSTGRES_DB: agapai_db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+  redis:
+    image: redis:7-alpine
+    restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+    ports:
+      - "6379:6379"
+
+  server:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    env_file:
+      - ./server/.env
+    depends_on:
+      - postgres
+    ports:
+      - "5000:5000"
+    # Use the built image contents in Compose so generated artifacts
+    # (Prisma client) included at image build time are available.
+    volumes: []
+    environment:
+      - DATABASE_URL=postgresql://admin:agapai143@postgres:5432/agapai_db
+    restart: on-failure
+    command: ["uvicorn", "app:asgi_app", "--host", "0.0.0.0", "--port", "5000", "--reload"]
+
+  seed:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    env_file:
+      - ./server/.env
+    depends_on:
+      - postgres
+    entrypoint: ["python", "seed_db.py"]
+    environment:
+      - AGAPAI_SEED_PASSWORD=${AGAPAI_SEED_PASSWORD}
+    # do not mount the local ./server here so the generated Prisma client
+    # produced at image build time remains available inside the container
+    restart: "no"
+
+volumes:
+  postgres_data:
