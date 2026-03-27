@@ -4,6 +4,10 @@ from datetime import UTC, datetime, timedelta
 from database import db
 from werkzeug.security import generate_password_hash
 
+from pathlib import Path
+import os
+from dotenv import load_dotenv
+
 async def seed_database():
     try:
         if not db.is_connected():
@@ -230,4 +234,13 @@ async def seed_database():
         return {"status": "error", "message": str(e)}
 
 if __name__ == "__main__":
-    asyncio.run(seed_database())
+    import asyncio
+    print("--- DEBUG: Starting the Event Loop ---")
+    try:
+        asyncio.run(seed_database())
+        print("--- SUCCESS: Database Seeded! ---")
+    except Exception as e:
+        print(f"--- ERROR: Seeding failed! ---")
+        print(f"Details: {e}")
+    finally:
+        print("--- DEBUG: Script Execution Ended ---")
