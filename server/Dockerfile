@@ -22,7 +22,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # 4. Copy ONLY the Prisma schema first to generate the client
 # This prevents re-generating every time you change a Python file
-COPY server/prisma ./prisma
+COPY prisma ./prisma
 RUN prisma generate --schema=prisma/schema.prisma
 
 # 5. Copy the rest of the code, but IGNORE the heavy stuff

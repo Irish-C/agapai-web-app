@@ -13,8 +13,9 @@ except (ImportError, ModuleNotFoundError):
         def off(self): print(f"MOCK: Pin {self.pin} turned OFF")
     
     class Button:
-        def __init__(self, pin, pull_up=True, bounce_time=0.1): self.pin = pin
-        self.when_pressed = None
+        def __init__(self, pin, pull_up=True, bounce_time=0.1):
+            self.pin = pin
+            self.when_pressed = None
 
 class HardwareAlertSystem:
     # ... the rest of your class code remains exactly the same ...
