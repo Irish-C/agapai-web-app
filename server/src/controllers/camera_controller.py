@@ -394,6 +394,24 @@ async def stream_camera_loop(camera_id, rtsp_url):
                         num_detections = len(r.boxes) if r.boxes else 0
                         if frame_counter % 600 == 0:  # Log every 600 frames (~10 sec at 60fps)
                             print(f"[camera_controller] Frame {frame_counter}: YOLO ran, detected {num_detections} object(s)")
+                        # # Draw polished green bounding boxes and labels (commented out for performance test)
+                        # annotated = frame.copy()
+                        # for box in r.boxes:
+                        #     # Get box coordinates
+                        #     x1, y1, x2, y2 = map(int, box.xyxy[0])
+                        #     cls_id = int(box.cls[0])
+                        #     conf = float(box.conf[0]) if hasattr(box, 'conf') else 0.0
+                        #     cls_name = YOLO_MODEL.names.get(cls_id, str(cls_id))
+                        #     label = f"{cls_name} {conf:.2f}"
+                        #     # Draw green rectangle
+                        #     cv2.rectangle(annotated, (x1, y1), (x2, y2), (0, 255, 0), 2)
+                        #     # Draw label background for readability
+                        #     (tw, th), _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2)
+                        #     cv2.rectangle(annotated, (x1, y1 - th - 6), (x1 + tw + 2, y1), (0, 255, 0), -1)
+                        #     # Draw label text
+                        #     cv2.putText(annotated, label, (x1 + 1, y1 - 4), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 0), 2, cv2.LINE_AA)
+                        # cached_annotated_frame = annotated
+                        # frame = cached_annotated_frame
                         # Use YOLO's built-in .plot() to draw bounding boxes and cache it
                         cached_annotated_frame = r.plot()
                         frame = cached_annotated_frame
