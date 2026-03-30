@@ -1,8 +1,13 @@
-venv/
-.venv/
-node_modules/
-__pycache__/
-*.pt
-*.onnx
-.git
-.env
+# Ignore heavy local folders
+**/node_modules
+**/venv
+**/.venv
+**/__pycache__
+**/.git
+**/dist
+**/build
+
+# Ignore local data
+server/ml/*.pt
+server/ml/*.json
+server/ml/*.xml
