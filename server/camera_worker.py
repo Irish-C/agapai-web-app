@@ -221,7 +221,11 @@ class CameraWorker:
                         if len(results) > 0:
                             r = results[0]
                             if r.boxes and len(r.boxes) > 0:
-                                cached_annotated = r.plot()
+                                # Commented out: r.plot() would draw annotations here.
+                                # Annotation rendering is handled by the central inference worker
+                                # to avoid duplicate rendering and excessive CPU usage.
+                                # cached_annotated = r.plot()
+                                cached_annotated = None
                                 print(f"[CameraWorker-{camera_id}] 🎯 Detection: {len(r.boxes)} object(s)")
                             else:
                                 cached_annotated = None
@@ -294,8 +298,9 @@ class CameraWorker:
                         
                         # Check for detections and cache the annotated frame
                         if r.boxes and len(r.boxes) > 0:
-                            # Plot immediately and cache the result
-                            self.cached_annotated_frame = results[0].plot()
+                            # Commented out: use central inference worker for drawing.
+                            # self.cached_annotated_frame = results[0].plot()
+                            self.cached_annotated_frame = None
                             self._yolo_last_alert = now
                             detected = True
                             print(f"[CameraWorker] 🎯 Detection on camera {self.active_camera_id}: {len(r.boxes)} object(s)")
