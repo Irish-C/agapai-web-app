@@ -29,7 +29,7 @@ const GlobalAlertModal = ({ alert, onClose }) => {
     if (!alert) return null;
 
     return (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black bg-opacity-80 animate-pulse">
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black bg-opacity-80">
             <div className="bg-white border-8 border-red-600 rounded-2xl shadow-2xl p-10 max-w-xl w-full text-center transform scale-110">
                 <div className="text-8xl mb-4 animate-bounce">🚨</div>
                 <h2 className="text-4xl font-black text-red-700 mb-2">
@@ -133,11 +133,6 @@ export default function App() {
             unregisterOnBufferFlush(handleBufferFlush);
         };
     }, []);
-
-    // --- API LOGIC ---
-    // Remove login function, use AuthContext.login instead
-
-    // Remove logout function, use AuthContext.logout instead
 
     const loadCameras = async () => {
         if (!user) return;
