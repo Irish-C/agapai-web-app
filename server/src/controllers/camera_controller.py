@@ -19,7 +19,7 @@ def get_redis():
 
 # Helper: server root
 _SERVER_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../'))
-_MTX_BIN = os.path.join(_SERVER_DIR, 'mediamtx')
+_MTX_BIN = os.path.join(_SERVER_DIR, 'mediamtx.exe')
 _MTX_CONF = os.path.join(_SERVER_DIR, 'mediamtx.yml')
 _MTX_PID = os.path.join(_SERVER_DIR, 'mediamtx.pid')
 
