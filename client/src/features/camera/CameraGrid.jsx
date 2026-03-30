@@ -165,7 +165,7 @@ export default function CameraGrid() {
       <div className="p-6">
         {header}
         <div className="flex items-center justify-center p-12 text-xl text-gray-700">
-          <FaSpinner className="animate-spin mr-2" /> Loading camera configurations...
+          <FaSpinner className="animate-spin mr-2" /> Loading streams ...
         </div>
       </div>
     );

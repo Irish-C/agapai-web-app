@@ -64,19 +64,16 @@ export default function VideoFeed({
         <span>Waiting for video stream...</span>
       </div>
     );
-  } else {
-    // Case 5: We have frame data from the socket stream
-    // Render it as an inline base64 JPEG image.
-    const base64Src = `data:image/jpeg;base64,${frameData}`;
 
+  } else {
+    // Case 5: We have frame data from the socket stream (base64 rendering removed)
     content = (
-      <img 
-        src={base64Src} 
-        alt={`${location} Feed`}
-        style={{ width: "100%", height: "130%" }}
-      />
-    );
-  }
+      <div className="flex flex-col items-center justify-center h-full text-yellow-500">
+        <FaVideo className="text-4xl mb-2" />
+        <span>Direct MJPEG or binary streaming only. Base64 frames are not supported.</span>
+      </div>
+    );
+  }
 
   const isLive = hasFrameData && isConnected; 
 

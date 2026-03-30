@@ -2,7 +2,6 @@ import os
 import time
 import cv2
 import asyncio
-import base64
 import json
 from ultralytics import YOLO
 from database import db
@@ -58,33 +57,9 @@ async def stream_camera_loop(camera_id, rtsp_url):
                 await asyncio.sleep(1)
                 continue
 
-            # Encode to base64
-            _, buffer = cv2.imencode('.jpg', frame)
-            frame_base64 = base64.b64encode(buffer).decode('utf-8')
+            # MJPEG or direct streaming only. Base64 encoding and socket emission removed.
+            # If you need to store or forward frames, use Redis or file system as in camera_controller.py
 
-            from app import socketio_server
-            payload = {
-                'cam_id': str(camera_id),
-                'frame': frame_base64
-            }
-
-            try:
-                rooms = getattr(socketio_server.manager, 'rooms', None)
-                if isinstance(rooms, dict):
-                    ns_rooms = rooms.get('/', {})
-                    members = ns_rooms.get(f'camera_{camera_id}')
-                    has_listeners = bool(members)
-                else:
-                    has_listeners = True
-            except Exception:
-                has_listeners = True
-
-            if has_listeners:
-                key = f"cam:{camera_id}"
-                if key not in FIRST_EMIT_LOGGED:
-                    print(f"[camera_worker] Emitting first camera_frame for {camera_id}")
-                    FIRST_EMIT_LOGGED.add(key)
-                await socketio_server.emit('camera_frame', payload, room=f'camera_{camera_id}')
 
             await asyncio.sleep(0.04)  # ~25 FPS
     except asyncio.CancelledError:
