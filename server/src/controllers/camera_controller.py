@@ -1,7 +1,6 @@
 import os
 import cv2
 import asyncio
-import base64
 import time
 import uuid
 from datetime import datetime
