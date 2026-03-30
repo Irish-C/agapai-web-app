@@ -6,6 +6,7 @@ lazy initialization of a Redis connection pool. The pool is created
 on first use and reused for all Redis operations throughout the application.
 """
 
+import os
 import redis
 import logging
 
@@ -53,8 +54,11 @@ class RedisConnectionPool:
         """
         if cls._pool is None:
             try:
-                cls._pool = redis.ConnectionPool(host='localhost', port=6379, db=0)
-                logger.info("[RedisPool] Connection pool initialized")
+                host = os.getenv("REDIS_HOST", "redis")
+                port = int(os.getenv("REDIS_PORT", "6379"))
+                db = int(os.getenv("REDIS_DB", "0"))
+                cls._pool = redis.ConnectionPool(host=host, port=port, db=db)
+                logger.info(f"[RedisPool] Connection pool initialized (host={host} port={port} db={db})")
             except Exception as e:
                 logger.error(f"[RedisPool] Failed to create connection pool: {e}")
                 raise
