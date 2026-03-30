@@ -63,7 +63,7 @@ export default function Header({ user, logout }) {
                     hidden ? '-translate-y-full' : 'translate-y-0'
                 } ${
                     scrolled 
-                    ? 'bg-[#015954] border-b border-teal-700/50 py-2 shadow-xl' 
+                    ? 'bg-gradient-to-r from-[#2d3092] to-[#015954] border-b border-teal-700/50 py-2 shadow-xl'  
                     : 'bg-gradient-to-r from-[#2d3092] to-[#015954] py-4 shadow-lg'
                 }`}
             >
