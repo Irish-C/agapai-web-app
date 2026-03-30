@@ -12,6 +12,7 @@ import signal
 import socket
 from urllib.parse import urlsplit, urlunsplit
 from src.utils.redis_pool import RedisConnectionPool
+import numpy as np
 
 # Get Redis client from singleton pool
 def get_redis():
@@ -158,6 +159,96 @@ async def stream_camera_loop(camera_id, rtsp_url):
         # Not all OpenCV builds support setting buffer size; ignore if it fails
         pass
 
+    # Inference worker queue: producer (capture) -> consumer (inference)
+    infer_queue = asyncio.Queue(maxsize=1)
+    infer_task = None
+
+    async def infer_worker(q: asyncio.Queue):
+        """Consume resized frames, run YOLO in a thread, draw annotations on
+        the latest full-resolution frame, and write annotated JPEG bytes to Redis.
+        """
+        r = get_redis()
+        # Model input size (YOLO OpenVINO model expects 640x640)
+        model_in_size = 640
+        while True:
+            try:
+                ts, small_img, full_shape = await q.get()
+            except asyncio.CancelledError:
+                break
+
+            try:
+                # Run blocking predict off the event loop
+                t0 = time.perf_counter()
+                # Run prediction on the resized small image but request the model input size
+                # Ultralytics will resize the provided image to the requested imgsz internally.
+                results = await asyncio.to_thread(
+                    lambda: YOLO_MODEL.predict(source=small_img, conf=0.3, imgsz=(model_in_size, model_in_size), verbose=False)
+                )
+                t1 = time.perf_counter()
+                # Log prediction time (sampled)
+                if int(time.time()) % 10 == 0:
+                    print(f"[perf] cam{camera_id} predict_time={(t1-t0):.3f}s")
+
+                # Fetch latest raw full frame bytes from Redis as fallback
+                try:
+                    raw_key = f'latest_frame_raw_{camera_id}'
+                    raw = r.get(raw_key)
+                except Exception:
+                    raw = None
+
+                if raw is None:
+                    # Nothing to annotate; continue
+                    continue
+
+                # Decode raw bytes to BGR image
+                try:
+                    arr = np.frombuffer(raw, dtype=np.uint8)
+                    full_frame = cv2.imdecode(arr, cv2.IMREAD_COLOR)
+                    if full_frame is None:
+                        continue
+                except Exception:
+                    continue
+
+                fh, fw = full_frame.shape[:2]
+                # Detections are reported in the model input coordinate space (model_in_size)
+                scale_x = fw / model_in_size
+                scale_y = fh / model_in_size
+
+                # Draw detections onto full frame
+                try:
+                    if results and len(results) > 0:
+                        r0 = results[0]
+                        for box in (r0.boxes or []):
+                            x1, y1, x2, y2 = map(float, box.xyxy[0])
+                            x1f = int(x1 * scale_x)
+                            y1f = int(y1 * scale_y)
+                            x2f = int(x2 * scale_x)
+                            y2f = int(y2 * scale_y)
+                            cls_id = int(box.cls[0])
+                            conf = float(box.conf[0]) if hasattr(box, 'conf') else 0.0
+                            cls_name = YOLO_MODEL.names.get(cls_id, str(cls_id))
+                            label = f"{cls_name} {conf:.2f}"
+                            cv2.rectangle(full_frame, (x1f, y1f), (x2f, y2f), (0, 255, 0), 2)
+                            (tw, th), _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2)
+                            cv2.rectangle(full_frame, (x1f, y1f - th - 6), (x1f + tw + 2, y1f), (0, 255, 0), -1)
+                            cv2.putText(full_frame, label, (x1f + 1, y1f - 4), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 0), 2, cv2.LINE_AA)
+                except Exception:
+                    # Fail gracefully on drawing errors
+                    pass
+
+                # Encode annotated frame and write to Redis (lower quality to save bandwidth)
+                try:
+                    _, ann_buf = cv2.imencode('.jpg', full_frame, [cv2.IMWRITE_JPEG_QUALITY, 35])
+                    ann_bytes = ann_buf.tobytes()
+                    r.set(f'latest_frame_{camera_id}', ann_bytes)
+                except Exception:
+                    pass
+
+            except Exception as e:
+                print(f"[infer_worker] Error in worker for camera {camera_id}: {e}")
+                continue
+
+
     # Track camera status
     camera_status = 'connecting'  # connecting, online, offline, error
     last_status_emit = 0.0
@@ -300,6 +391,9 @@ async def stream_camera_loop(camera_id, rtsp_url):
     try:
         # Log YOLO status on first frame
         yolo_status_logged = False
+        # Start inference worker if model available
+        if YOLO_MODEL is not None:
+            infer_task = asyncio.create_task(infer_worker(infer_queue))
         
         while cap.isOpened():
             ret, frame = cap.read()
@@ -412,8 +506,9 @@ async def stream_camera_loop(camera_id, rtsp_url):
                         # cached_annotated_frame = annotated
                         # frame = cached_annotated_frame
                         # Use YOLO's built-in .plot() to draw bounding boxes and cache it
-                        cached_annotated_frame = r.plot()
-                        frame = cached_annotated_frame
+                        # Commented out: annotations are now produced by the inference worker
+                        # cached_annotated_frame = r.plot()
+                        # frame = cached_annotated_frame
                         if r.boxes is not None and len(r.boxes) > 0:  # Removed per-frame logging for performance
                             # Detections logged above at frame_counter % 600 interval
                             # First: check for person/human detections to drive inactivity logic
@@ -508,18 +603,36 @@ async def stream_camera_loop(camera_id, rtsp_url):
             if inactive_by_model and (now - last_inactivity_alert) > inactivity_alert_cooldown:
                 last_inactivity_alert = now
 
-            # 1. ENCODE FRAME: Convert the OpenCV image to JPEG
-            # Lower quality (50) for faster transmission - matches Flask example performance
+            # 1. ENCODE FRAME: Convert the OpenCV image to JPEG (raw frame stored immediately)
+            t_cap0 = time.perf_counter()
             _, buffer = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 50])
             frame_bytes = buffer.tobytes()
+            t_cap1 = time.perf_counter()
+            # Sample capture/encode timing every 600 frames
+            if frame_counter % 600 == 0:
+                print(f"[perf] cam{camera_id} capture_encode={(t_cap1-t_cap0):.3f}s queue_size={infer_queue.qsize()}")
 
-            # 2. STORE TO REDIS: For MJPEG streaming (faster than Socket.IO)
+            # 2. STORE RAW FRAME TO REDIS: For MJPEG streaming fallback and annotation worker
             try:
                 r = get_redis()
-                r.set(f'latest_frame_{camera_id}', frame_bytes)
+                r.set(f'latest_frame_raw_{camera_id}', frame_bytes)
                 r.set('latest_frame', frame_bytes)  # Fallback
             except Exception as e:
                 print(f"[camera_controller] Redis error: {e}")
+
+            # 3. PRODUCER: push a small resized copy to the inference queue (non-blocking)
+            try:
+                h, w = frame.shape[:2]
+                pred_w = 320
+                pred_h = max(1, int((pred_w / w) * h))
+                small = cv2.resize(frame, (pred_w, pred_h))
+                try:
+                    infer_queue.put_nowait((time.time(), small, (w, h)))
+                except asyncio.QueueFull:
+                    # Queue is full; drop this frame so capture/encode stays smooth
+                    pass
+            except Exception:
+                pass
 
             # 3. EMIT FRAME TO FRONTEND: Also emit via Socket.IO for alerts and status
             # ❌ REMOVED - inefficient duplicate path (base64 + Socket.IO overhead)
@@ -549,6 +662,15 @@ async def stream_camera_loop(camera_id, rtsp_url):
     except asyncio.CancelledError:
         pass
     finally:
+        # Cancel inference worker
+        try:
+            if infer_task is not None:
+                infer_task.cancel()
+                # give the task a cycle to exit
+                await asyncio.sleep(0)
+        except Exception:
+            pass
+
         cap.release()
         print(f"Stopped stream for camera {camera_id}")
 
