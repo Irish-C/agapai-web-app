@@ -4,6 +4,7 @@ import asyncio
 import base64
 import time
 import uuid
+from datetime import datetime
 from ultralytics import YOLO
 from database import db
 import yaml
@@ -19,7 +20,7 @@ def get_redis():
 
 # Helper: server root
 _SERVER_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../'))
-_MTX_BIN = os.path.join(_SERVER_DIR, 'mediamtx')
+_MTX_BIN = os.path.join(_SERVER_DIR, 'mediamtx.exe')
 _MTX_CONF = os.path.join(_SERVER_DIR, 'mediamtx.yml')
 _MTX_PID = os.path.join(_SERVER_DIR, 'mediamtx.pid')
 
@@ -71,20 +72,18 @@ SNAPSHOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../st
 os.makedirs(SNAPSHOT_DIR, exist_ok=True)
 SNAPSHOT_BASE_URL = os.getenv('SNAPSHOT_BASE_URL') or os.getenv('VITE_API_URL') or 'http://localhost:5000'
 
-# Load YOLO model if available
-MODEL_PATH = os.path.join(os.path.dirname(__file__), '../../ml/yolov11_fin.pt')
-YOLO_MODEL = None
-print(f"[camera_controller] Attempting to load YOLO from: {MODEL_PATH}")
+# Load OpenVINO model using Ultralytics YOLO API
+OPENVINO_EXPORT_DIR = os.path.join(os.path.dirname(__file__), '../../ml/best_openvino_model')
+yolo_model = None
 try:
-    if os.path.exists(MODEL_PATH):
-        print(f"[camera_controller] Model file exists, loading...")
-        YOLO_MODEL = YOLO(MODEL_PATH)
-        YOLO_MODEL.to('cpu')
-        print(f"[camera_controller] Loaded YOLO model: {MODEL_PATH}")
+    if os.path.exists(OPENVINO_EXPORT_DIR):
+        yolo_model = YOLO(OPENVINO_EXPORT_DIR, task="detect")
+        print(f"[camera_controller] Loaded Ultralytics YOLO OpenVINO model from: {OPENVINO_EXPORT_DIR}")
+        print("Loaded class names:", yolo_model.names)
     else:
-        print(f"[camera_controller] YOLO model not found at: {MODEL_PATH}")
+        print(f"[camera_controller] OpenVINO export folder not found at: {OPENVINO_EXPORT_DIR}")
 except Exception as e:
-    print(f"[camera_controller] Failed to load YOLO model: {e}")
+    print(f"[camera_controller] Failed to load Ultralytics YOLO OpenVINO model: {e}")
     import traceback
     traceback.print_exc()
 
@@ -256,10 +255,10 @@ async def stream_camera_loop(camera_id, rtsp_url):
         except Exception as e:
             print(f"[camera_controller] Failed to persist event: {e}")
 
-    # YOLO inference control
+    # OpenVINO inference control
     frame_counter = 0
-    yolo_skip = 6  # Run YOLO every N frames (tunable - lower for faster detection)
-    cached_annotated_frame = None  # Cache annotated frame to reuse across YOLO cycles
+    infer_skip = 6  # Run inference every N frames (tunable)
+    cached_annotated_frame = None  # Cache annotated frame to reuse across cycles
     last_fall_alert = 0.0
     fall_alert_cooldown = 2.0
 
@@ -275,16 +274,11 @@ async def stream_camera_loop(camera_id, rtsp_url):
     prev_gray = None
     motion_threshold = 3000  # total contour area threshold
 
-    # Map YOLO class labels to fall event classes
-    # Adjust these mappings to match your model's output labels.
-    def map_yolo_class_to_event(cls_name: str):
-        """Return an event class name (for 'Fall' events) or None."""
+    # Map OpenVINO class labels to fall event classes
+    def map_openvino_class_to_event(cls_name: str):
         if not cls_name:
             return None
-
         cls_lower = cls_name.lower()
-
-        # FALLS
         if 'fall' in cls_lower or 'fallen' in cls_lower:
             if 'forward' in cls_lower:
                 return 'Forward Fall'
@@ -292,16 +286,14 @@ async def stream_camera_loop(camera_id, rtsp_url):
                 return 'Backward Fall'
             if 'side' in cls_lower:
                 return 'Side Fall'
-            # Generic fallback for any other fall labels
             return 'Forward Fall'
-
         return None
 
     try:
-        # Log YOLO status on first frame
-        yolo_status_logged = False
-        
         while cap.isOpened():
+            # Discard all frames in the buffer before reading the latest frame
+            while cap.grab():
+                pass
             ret, frame = cap.read()
             if not ret:
                 print(f"[stream_camera_loop] Stream failed for camera {camera_id}. Retrying in 5s...")
@@ -310,14 +302,6 @@ async def stream_camera_loop(camera_id, rtsp_url):
                 cap = cv2.VideoCapture(normalized_url, cv2.CAP_FFMPEG)
                 connection_start_time = time.time()  # Reset timeout when reconnecting
                 continue
-
-            # Log YOLO status once on first frame
-            if not yolo_status_logged:
-                if YOLO_MODEL is not None:
-                    print(f"[stream_camera_loop] Camera {camera_id}: YOLO_MODEL is LOADED ✓")
-                else:
-                    print(f"[stream_camera_loop] Camera {camera_id}: YOLO_MODEL is NONE ✗ (not loaded)")
-                yolo_status_logged = True
 
             # Camera is online, emit online status once
             if camera_status != 'online':
@@ -355,95 +339,76 @@ async def stream_camera_loop(camera_id, rtsp_url):
 
             prev_gray = gray
 
-            # Run YOLO periodically (reduces CPU load) and trigger fall alerts
+            # Run OpenVINO inference periodically (reduces CPU load) and trigger fall alerts
             fall_event_class = None
-            
             # Check if AI is enabled globally
             try:
                 gs = await db.globalsetting.find_first()
                 ai_enabled_now = bool(getattr(gs, 'ai_enabled', True)) if gs else True
             except Exception:
                 ai_enabled_now = True
-            
             # Get previous AI state (initialize on first run)
             if not hasattr(stream_camera_loop, '_prev_ai_enabled'):
                 stream_camera_loop._prev_ai_enabled = ai_enabled_now
-            
             ai_enabled = ai_enabled_now
-            
             # If AI was enabled but is now disabled, clear the cached annotated frame immediately
             if stream_camera_loop._prev_ai_enabled and not ai_enabled:
                 cached_annotated_frame = None
                 print(f"[stream_camera_loop] 🔴 Frame {frame_counter}: AI DISABLED - clearing cache, switching to raw video")
-            
             # Update previous state for next iteration
             stream_camera_loop._prev_ai_enabled = ai_enabled
-            
-            # Debug: Log YOLO condition check every 600 frames (10x reduction for performance)
+            # Debug: Log YOLO model condition check every 600 frames
             if frame_counter % 600 == 0:
-                print(f"[stream_camera_loop] Frame {frame_counter}: YOLO_MODEL={YOLO_MODEL is not None}, ai_enabled={ai_enabled}, frame_counter%yolo_skip={frame_counter % yolo_skip}")
-            
-            if YOLO_MODEL and ai_enabled and (frame_counter % yolo_skip == 0):
+                print(f"[stream_camera_loop] Frame {frame_counter}: YOLO model loaded={yolo_model is not None}, ai_enabled={ai_enabled}, frame_counter%infer_skip={frame_counter % infer_skip}")
+            if yolo_model and ai_enabled and (frame_counter % infer_skip == 0):
                 try:
-                    # Run the model at higher resolution for better accuracy
-                    # Lowered conf to 0.3 to catch more detections
-                    results = YOLO_MODEL(frame, conf=0.3, imgsz=640, verbose=False)
-                    
-                    if len(results) > 0:
-                        r = results[0]
-                        num_detections = len(r.boxes) if r.boxes else 0
-                        
-                        if frame_counter % 600 == 0:  # Log every 600 frames (~10 sec at 60fps)
-                            print(f"[camera_controller] Frame {frame_counter}: YOLO ran, detected {num_detections} object(s)")
-                        
-                        # Use YOLO's built-in .plot() to draw bounding boxes and cache it
-                        cached_annotated_frame = r.plot()
-                        frame = cached_annotated_frame
-                        
-                        if r.boxes is not None and len(r.boxes) > 0:  # Removed per-frame logging for performance
-                            # Detections logged above at frame_counter % 600 interval
-                            # First: check for person/human detections to drive inactivity logic
-                            person_detected = False
-                            for box in r.boxes:
-                                cls_id = int(box.cls[0])
-                                cls_name = YOLO_MODEL.names.get(cls_id, str(cls_id))
-                                if 'person' in cls_name.lower() or 'human' in cls_name.lower() or 'people' in cls_name.lower():
-                                    person_detected = True
-                                    break
-
-                            if person_detected:
-                                last_person_detection = now
-
-                            # Then: existing fall-detection logic (separate concern)
-                            for box in r.boxes:
-                                cls_id = int(box.cls[0])
-                                cls_name = YOLO_MODEL.names.get(cls_id, str(cls_id))
-                                mapped_class = map_yolo_class_to_event(cls_name)
-                                if mapped_class:
-                                    fall_event_class = mapped_class
-                                    # Use the first matching fall class per frame
-                                    break
-
-                            if fall_event_class:
-                                # If a fall is detected, consider that activity as well
-                                last_person_detection = now
-                        else:
-                            if frame_counter % 3000 == 0:  # Log every 3000 frames (~50 sec)
-                                print(f"[camera_controller] Frame {frame_counter}: No objects detected by YOLO")
-                    else:
-                        if frame_counter % 3000 == 0:
-                            print(f"[camera_controller] Frame {frame_counter}: Empty YOLO results")
-
+                    print(f"[DEBUG] Running YOLO inference on frame {frame_counter}")
+                    results = yolo_model.predict(frame, conf=0.3, verbose=True)
+                    print(f"[DEBUG] YOLO results: {results}")
+                    detections = []
+                    for r in results:
+                        print(f"[DEBUG] r.boxes: {getattr(r, 'boxes', None)}")
+                        boxes = r.boxes.xyxy.cpu().numpy() if hasattr(r.boxes, 'xyxy') else []
+                        confs = r.boxes.conf.cpu().numpy() if hasattr(r.boxes, 'conf') else []
+                        clss = r.boxes.cls.cpu().numpy() if hasattr(r.boxes, 'cls') else []
+                        print(f"[DEBUG] boxes: {boxes}, confs: {confs}, clss: {clss}")
+                        for i in range(len(boxes)):
+                            x1, y1, x2, y2 = boxes[i]
+                            conf = confs[i]
+                            class_id = int(clss[i])
+                            cls_name = yolo_model.names[class_id] if class_id < len(yolo_model.names) else str(class_id)
+                            detections.append((x1, y1, x2, y2, conf, cls_name))
+                    print(f"[OpenVINO] Frame {frame_counter}: {len(detections)} detections: {detections}")
+                    # Draw boxes and cache annotated frame
+                    annotated = frame.copy()
+                    person_detected = False
+                    for x1, y1, x2, y2, conf, cls_name in detections:
+                        color = (0, 255, 0)
+                        label = f"{cls_name} {conf:.2f}"
+                        cv2.rectangle(annotated, (int(x1), int(y1)), (int(x2), int(y2)), color, 2)
+                        cv2.putText(annotated, label, (int(x1), int(y1)-10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
+                        if 'person' in cls_name.lower() or 'human' in cls_name.lower() or 'people' in cls_name.lower():
+                            person_detected = True
+                        mapped_class = map_openvino_class_to_event(cls_name)
+                        if mapped_class and not fall_event_class:
+                            fall_event_class = mapped_class
+                    cached_annotated_frame = annotated
+                    frame = cached_annotated_frame
+                    if person_detected:
+                        last_person_detection = now
+                    if fall_event_class:
+                        last_person_detection = now
+                    if frame_counter % 600 == 0:
+                        print(f"[camera_controller] Frame {frame_counter}: OpenVINO ran, detected {len(detections)} object(s)")
                 except Exception as e:
-                    print(f"[camera_controller] YOLO inference error on frame {frame_counter}: {e}")
+                    print(f"[camera_controller] Ultralytics YOLO OpenVINO inference error on frame {frame_counter}: {e}")
                     import traceback
                     traceback.print_exc()
             else:
-                # If AI is enabled but YOLO didn't run this frame, reuse cached frame
-                # If AI is disabled, use raw frame (don't use old cached annotated frames)
+                # If AI is enabled but OpenVINO didn't run this frame, reuse cached frame
                 if ai_enabled and cached_annotated_frame is not None:
                     frame = cached_annotated_frame
-                    if frame_counter % 1200 == 0:  # Log every 1200 frames (~20 sec at 60fps)
+                    if frame_counter % 1200 == 0:
                         print(f"[camera_controller] Frame {frame_counter}: Reusing cached annotated frame")
                 elif ai_enabled and frame_counter % 3000 == 0:
                     print(f"[camera_controller] Frame {frame_counter}: No cached frame available, using raw frame")
@@ -484,7 +449,7 @@ async def stream_camera_loop(camera_id, rtsp_url):
 
             # Inactivity: prefer model-based detection when available.
             inactive_by_model = False
-            if YOLO_MODEL:
+            if yolo_model:
                 if now - last_person_detection > inactivity_timeout:
                     inactive_by_model = True
             else:
