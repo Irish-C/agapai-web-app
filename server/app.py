@@ -55,8 +55,8 @@ env_path = Path(__file__).parent / ".env"
 load_dotenv(dotenv_path=env_path)
 
 # DEBUG: This will tell us exactly what Python found
-print(f"DEBUG: Looking for .env at: {env_path}")
-print(f"DEBUG: DATABASE_URL is: {os.getenv('DATABASE_URL')}")
+# print(f"DEBUG: Looking for .env at: {env_path}")
+# print(f"DEBUG: DATABASE_URL is: {os.getenv('DATABASE_URL')}")
 
 # --- 2. Socket.IO (ASGI) ---
 socketio_server = socketio.AsyncServer(
@@ -172,11 +172,12 @@ async def bigint_middleware(request, call_next):
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173", "http://127.0.0.1:5000"],
+    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
 app.include_router(user_router, prefix='/api')
 app.include_router(camera_router, prefix='/api')
 app.include_router(event_router, prefix='/api')
@@ -209,14 +210,18 @@ from fastapi import Request
 async def set_active_camera(request: Request):
     data = await get_sanitized_json(request)
     camera_id = data.get('camera_id')
-    r = redis.Redis(host='localhost', port=6379, db=0)
+    r = redis.Redis(host='redis', port=6379, db=0)
+    r.ping()
+    print("✓ Redis is running")
     r.set('active_camera_id', camera_id)
     return {'status': 'success', 'active_camera_id': camera_id}
 
 # --- 11. Get Active Camera Endpoint ---
 @app.get('/api/get_active_camera')
 async def get_active_camera():
-    r = redis.Redis(host='localhost', port=6379, db=0)
+    r = redis.Redis(host='redis', port=6379, db=0)
+    r.ping()
+    print("✓ Redis is running")
     camera_id = r.get('active_camera_id')
     if camera_id:
         camera_id = camera_id.decode()

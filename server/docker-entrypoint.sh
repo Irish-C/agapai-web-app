@@ -11,11 +11,13 @@ done
 echo "Postgres is ready."
 
 if command -v npx >/dev/null 2>&1; then
-  npx prisma generate --schema=./prisma/schema.prisma || true
+  # Added --yes to prevent the "Ok to proceed?" prompt
+  npx --yes prisma@4 generate --schema=./prisma/schema.prisma || true
 fi
 
 if [ -n "$PRISMA_MIGRATE" ]; then
-  npx prisma migrate deploy --schema=./prisma/schema.prisma || true
+  # Added --yes here as well
+  npx --yes prisma@4 migrate deploy --schema=./prisma/schema.prisma || true
 fi
 
 exec "$@"

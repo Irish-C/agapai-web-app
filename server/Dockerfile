@@ -37,6 +37,7 @@ COPY . ./
 # Entrypoint
 COPY docker-entrypoint.sh /app/docker-entrypoint.sh
 RUN chmod +x /app/docker-entrypoint.sh
+RUN npm install -g prisma@4.16.2
 
 EXPOSE 5000
 ENTRYPOINT ["/app/docker-entrypoint.sh"]
