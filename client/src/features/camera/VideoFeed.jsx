@@ -65,37 +65,38 @@ function MJPEGCanvas({ camId, cameraName, onStatusChange }) {
         if (!reader) throw new Error('No stream reader');
 
         const frameQueue = [];
+        const FRAME_QUEUE_MAX = 2; // small client-side buffer (1-3 recommended for low latency)
         let isRendering = false;
         let lastRenderedTimestamp = Date.now();
         let lastCanvasUpdateCheck = Date.now();
+        let lastBitmapWidth = 0;
+        let lastBitmapHeight = 0;
 
         // Rendering loop using requestAnimationFrame
-        const renderFrame = () => {
-          if (frameQueue.length > 0 && canvas.offsetParent) {
+        const renderFrame = async () => {
+          if (frameQueue.length > 0 && canvas.offsetParent && !isRendering) {
+            isRendering = true;
             const frameData = frameQueue.shift();
-            
             try {
               const blob = new Blob([frameData], { type: 'image/jpeg' });
-              const url = URL.createObjectURL(blob);
-              const img = new Image();
-
-              img.onload = () => {
-                if (img.width > 0 && img.height > 0) {
-                  canvas.width = img.width;
-                  canvas.height = img.height;
-                  ctx.drawImage(img, 0, 0);
-                  lastRenderedTimestamp = Date.now(); // Track successful render
+              // use createImageBitmap for faster, non-blocking decode
+              const bitmap = await createImageBitmap(blob);
+              if (bitmap && bitmap.width > 0 && bitmap.height > 0) {
+                // Only resize canvas when resolution actually changes
+                if (bitmap.width !== lastBitmapWidth || bitmap.height !== lastBitmapHeight) {
+                  canvas.width = bitmap.width;
+                  canvas.height = bitmap.height;
+                  lastBitmapWidth = bitmap.width;
+                  lastBitmapHeight = bitmap.height;
                 }
-                URL.revokeObjectURL(url);
-              };
-
-              img.onerror = () => {
-                URL.revokeObjectURL(url);
-              };
-
-              img.src = url;
+                ctx.drawImage(bitmap, 0, 0);
+                lastRenderedTimestamp = Date.now();
+                bitmap.close?.();
+              }
             } catch (err) {
               console.error('Frame rendering error:', err);
+            } finally {
+              isRendering = false;
             }
           }
           
@@ -126,7 +127,7 @@ function MJPEGCanvas({ camId, cameraName, onStatusChange }) {
             
             if (type === 'frames' && frames) {
               frames.forEach(buffer => {
-                if (frameQueue.length < 15) {
+                if (frameQueue.length < FRAME_QUEUE_MAX) {
                   frameQueue.push(new Uint8Array(buffer));
                 }
               });
@@ -141,7 +142,7 @@ function MJPEGCanvas({ camId, cameraName, onStatusChange }) {
         let frozenCheckId = null;
         let readerTimeoutId = null;
         const FRAME_TIMEOUT = 5000; // 5 seconds without ANY data = offline
-        const FROZEN_STATE_TIMEOUT = 1500; // 1.5 seconds without NEW frames = frozen, try reconnect
+        const FROZEN_STATE_TIMEOUT = 600; // 0.6 seconds without NEW frames = frozen, try reconnect
         let lastFrameTimestamp = Date.now();
 
         const resetFrameTimeout = () => {
@@ -307,6 +308,11 @@ function VideoFeed({
 }) {
   const [currentDateTime, setCurrentDateTime] = useState(new Date());
   const [cameraStatus, setCameraStatus] = useState('connecting'); // connecting, online, offline, error
+  const [noDisplay, setNoDisplay] = useState(() => {
+    try {
+      return localStorage.getItem(`camera_${camId}_no_display`) === '1';
+    } catch (e) { return false; }
+  });
   const subscriptionRef = useRef(null); // Track if subscribed to prevent duplicate subscribe calls
 
   useEffect(() => {
@@ -374,27 +380,38 @@ function VideoFeed({
     statusColor = 'text-red-400';
   }
 
-  content = (
-    <>
-      {/* MJPEG Stream using fetch for better compatibility */}
-      <MJPEGCanvas
-        camId={camId}
-        cameraName={cameraName}
-        onStatusChange={setCameraStatus}
-      />
-      
-      {/* Loading/Error overlay (only visible when MJPEG is not connecting) */}
-      {cameraStatus !== 'online' && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/70">
-          <svg className="animate-spin h-12 w-12 mb-2 text-gray-500" fill="none" viewBox="0 0 24 24">
-            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-          </svg>
-          <span className={statusColor}>{statusMessage}</span>
+  if (noDisplay) {
+    content = (
+      <div className="w-full h-full flex items-center justify-center bg-black text-white">
+        <div className="text-center">
+          <div className="text-2xl font-semibold mb-2">No display</div>
+          <div className="text-sm text-gray-300">Stream configuration is invalid or media server unavailable.</div>
         </div>
-      )}
-    </>
-  );
+      </div>
+    );
+  } else {
+    content = (
+      <>
+        {/* MJPEG Stream using fetch for better compatibility */}
+        <MJPEGCanvas
+          camId={camId}
+          cameraName={cameraName}
+          onStatusChange={setCameraStatus}
+        />
+        
+        {/* Loading/Error overlay (only visible when MJPEG is not connecting) */}
+        {cameraStatus !== 'online' && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/70">
+            <svg className="animate-spin h-12 w-12 mb-2 text-gray-500" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            <span className={statusColor}>{statusMessage}</span>
+          </div>
+        )}
+      </>
+    );
+  }
 
   return (
     <div

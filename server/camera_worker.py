@@ -43,6 +43,7 @@ async def stream_camera_loop(camera_id, rtsp_url):
         return
 
     cap = cv2.VideoCapture(rtsp_url)
+    redis = RedisConnectionPool.get()
     
     try:
         while True:
@@ -57,8 +58,13 @@ async def stream_camera_loop(camera_id, rtsp_url):
                 await asyncio.sleep(1)
                 continue
 
-            # MJPEG or direct streaming only. Base64 encoding and socket emission removed.
-            # If you need to store or forward frames, use Redis or file system as in camera_controller.py
+            # Encode to JPEG at reduced quality and write to Redis for MJPEG consumers.
+            try:
+                _, buffer = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 50])
+                if buffer is not None:
+                    redis.set(f"latest_frame_raw_{camera_id}", buffer.tobytes())
+            except Exception as e:
+                print(f"[stream_camera_loop-{camera_id}] JPEG encode/Redis write error: {e}")
 
 
             await asyncio.sleep(0.04)  # ~25 FPS
@@ -80,7 +86,7 @@ class CameraWorker:
         self.yolo = None
         self.yolo_enabled = False
         self._yolo_frame_counter = 0
-        self._yolo_skip = 5  # run inference every N frames
+        self._yolo_skip = 10  # run inference every N frames (increased to reduce CPU load)
         self._yolo_last_alert = 0.0
         self._yolo_alert_cooldown = 2.0  # seconds between alerts
         self.cached_annotated_frame = None  # Cache annotated frame for smooth rendering
@@ -234,15 +240,20 @@ class CameraWorker:
                 
                 # Use annotated frame if available
                 output_frame = cached_annotated if cached_annotated is not None else frame
-                
-                # NOTE: Redis writes are now handled by camera_controller.py (stream_camera_loop)
-                # which has YOLO caching logic. Disabled here to avoid race conditions.
-                # try:
-                #     _, buffer = cv2.imencode('.jpg', output_frame, [cv2.IMWRITE_JPEG_QUALITY, 50])
-                #     if buffer is not None:
-                #         self.redis.set(f"latest_frame_{camera_id}", buffer.tobytes())
-                # except Exception as e:
-                #     print(f"[CameraWorker-{camera_id}] Frame save error: {e}")
+
+                # Write latest annotated/raw frame into Redis as JPEG (low quality to save CPU/bandwidth)
+                try:
+                    # Lower JPEG quality for high-resolution streams
+                    _, buffer = cv2.imencode('.jpg', output_frame, [cv2.IMWRITE_JPEG_QUALITY, 50])
+                    if buffer is not None:
+                        # store as bytes so the /video_feed endpoint and MJPEG consumer can read it
+                        self.redis.set(f"latest_frame_{camera_id}", buffer.tobytes())
+                        # Log first emit per camera once for diagnostics
+                        if camera_id not in FIRST_EMIT_LOGGED:
+                            print(f"[CameraWorker-{camera_id}] Wrote first frame to Redis (latest_frame_{camera_id})")
+                            FIRST_EMIT_LOGGED.add(camera_id)
+                except Exception as e:
+                    print(f"[CameraWorker-{camera_id}] Frame save error: {e}")
                 
                 # Dynamic sleep: adjust based on actual processing time
                 elapsed = time.time() - frame_start

@@ -4,7 +4,7 @@ export const contactSupport = (data) => {
 };
 // src/services/apiService.js
 
-const BASE_API_URL = 'http://127.0.0.1:5000/api';
+const BASE_API_URL = import.meta.env.VITE_API_URL || '/api';
 const AUTH_TOKEN_KEY = 'authToken'; 
 
 /**
@@ -12,10 +12,11 @@ const AUTH_TOKEN_KEY = 'authToken';
  * This is the engine for all API calls in the AGAPAI system.
  */
 export const fetchApi = async (endpoint, method = 'GET', data = null) => {
-    const url = `${BASE_API_URL}${endpoint}`;
-    
+    const base = String(BASE_API_URL).replace(/\/+$/, '');
+    const url = `${base}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`;
+
     console.log(`fetchApi: Requesting ${method} ${endpoint}...`);
-    
+
     const options = {
         method,
         headers: {

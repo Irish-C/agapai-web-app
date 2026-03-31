@@ -787,13 +787,29 @@ async def publish_camera_to_mediamtx(camera_id):
         stream_url = camera.stream_url
 
         # Load existing mediamtx.yml
-        with open(_MTX_CONF, 'r') as f:
-            cfg = yaml.safe_load(f) or {}
+        bad_yaml = False
+        try:
+            with open(_MTX_CONF, 'r') as f:
+                cfg = yaml.safe_load(f) or {}
+        except yaml.YAMLError as ye:
+            # If the YAML file is malformed (e.g. "mapping values are not allowed here"),
+            # log and continue with an empty config so we can still save the path.
+            bad_yaml = True
+            print(f"[camera_controller] Warning: Failed to parse {_MTX_CONF}: {ye}")
+            try:
+                # Backup the broken file so admin can inspect it later
+                with open(_MTX_CONF + '.bad', 'w') as badf:
+                    badf.write(open(_MTX_CONF, 'r', encoding='utf-8', errors='replace').read())
+            except Exception:
+                pass
+            cfg = {}
 
         if 'paths' not in cfg:
             cfg['paths'] = {}
 
         # Add or update path
+        if 'paths' not in cfg:
+            cfg['paths'] = {}
         cfg['paths'][path_name] = {
             'source': stream_url,
             'sourceOnDemand': True
@@ -822,7 +838,10 @@ async def publish_camera_to_mediamtx(camera_id):
         except Exception:
             pass
 
-        # Start mediamtx binary
+        # Start mediamtx binary. Treat failures to start as non-fatal:
+        # write the config and return success to the caller so the camera
+        # appears published even if MediaMTX can't validate/connect to the source.
+        started_ok = True
         try:
             proc = subprocess.Popen([
                 _MTX_BIN, _MTX_CONF
@@ -830,13 +849,22 @@ async def publish_camera_to_mediamtx(camera_id):
             with open(_MTX_PID, 'w') as pf:
                 pf.write(str(proc.pid))
         except Exception as e:
-            return {"error": f"Failed to start mediamtx: {e}"}, 500
+            started_ok = False
+            print(f"[camera_controller] Warning: Failed to start mediamtx: {e}")
 
         host = os.getenv('VITE_API_URL') or 'http://127.0.0.1'
         hls_url = f"{host}:8888/{path_name}/index.m3u8"
         webrtc_url = f"{host}:8889/{path_name}/whep"
 
-        return {"status": "ok", "hls": hls_url, "webrtc": webrtc_url, "path": path_name}, 200
+        result = {"status": "ok", "hls": hls_url, "webrtc": webrtc_url, "path": path_name}
+        if not started_ok:
+            result['warning'] = 'MediaMTX failed to start; path saved to config but media server may be unavailable.'
+        if bad_yaml:
+            # Signal the frontend that the mediamtx config was malformed and
+            # although we saved the path, the media server may not load it.
+            result['no_display'] = True
+            result['warning'] = (result.get('warning', '') + ' Original mediamtx.yml was malformed; saved new config.').strip()
+        return result, 200
     except Exception as e:
         return {"error": str(e)}, 500
 
@@ -884,7 +912,8 @@ async def unpublish_camera_from_mediamtx(camera_id):
         except Exception:
             pass
 
-        # Start mediamtx binary
+        # Start mediamtx binary. Treat failures to start as non-fatal.
+        started_ok = True
         try:
             proc = subprocess.Popen([
                 _MTX_BIN, _MTX_CONF
@@ -892,8 +921,12 @@ async def unpublish_camera_from_mediamtx(camera_id):
             with open(_MTX_PID, 'w') as pf:
                 pf.write(str(proc.pid))
         except Exception as e:
-            return {"error": f"Failed to start mediamtx: {e}"}, 500
+            started_ok = False
+            print(f"[camera_controller] Warning: Failed to start mediamtx after unpublish: {e}")
 
-        return {"status": "ok", "message": "Camera unpublished."}, 200
+        result = {"status": "ok", "message": "Camera unpublished."}
+        if not started_ok:
+            result['warning'] = 'MediaMTX failed to start after unpublish; config updated but media server may be unavailable.'
+        return result, 200
     except Exception as e:
         return {"error": str(e)}, 500

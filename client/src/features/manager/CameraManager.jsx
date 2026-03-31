@@ -82,7 +82,15 @@ export default function CameraManager({ locations: initialLocations, onCameraUpd
     const isPublished = publishedCameras.has(publishModal.id);
     try {
       const fn = isPublished ? unpublishCamera : publishCamera;
-      await fn(publishModal.id);
+      const resp = await fn(publishModal.id);
+      // If backend indicates mediamtx.yml was malformed, mark this camera as 'no display'
+      if (resp && resp.no_display) {
+        try {
+          localStorage.setItem(`camera_${publishModal.id}_no_display`, '1');
+        } catch (e) {}
+      } else {
+        try { localStorage.removeItem(`camera_${publishModal.id}_no_display`); } catch (e) {}
+      }
       setPublishedCameras(p => {
         const u = new Set(p);
         isPublished ? u.delete(publishModal.id) : u.add(publishModal.id);

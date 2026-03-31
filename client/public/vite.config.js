@@ -1,4 +1,3 @@
-// client/vite.config.js
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
@@ -11,35 +10,24 @@ const clientRoot = resolve(__dirname, '..');
 export default defineConfig({
   root: clientRoot,
   plugins: [react(), tailwindcss()],
+  optimizeDeps: {
+    include: ['react', 'react-dom', 'react-router-dom', 'socket.io-client', 'axios', 'react-icons', 'react/jsx-runtime', 'react/jsx-dev-runtime']
+  },
+  esbuild: {
+    target: 'es2020'
+  },
   build: {
     outDir: resolve(clientRoot, '..', 'dist'),
     emptyOutDir: true,
   },
   server: {
-    host: '127.0.0.1',
+    host: true,
     port: 5173,
-    strictPort: true, // Fail if port 5173 is unavailable (prevents auto-switching to 5174/5273)
+    strictPort: true,
     proxy: {
-      // Directs standard API calls to FastAPI
-      '/api': {
-        target: 'http://127.0.0.1:5000', 
-        changeOrigin: true,
-        secure: false,
-        // rewrite: (path) => path
-      },
-      // Directs video feed stream to FastAPI
-      '/video_feed': {
-        target: 'http://127.0.0.1:5000',
-        changeOrigin: true,
-        secure: false,
-      },
-      // Directs WebSocket traffic to Flask-SocketIO
-      '/socket.io': {
-        target: 'http://127.0.0.1:5000',
-        ws: true, // Enables WebSocket proxying
-        changeOrigin: true,
-        secure: false,
-      }
+      '/api': { target: 'http://127.0.0.1:5000', changeOrigin: true, secure: false },
+      '/video_feed': { target: 'http://127.0.0.1:5000', changeOrigin: true, secure: false },
+      '/socket.io': { target: 'http://127.0.0.1:5000', ws: true, changeOrigin: true, secure: false }
     }
   }
 });
