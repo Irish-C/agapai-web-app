@@ -65,7 +65,7 @@ function MJPEGCanvas({ camId, cameraName, onStatusChange }) {
         if (!reader) throw new Error('No stream reader');
 
         const frameQueue = [];
-        const FRAME_QUEUE_MAX = 2; // small client-side buffer (1-3 recommended for low latency)
+        const FRAME_QUEUE_MAX = 1; // keep only the newest frame to minimize latency
         let isRendering = false;
         let lastRenderedTimestamp = Date.now();
         let lastCanvasUpdateCheck = Date.now();
@@ -124,11 +124,30 @@ function MJPEGCanvas({ camId, cameraName, onStatusChange }) {
         if (workerRef.current) {
           workerRef.current.onmessage = (event) => {
             const { type, frames, fps } = event.data;
-            
+
             if (type === 'frames' && frames) {
               frames.forEach(buffer => {
-                if (frameQueue.length < FRAME_QUEUE_MAX) {
-                  frameQueue.push(new Uint8Array(buffer));
+                try {
+                  const newBuf = new Uint8Array(buffer);
+                  // Cheap duplicate detection: compare length and first bytes
+                  const last = frameQueue[frameQueue.length - 1];
+                  if (last && last.length === newBuf.length) {
+                    let same = true;
+                    const cmpLen = Math.min(16, newBuf.length);
+                    for (let i = 0; i < cmpLen; i++) {
+                      if (last[i] !== newBuf[i]) { same = false; break; }
+                    }
+                    if (same) return; // skip obvious duplicate
+                  }
+
+                  if (frameQueue.length < FRAME_QUEUE_MAX) {
+                    frameQueue.push(newBuf);
+                  } else {
+                    // Overwrite the queued frame with the newest one (drop-oldest)
+                    frameQueue[frameQueue.length - 1] = newBuf;
+                  }
+                } catch (e) {
+                  // ignore malformed frame
                 }
               });
             } else if (type === 'fps') {

@@ -188,6 +188,189 @@ Default local URLs:
 - Frontend (Vite): http://127.0.0.1:5173
 - Backend (FastAPI/Socket.IO): http://127.0.0.1:5000
 
+### Running with Docker Compose (recommended for parity)
+
+If you prefer to run services in containers (Postgres + backend), use Docker Compose. The `docker-compose.yml` is configured so the `server` container connects to the `postgres` service by hostname and uses the image-built files (the generated Prisma client is included in the image).
+
+Commands:
+
+```powershell
+# Build and start Postgres + Server (server image is rebuilt)
+docker compose up -d --build server postgres
+
+# Tail server logs
+docker compose logs -f server --no-log-prefix --timestamps
+```
+
+Notes:
+- The `server` service in Compose is configured to use `DATABASE_URL=postgresql://admin:agapai143@postgres:5432/agapai_db` so the container resolves `postgres` on the Compose network.
+- We removed the `./server:/app` bind mount in Compose so files produced at image build time (Prisma client) remain available in the image. For iterative development you can re-add the bind mount locally but then ensure you run `npx prisma generate` on the host or at container start.
+
+### Seeding the Database (in Compose)
+
+You can run the seeder via Compose so it runs with the built image:
+
+```powershell
+# Provide seed password via env and run seed (the image already includes generated client)
+docker compose run --rm -e AGAPAI_SEED_PASSWORD=agapai143 seed
+```
+
+Or call the API endpoint from the backend when running (not recommended for production):
+
+```bash
+curl -X POST http://127.0.0.1:5000/api/seed_db
+```
+
+### Local development (venv)
+
+For quick local iteration (FastAPI running in your venv and Vite serving frontend):
+
+1. Keep `server/.env` set to `127.0.0.1` so the backend connects to a Postgres instance bound on the host (or change to `postgres` if running inside Compose).
+2. Start Postgres via Docker Compose as before (this binds Postgres to host port 5432):
+
+```powershell
+docker compose up -d postgres
+```
+
+3. In `server/` activate venv and run the backend:
+
+```powershell
+cd server
+.\venv\Scripts\Activate
+python -m uvicorn app:asgi_app --reload --host 127.0.0.1 --port 5000
+```
+
+4. Build frontend (if needed) and serve with Vite during development:
+
+```bash
+cd client
+npm install
+npm run dev
+```
+
+5. If you change Prisma schema or need the Python client, regenerate it in your venv environment:
+
+```powershell
+cd server
+.\venv\Scripts\Activate
+npx prisma generate --schema=prisma/schema.prisma
+```
+
+### Static assets / logo troubleshooting
+
+If the SPA assets are built into `client/dist` the server will serve them from `/assets/...`. If a logo fails to load:
+
+- Confirm `client/dist/assets` contains the generated image (e.g. `agapai-logo-*.png`).
+- If running server in Compose, rebuild the server image after building the client so the `/client/dist` contents are included in the image:
+
+```powershell
+cd client && npm run build
+docker compose up -d --build server
+```
+
+Then verify the file is served:
+
+```powershell
+curl -I http://127.0.0.1:5000/assets/agapai-logo-dhgYnCIq.png
+```
+
+## Setup checklist for other machines
+
+Use this checklist to prepare another device (developer laptop, CI runner, or teammate machine) so it can run the stack the same way you do.
+
+1. Clone the repository:
+
+```bash
+git clone https://github.com/Irish-C/agapai-web-app.git
+cd agapai-web-app
+```
+
+2. Prepare environment choices (pick one):
+
+- Recommended (Docker Compose): install Docker Desktop and use the provided `docker-compose.yml` to run Postgres and the server container. This preserves build-time artifacts (Prisma client, static `client/dist`) inside the image.
+- Local (venv + Node): install Python, Node, and Postgres locally and run the backend in a venv and the frontend with Vite.
+
+3. Example `.env` files (placeholders — do NOT commit secrets):
+
+- Root `.env` (optional, Compose will read it):
+
+```
+VITE_API_URL=http://127.0.0.1:5000
+AGAPAI_SEED_PASSWORD=agapai143
+```
+
+- `server/.env` (for local venv development)
+
+```
+FLASK_SECRET_KEY=your-very-secret-key
+DATABASE_URL=postgresql://admin:agapai143@127.0.0.1:5432/agapai_db
+```
+
+Note: When running in Docker Compose the running container will use the Compose-set `DATABASE_URL` (postgres host) so you do not need to edit `server/.env` for Compose runs.
+
+4. Quick Docker Compose workflow (recommended):
+
+```powershell
+# Build client assets (so they are copied into server image)
+cd client
+npm ci
+npm run build
+cd ..
+
+# Build the server image and start Postgres + server
+docker compose up -d --build server postgres
+
+# Seed database (one-off)
+docker compose run --rm -e AGAPAI_SEED_PASSWORD=agapai143 seed
+
+# Tail logs / check health
+docker compose logs -f server --no-log-prefix --timestamps
+curl http://127.0.0.1:5000/health
+```
+
+5. Quick local (venv) workflow (no Docker for backend):
+
+```powershell
+# Start Postgres locally (or run docker compose up -d postgres)
+docker compose up -d postgres
+
+# Backend venv
+cd server
+python -m venv venv
+.\venv\Scripts\Activate
+pip install -r requirements.txt
+
+# Generate Prisma client (requires Node installed)
+npx prisma generate --schema=prisma/schema.prisma
+
+# Apply migrations (if needed)
+npx prisma migrate deploy --schema=server/prisma/schema.prisma
+
+# Run server
+python -m uvicorn app:asgi_app --reload --host 127.0.0.1 --port 5000
+
+# Frontend
+cd ../client
+npm ci
+npm run dev
+```
+
+6. Notes & verification
+
+- Ports used: `5000` (backend), `5173` (Vite dev), `5432` (Postgres). Ensure firewall permits these on the host.
+- If the server logs show `P1001` or "can't reach database", wait a few seconds and retry — Compose `depends_on` does not wait for DB readiness. Use `docker compose logs postgres` to verify Postgres health.
+- If you change the frontend build, rebuild the client and then rebuild the server image so the new `client/dist` is copied into the server image.
+
+7. Common commands summary
+
+```bash
+docker compose up -d --build server postgres
+docker compose run --rm -e AGAPAI_SEED_PASSWORD=agapai143 seed
+docker compose logs -f server --no-log-prefix --timestamps
+curl http://127.0.0.1:5000/health
+```
+
+
 ## Project Structure
 
 ```text

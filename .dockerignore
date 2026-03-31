@@ -11,3 +11,5 @@
 server/ml/*.pt
 server/ml/*.json
 server/ml/*.xml
+server/ml/*.bin
+server/ml/*.xml

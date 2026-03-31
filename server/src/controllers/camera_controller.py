@@ -228,10 +228,11 @@ async def stream_camera_loop(camera_id, rtsp_url):
                             conf = float(box.conf[0]) if hasattr(box, 'conf') else 0.0
                             cls_name = YOLO_MODEL.names.get(cls_id, str(cls_id))
                             label = f"{cls_name} {conf:.2f}"
-                            cv2.rectangle(full_frame, (x1f, y1f), (x2f, y2f), (0, 255, 0), 2)
-                            (tw, th), _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2)
-                            cv2.rectangle(full_frame, (x1f, y1f - th - 6), (x1f + tw + 2, y1f), (0, 255, 0), -1)
-                            cv2.putText(full_frame, label, (x1f + 1, y1f - 4), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 0), 2, cv2.LINE_AA)
+                            # OpenCV manual drawing disabled: annotations will not be drawn here.
+                            # cv2.rectangle(full_frame, (x1f, y1f), (x2f, y2f), (0, 255, 0), 2)
+                            # (tw, th), _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2)
+                            # cv2.rectangle(full_frame, (x1f, y1f - th - 6), (x1f + tw + 2, y1f), (0, 255, 0), -1)
+                            # cv2.putText(full_frame, label, (x1f + 1, y1f - 4), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 0), 2, cv2.LINE_AA)
                 except Exception:
                     # Fail gracefully on drawing errors
                     pass
