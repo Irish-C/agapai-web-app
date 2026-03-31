@@ -76,9 +76,30 @@ SNAPSHOT_BASE_URL = os.getenv('SNAPSHOT_BASE_URL') or os.getenv('VITE_API_URL') 
 MODEL_PATH = os.path.join(os.path.dirname(__file__), '../../ml/best_openvino_model')
 YOLO_MODEL = None
 print(f"[camera_controller] Attempting to load YOLO from: {MODEL_PATH}")
+# Device selection for OpenVINO: respect `DEVICE` env var (CPU/GPU/AUTO)
+DEVICE = os.getenv('DEVICE', 'CPU').upper()
+try:
+    # If OpenVINO runtime is available, query devices and pick the requested one when possible
+    import importlib
+    if importlib.util.find_spec('openvino.runtime'):
+        from openvino.runtime import Core
+        try:
+            core = Core()
+            available = core.get_available_devices()
+            print(f"[camera_controller] OpenVINO available devices: {available}")
+            # Prefer exact match, else fallback to first available
+            selected = DEVICE if DEVICE in available else (available[0] if available else DEVICE)
+            os.environ['OPENVINO_DEVICE'] = selected
+            print(f"[camera_controller] Selected OpenVINO device: {selected}")
+        except Exception as _e:
+            print(f"[camera_controller] OpenVINO device query failed: {_e}")
+except Exception:
+    # openvino not installed in this environment
+    pass
 try:
     if os.path.exists(MODEL_PATH):
         print(f"[camera_controller] Model file exists, loading...")
+        # Respect OPENVINO_DEVICE if set (some runtimes read this env var)
         YOLO_MODEL = YOLO(MODEL_PATH)
         # Do NOT call .to('cpu') for OpenVINO/ONNX/TensorRT models
         print(f"[camera_controller] Loaded YOLO model: {MODEL_PATH}")

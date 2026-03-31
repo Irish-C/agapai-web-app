@@ -1,3 +1,21 @@
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+venv/
+.venv/
+node_modules/
+client/node_modules/
+client/dist/
+dist/
+ml/
+server/mediamtx
+server/mediamtx.pid
+*.log
+.env
+server/.env
+.git
+.gitignore
 # Ignore heavy local folders
 **/node_modules
 **/venv

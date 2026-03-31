@@ -1,34 +1,46 @@
 # Use a cleaner base
 FROM python:3.11-slim
-
+ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
 WORKDIR /app
 
-# 1. Install ONLY the necessary system libs
+# Default device for OpenVINO inferencing; can be overridden at runtime
+ENV DEVICE=CPU
+
+# System deps (ffmpeg, OpenCV runtime libs, postgresql client, build tools)
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    libatomic1 curl ca-certificates \
+    ffmpeg git curl wget build-essential libgl1 libglib2.0-0 libsm6 libxext6 libxrender1 ca-certificates postgresql-client \
+    libnuma1 libtbbmalloc2 libgomp1 lsb-release \
     && rm -rf /var/lib/apt/lists/*
 
-# 2. Install Node (Prisma needs it) using a smaller method
+# Install Node (for npx/prisma)
 RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
-    apt-get install -y nodejs && \
-    rm -rf /var/lib/apt/lists/*
+    apt-get install -y nodejs && rm -rf /var/lib/apt/lists/*
 
-# 3. Copy ONLY the requirements first (Better Caching)
-COPY requirements.txt .
-RUN pip install --no-cache-dir torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
-# TIP: If you don't need GPU, use: 
-# RUN pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu
-RUN pip install --no-cache-dir -r requirements.txt
+# ---- Install Torch in its own cached layer ----
+COPY requirements-torch.txt ./requirements-torch.txt
+RUN pip install --no-cache-dir -r requirements-torch.txt --index-url https://download.pytorch.org/whl/cpu || true
 
-# 4. Copy ONLY the Prisma schema first to generate the client
-# This prevents re-generating every time you change a Python file
+# Copy and install remaining Python deps
+COPY requirements.txt ./requirements.txt
+# Ensure pip is recent and install remaining Python deps
+RUN pip install --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt
+
+# Prisma schema + generate (npx)
 COPY prisma ./prisma
-RUN prisma generate --schema=prisma/schema.prisma
+    # Generate Prisma client using the Python Prisma generator (matches installed python prisma package)
+    RUN python -m prisma generate --schema=prisma/schema.prisma
 
-# 5. Copy the rest of the code, but IGNORE the heavy stuff
-# IMPORTANT: Create a .dockerignore file (see below)
-COPY . .
+# Copy app code
+COPY . ./
+
+# Entrypoint
+COPY docker-entrypoint.sh /app/docker-entrypoint.sh
+RUN chmod +x /app/docker-entrypoint.sh
 
 EXPOSE 5000
+ENTRYPOINT ["/app/docker-entrypoint.sh"]
+# Expose API port and MediaMTX RTSP port (if MediaMTX runs in same host/container)
+EXPOSE 8554
 
 CMD ["uvicorn", "app:asgi_app", "--host", "0.0.0.0", "--port", "5000"]
