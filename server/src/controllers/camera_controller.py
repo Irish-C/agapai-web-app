@@ -100,7 +100,7 @@ try:
     if os.path.exists(MODEL_PATH):
         print(f"[camera_controller] Model file exists, loading...")
         # Respect OPENVINO_DEVICE if set (some runtimes read this env var)
-        YOLO_MODEL = YOLO(MODEL_PATH)
+        YOLO_MODEL = YOLO(MODEL_PATH, task='detect')
         # Do NOT call .to('cpu') for OpenVINO/ONNX/TensorRT models
         print(f"[camera_controller] Loaded YOLO model: {MODEL_PATH}")
     else:
