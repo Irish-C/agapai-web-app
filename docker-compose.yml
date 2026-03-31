@@ -4,20 +4,19 @@ networks:
 
 services:
   postgres:
-    image: postgres:15
+    image: postgres:15-alpine
     restart: unless-stopped
+    # Pulling credentials from .env to ensure they match the server
     env_file:
       - ./server/.env
-    environment:
-      POSTGRES_USER: ${POSTGRES_USER:-agapai}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password}
-      POSTGRES_DB: ${POSTGRES_DB:-agapai}
     volumes:
       - pgdata:/var/lib/postgresql/data
+      - ./server:/app
     ports:
       - "5432:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-agapai}"]
+      # Using $$ to escape the variable for the shell test
+      test: ["CMD-SHELL", "pg_isready -U admin -d agapai_db"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -25,31 +24,37 @@ services:
       - agapai
 
   redis:
-    image: redis:7
+    image: redis:7-alpine
     restart: unless-stopped
     ports:
       - "6379:6379"
     networks:
       - agapai
 
-  # MediaMTX service removed temporarily because image pull failed.
-  # To enable, add a working image (e.g. ghcr.io/aler9/mediamtx:latest) or bundle the binary.
-
   server:
+    restart: on-failure
     build:
       context: ./server
       dockerfile: Dockerfile
-    restart: unless-stopped
     env_file:
       - ./server/.env
     depends_on:
-      - postgres
-      - redis
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    volumes:
+      - ./server:/app
+      # Prevents local node_modules from overwriting the container's prisma install
+      - /app/node_modules
     ports:
       - "5000:5000"
     networks:
       - agapai
-    command: ["uvicorn", "app:asgi_app", "--host", "0.0.0.0", "--port", "5000", "--reload"]
+    environment:
+      - PRISMA_MIGRATE=true
+      - PYTHONUNBUFFERED=1
+      - PRISMA_PY_DEBUG_GENERATOR=1
 
   seed:
     build:
@@ -58,10 +63,12 @@ services:
     env_file:
       - ./server/.env
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
+    networks:
+      - agapai
     entrypoint: ["python", "seed_db.py"]
-    environment:
-      - AGAPAI_SEED_PASSWORD=${AGAPAI_SEED_PASSWORD}
+    # This will only run once and then stop
     restart: "no"
 
 volumes:
