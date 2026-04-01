@@ -31,6 +31,31 @@ services:
     networks:
       - agapai
 
+  mediamtx:
+    image: bluenviron/mediamtx:latest-ffmpeg
+    restart: unless-stopped
+    ports:
+      - "8554:8554"  # RTSP
+      - "1935:1935"  # RTMP
+      - "8080:8080"  # HTTP (web/API)
+      - "8888:8888" # HLS
+      - "8889:8889" # WebRTC HTTP
+      - "8890:8890/udp" # SRT
+      - "8189:8189/udp" # ICE/UDP
+    environment:
+      MTX_RTSPTRANSPORTS: "tcp"
+      # Replace with your LAN/public IPs for WebRTC ICE candidates (comma separated)
+      MTX_WEBRTCADDITIONALHOSTS: "192.168.254.113"  
+    volumes:
+      - ./server/mediamtx.yml:/mediamtx.yml:ro
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/ || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    networks:
+      - agapai
+
   server:
     restart: on-failure
     build:
@@ -55,6 +80,9 @@ services:
       - PRISMA_MIGRATE=true
       - PYTHONUNBUFFERED=1
       - PRISMA_PY_DEBUG_GENERATOR=1
+      - MEDIAMTX_URL=rtsp://mediamtx:8554
+      - MEDIAMTX_API=http://mediamtx:8080
+      - MEDIAMTX_MANAGE=false
 
   seed:
     build:

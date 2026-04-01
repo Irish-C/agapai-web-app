@@ -1,4 +1,13 @@
+mediamtx
+mediamtx.exe
+mediamtx.pid
+mediamtx.yml
+.venv
 __pycache__
+*.pyc
+node_modules
+dist
+build__pycache__
 *.pyc
 *.pyo
 *.pyd
