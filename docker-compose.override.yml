@@ -3,10 +3,7 @@ services:
     volumes:
       - ./server:/app:delegated
       - ./ml:/ml:delegated
-    command: >
-      sh -c "python -m prisma generate --schema=prisma/schema.prisma && \
-             npx --yes prisma@4 migrate deploy --schema=prisma/schema.prisma && \
-             uvicorn app:asgi_app --host 0.0.0.0 --port 5000 --reload"
+    command: ["uvicorn", "app:asgi_app", "--host", "0.0.0.0", "--port", "5000"]
     environment:
       - PYTHONUNBUFFERED=1
       - NPM_CONFIG_YES=true

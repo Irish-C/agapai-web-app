@@ -15,9 +15,16 @@ if command -v npx >/dev/null 2>&1; then
   npx --yes prisma@4 generate --schema=./prisma/schema.prisma || true
 fi
 
-if [ -n "$PRISMA_MIGRATE" ]; then
+if command -v npx >/dev/null 2>&1 && [ -n "$PRISMA_MIGRATE" ]; then
   # Added --yes here as well
   npx --yes prisma@4 migrate deploy --schema=./prisma/schema.prisma || true
 fi
 
+echo "PATH=$PATH"
+if command -v uvicorn >/dev/null 2>&1; then
+  echo "uvicorn found at: $(command -v uvicorn)"
+else
+  echo "uvicorn not found"
+fi
+echo "Execing: $@"
 exec "$@"
