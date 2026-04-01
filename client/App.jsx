@@ -29,43 +29,59 @@ const GlobalAlertModal = ({ alert, onClose }) => {
     if (!alert) return null;
 
     return (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black bg-opacity-80">
-            <div className="bg-white border-8 border-red-600 rounded-2xl shadow-2xl p-10 max-w-xl w-full text-center transform scale-110">
-                <div className="text-8xl mb-4 animate-bounce">🚨</div>
-                <h2 className="text-4xl font-black text-red-700 mb-2">
-                    {alert.type ? `${alert.type.toUpperCase()} DETECTED!` : 'ALERT DETECTED!'}
-                </h2>
-
-                <p className="text-2xl text-gray-900 mb-6">
-                    Location: <span className="font-bold underline">{alert.location || 'Unknown Area'}</span>
-                </p>
-
-                {alert.snapshot_url ? (
-                    <div className="mb-6">
-                        <p className="text-lg font-semibold text-gray-800 mb-2">Snapshot</p>
-                        <img
-                            src={alert.snapshot_url}
-                            alt="Alert snapshot"
-                            className="w-full max-w-md mx-auto rounded-lg border border-gray-300 shadow-sm"
-                        />
-                    </div>
-                ) : null}
-
-                <div className="bg-red-100 border-l-8 border-red-600 text-red-700 px-6 py-4 rounded-lg mb-6 text-left">
-                    <p className="font-bold text-xl mb-1">Status: Hardware Alarm Active</p>
-                    <p className="text-lg">Check the patient immediately! Provide medical assistance if necessary.</p>
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80">
+            
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95
+                animate-out fade-out zoom-out-95 shadow-[0_0_60px_rgba(239,68,68,0.5)] ring-2 ring-red-600/60">
+                
+                {/* Top Alert Bar */}
+                <div className="bg-red-600 text-white py-2 px-4 flex items-center justify-center gap-2">
+                    <span className="text-sm font-semibold tracking-wide">
+                        EMERGENCY ALERT
+                    </span>
                 </div>
 
-                <p className="text-md text-gray-600 mb-8 italic">
-                    The physical alarm on the device is currently sounding.
-                </p>
+                <div className="p-6 text-center">
 
-                <button 
-                    onClick={onClose}
-                    className="bg-red-600 hover:bg-red-800 text-white font-bold py-4 px-8 rounded-xl text-xl w-full transition-colors shadow-lg"
-                >
-                    Dismiss Notification
-                </button>
+                    {/* Title */}
+                    <h2 className="text-2xl font-bold text-red-700 mb-2">
+                        {alert.type
+                            ? `${alert.type.toUpperCase()} DETECTED`
+                            : "ALERT DETECTED"}
+                    </h2>
+
+                    {/* Location */}
+                    <p className="text-sm text-gray-700 mb-4">
+                        Location:{" "}
+                        <span className="font-semibold underline">
+                            {alert.location || "Unknown Area"}
+                        </span>
+                    </p>
+
+                    {/* Snapshot */}
+                    {alert.snapshot_url && (
+                        <div className="mb-4">
+                            <img
+                                src={alert.snapshot_url}
+                                alt="Alert snapshot"
+                                className="w-full max-w-xs mx-auto rounded-lg border border-gray-300 shadow-sm"
+                            />
+                        </div>
+                    )}
+
+                    {/* Warning Text */}
+                    <p className="text-sm text-red-600 font-medium mb-5">
+                        Alarm is actively sounding on the device
+                    </p>
+
+                    {/* Button */}
+                    <button
+                        onClick={onClose}
+                        className="w-full bg-red-600 hover:bg-red-700 text-white font-semibold py-2.5 rounded-xl transition-all duration-200 shadow-md hover:shadow-lg active:scale-95"
+                    >
+                        Dismiss Alert
+                    </button>
+                </div>
             </div>
         </div>
     );
