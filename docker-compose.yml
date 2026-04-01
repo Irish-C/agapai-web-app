@@ -6,17 +6,15 @@ services:
   postgres:
     image: postgres:15-alpine
     restart: unless-stopped
-    # Pulling credentials from .env to ensure they match the server
     env_file:
       - ./server/.env
     volumes:
       - pgdata:/var/lib/postgresql/data
-      - ./server:/app
+    # REMOVED: - ./server:/app (Not needed for DB)
     ports:
       - "5432:5432"
     healthcheck:
-      # Using $$ to escape the variable for the shell test
-      test: ["CMD-SHELL", "pg_isready -U admin -d agapai_db"]
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER:-admin} -d $${POSTGRES_DB:-agapai_db}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -37,17 +35,16 @@ services:
     image: bluenviron/mediamtx:latest-ffmpeg
     restart: unless-stopped
     ports:
-      - "8554:8554"  # RTSP
-      - "1935:1935"  # RTMP
-      - "8080:8080"  # HTTP (web/API)
-      - "8888:8888" # HLS
-      - "8889:8889" # WebRTC HTTP
-      - "8890:8890/udp" # SRT
-      - "8189:8189/udp" # ICE/UDP
+      - "8554:8554"
+      - "1935:1935"
+      - "8080:8080"
+      - "8888:8888"
+      - "8889:8889"
+      - "8890:8890/udp"
+      - "8189:8189/udp"
     environment:
       MTX_RTSPTRANSPORTS: "tcp"
-      # Replace with your LAN/public IPs for WebRTC ICE candidates (comma separated)
-      MTX_WEBRTCADDITIONALHOSTS: "192.168.254.113"  
+      MTX_WEBRTCADDITIONALHOSTS: "${MTX_WEBRTC_HOST}"
     volumes:
       - ./server/mediamtx.yml:/mediamtx.yml:ro
     healthcheck:
@@ -59,11 +56,11 @@ services:
       - agapai
 
   server:
-    restart: on-failure
     image: server:latest
     build:
       context: ./server
       dockerfile: Dockerfile
+    restart: on-failure
     env_file:
       - ./server/.env
     command: ["uvicorn", "app:asgi_app", "--host", "0.0.0.0", "--port", "5000"]
@@ -74,7 +71,6 @@ services:
         condition: service_started
     volumes:
       - ./server:/app
-      # Prevents local node_modules from overwriting the container's prisma install
       - server_node_modules:/app/node_modules
     ports:
       - "5000:5000"
@@ -87,21 +83,23 @@ services:
       - MEDIAMTX_URL=rtsp://mediamtx:8554
       - MEDIAMTX_API=http://mediamtx:8080
       - MEDIAMTX_MANAGE=false
+    # ADDED: Healthcheck so the 'seed' service knows when to start
+    healthcheck:
+      test: ["CMD", "python", "-c", "import socket; s = socket.socket(socket.AF_INET, socket.SOCK_STREAM); s.connect(('localhost', 5000))"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
 
   seed:
     image: server:latest
-    build:
-      context: ./server
-      dockerfile: Dockerfile
     env_file:
       - ./server/.env
     depends_on:
-      postgres:
+      server:
         condition: service_healthy
     networks:
       - agapai
     entrypoint: ["python", "seed_db.py"]
-    # This will only run once and then stop
     restart: "no"
 
 volumes:
