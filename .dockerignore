@@ -1,3 +1,28 @@
+# Local Virtual Environments (The 1.25GB culprit)
+server/venv
+venv
+.venv
+**/venv
+**/.venv
+
+# Large Media/ML folders
+ml/
+server/ml/
+**/ml/
+
+# Build & Dependency Artifacts
+node_modules
+**/node_modules
+dist
+**/dist
+build
+**/build
+__pycache__
+**/__pycache__
+
+# Git history (Can be huge)
+.git
+**/.git
 mediamtx
 mediamtx.exe
 mediamtx.pid
@@ -13,9 +38,13 @@ build__pycache__
 *.pyd
 venv/
 .venv/
+server/venv/
 node_modules/
 client/node_modules/
 client/dist/
+**/node_modules/
+**/.git/
+**/__pycache__/
 dist/
 ml/
 server/mediamtx
@@ -40,3 +69,4 @@ server/ml/*.json
 server/ml/*.xml
 server/ml/*.bin
 server/ml/*.xml
+
