@@ -59,7 +59,7 @@ export default function Header({ user, logout }) {
     return (
         <>
             <header
-                className={`sticky top-0 z- transition-all duration-500 ${
+                className={`sticky top-0 z-40 transition-all duration-500 ${
                     hidden ? '-translate-y-full' : 'translate-y-0'
                 } ${
                     scrolled 

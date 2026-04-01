@@ -20,9 +20,15 @@ def get_redis():
 
 # Helper: server root
 _SERVER_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../'))
+# Optional legacy binary paths (kept but not used by default)
 _MTX_BIN = os.path.join(_SERVER_DIR, 'mediamtx.exe')
 _MTX_CONF = os.path.join(_SERVER_DIR, 'mediamtx.yml')
 _MTX_PID = os.path.join(_SERVER_DIR, 'mediamtx.pid')
+
+# Use env-configured MediaMTX endpoints when available
+MEDIAMTX_URL = os.getenv('MEDIAMTX_URL', 'rtsp://mediamtx:8554')
+MEDIAMTX_API = os.getenv('MEDIAMTX_API', 'http://mediamtx:8080')
+MEDIAMTX_MANAGE = os.getenv('MEDIAMTX_MANAGE', 'false').lower() in ('1', 'true', 'yes')
 
 
 def _is_tcp_listening(host: str, port: int, timeout: float = 0.4) -> bool:
@@ -34,15 +40,29 @@ def _is_tcp_listening(host: str, port: int, timeout: float = 0.4) -> bool:
 
 
 async def ensure_mediamtx_running() -> bool:
-    """Start MediaMTX if RTSP port is not available.
+    """Ensure MediaMTX is reachable. If MEDIAMTX_MANAGE is true and a local binary exists,
+    attempt to start the local binary as a fallback (not used for docker-compose-managed instance).
+    Returns True if the configured RTSP/API endpoint is reachable."""
+    # Parse MEDIAMTX_URL host:port to test RTSP socket
+    try:
+        from urllib.parse import urlsplit
+        parsed = urlsplit(MEDIAMTX_URL)
+        test_host = parsed.hostname or '127.0.0.1'
+        test_port = parsed.port or 8554
+    except Exception:
+        test_host, test_port = '127.0.0.1', 8554
 
-    Returns True when RTSP listener is available after the check.
-    """
-    if _is_tcp_listening('127.0.0.1', 8554):
+    if _is_tcp_listening(test_host, test_port):
         return True
 
+    # If we are not responsible for managing MediaMTX, just report unreachable
+    if not MEDIAMTX_MANAGE:
+        print(f"[camera_controller] MediaMTX unreachable at {MEDIAMTX_URL} and MEDIAMTX_MANAGE=false")
+        return False
+
+    # MEDIAMTX_MANAGE=true: try to start local binary if present (legacy)
     if not os.path.exists(_MTX_BIN):
-        print(f"[camera_controller] MediaMTX binary not found at {_MTX_BIN}")
+        print(f"[camera_controller] MediaMTX binary not found at {_MTX_BIN}, cannot manage locally")
         return False
 
     try:
@@ -54,17 +74,12 @@ async def ensure_mediamtx_running() -> bool:
         )
         with open(_MTX_PID, 'w') as pf:
             pf.write(str(proc.pid))
-
-        # Give MediaMTX a brief moment to bind sockets.
-        await asyncio.sleep(0.8)
-        ok = _is_tcp_listening('127.0.0.1', 8554)
-        if ok:
-            print('[camera_controller] MediaMTX started and listening on :8554')
-        else:
-            print('[camera_controller] MediaMTX start attempted, but :8554 is still unavailable')
+        await asyncio.sleep(1.0)
+        ok = _is_tcp_listening(test_host, test_port)
+        print(f'[camera_controller] Local MediaMTX start attempted, reachable={ok}')
         return ok
     except Exception as e:
-        print(f"[camera_controller] Failed to start MediaMTX: {e}")
+        print(f"[camera_controller] Failed to start local MediaMTX: {e}")
         return False
 
 # Snapshot storage (for alert snapshots)

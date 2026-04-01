@@ -312,8 +312,8 @@ function MJPEGCanvas({ camId, cameraName, onStatusChange }) {
   return (
     <canvas
       ref={canvasRef}
-      className="w-full h-full"
-      style={{ display: 'block', backgroundColor: '#000', maxWidth: '100%', maxHeight: '100%' }}
+      className="block max-w-full max-h-full"
+      style={{ display: 'block', backgroundColor: '#000', width: 'auto', height: 'auto', maxWidth: '100%', maxHeight: '100%' }}
     />
   );
 }
@@ -434,16 +434,16 @@ function VideoFeed({
 
   return (
     <div
-      className={`group bg-black rounded-lg shadow-lg overflow-hidden border-2 border-gray-700 relative ${
+      className={`group bg-black rounded-none shadow-md overflow-hidden border-2 border-gray-700 relative ${
         !isFocused ? 'cursor-pointer hover:border-teal-500 transition-all' : 'border-teal-600'
       }`}
       onClick={() => !isFocused && onFocusChange?.(camId)}
     >
       {/* Header Bar */}
-      <div className="bg-gray-800 text-white p-2 flex items-center justify-between">
-        <div className="flex flex-col overflow-hidden">
+      <div className="absolute top-0 left-0 w-full text-white p-2 flex items-center justify-between z-10">
+        <div className="flex items-center gap-2 overflow-hidden min-w-0">
           <h4 className="font-semibold text-sm truncate">{cameraName}</h4>
-          <p className="text-xs text-gray-400 truncate">{location}</p>
+          <p className="text-xs text-gray-400 truncate font-normal">{location}</p>
         </div>
         {/* Status Indicator Dot */}
         <span className={`w-2 h-2 rounded-full ${
@@ -458,15 +458,15 @@ function VideoFeed({
       {/* Video Area */}
       <div
         className={`w-full bg-gray-900 flex items-center justify-center relative ${
-          isFocused ? 'h-[75vh]' : 'aspect-video'
+          isFocused ? '' : 'aspect-video'
         }`}
+        style={isFocused ? { width: '100%', height: 'calc(100vh - 6rem)', maxHeight: 'calc(100vh - 6rem)' } : {}}
       >
         {content}
 
         {/* CCTV Timestamp Overlay */}
-        <div className="absolute bottom-2 left-2 bg-black/60 text-white px-3 py-1 rounded text-xs font-mono backdrop-blur-sm">
-          <div>{currentDateTime.toLocaleDateString()}</div>
-          <div>{currentDateTime.toLocaleTimeString()}</div>
+        <div className="absolute bottom-2 left-2 bg-transparent text-white px-3 py-1 rounded text-xs font-mono">
+          <div>DATE: {currentDateTime.toLocaleDateString()} {currentDateTime.toLocaleTimeString()}</div>
         </div>
 
         {/* Focus/Unfocus Button */}
@@ -476,14 +476,14 @@ function VideoFeed({
               e.stopPropagation();
               onFocusChange?.(null);
             }}
-            className="absolute top-2 right-2 p-2 bg-black/60 rounded-full text-white hover:bg-red-600 transition-colors"
+            className="absolute top-2 right-2 p-2 bg-black/60 rounded-full text-white hover:bg-red-600 transition-colors z-20"
             title="Return to Grid"
           >
             <FaTimes />
           </button>
         ) : (
           <div
-            className="absolute top-2 right-2 p-2 bg-black/60 rounded-full text-white opacity-0 group-hover:opacity-100 transition-opacity"
+            className="absolute top-2 right-2 p-2 bg-black/60 rounded-full text-white opacity-0 group-hover:opacity-100 transition-opacity z-20"
             title="Focus"
           >
             <FaExpand />

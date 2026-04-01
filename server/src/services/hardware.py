@@ -2,7 +2,7 @@ import time
 from threading import Timer
 
 try:
-    from gpiozero import OutputDevice, Button
+    from gpiozero import OutputDevice, Button # pyright: ignore[reportMissingImports]
     print("[HARDWARE] gpiozero loaded successfully.")
 except (ImportError, ModuleNotFoundError):
     # Mock classes so the code doesn't crash on non-Pi devices

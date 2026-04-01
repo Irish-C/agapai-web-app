@@ -91,8 +91,8 @@ export default function VideoFeed({
       `}
       onClick={handleFocusClick}
     >
-      {/* Header Bar */}
-      <div className="bg-gray-800 text-white p-2 flex items-center justify-between">
+  {/* Header Bar */}
+    <div className="bg-transparent text-white p-2 flex items-center justify-between">
         <h4 className="font-semibold text-sm truncate">
           <FaVideo className="inline-block mr-2 text-teal-400" />
           {location}
@@ -115,7 +115,7 @@ export default function VideoFeed({
         {content}
 
         {/* CCTV Timestamp Overlay */}
-        <div className="absolute bottom-2 left-2 bg-black/60 text-white px-3 py-1 rounded text-xs font-mono backdrop-blur-sm">
+        <div className="absolute bottom-2 left-2 bg-transparent text-white px-3 py-1 rounded text-xs font-mono">
           <div>{currentDateTime.toLocaleDateString()}</div>
           <div>{currentDateTime.toLocaleTimeString()}</div>
         </div>

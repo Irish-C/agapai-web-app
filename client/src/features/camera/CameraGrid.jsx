@@ -183,7 +183,7 @@ export default function CameraGrid() {
   }
 
   return (
-    <div className="flex flex-col lg:flex-row gap-6 p-6">
+    <div className="flex flex-col lg:flex-row gap-4 p-4">
       {focusedCameraId && focusedCamera ? (
         <div className="flex-grow w-full">
           {header}
@@ -195,19 +195,13 @@ export default function CameraGrid() {
             isFocused={true}
             onFocusChange={setFocusedCameraId}
           />
-          <button
-            onClick={() => setFocusedCameraId(null)}
-            className="mt-4 px-4 py-2 bg-blue-500 text-white rounded"
-          >
-            Back to Grid
-          </button>
         </div>
       ) : (
         <>
           <div className="flex-grow lg:w-3/4">
             {header}
             {!isLoading && publishedCameraList.length > 0 && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-0">
                 {publishedCameraList.map((camera) => {
                   const location = camera.location_name || camera.location || camera.loc_name;
                   return (
