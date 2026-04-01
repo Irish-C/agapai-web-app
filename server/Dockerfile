@@ -8,10 +8,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential curl git && rm -rf /var/lib/apt/lists/*
 
 # Install heavy Python libs into a specific folder
-# Use generated requirements without PyTorch to avoid pulling large torch packages
-COPY requirements-no-torch.txt requirements.txt ./
+# Use pruned requirements determined from repo analysis
+COPY requirements-pruned.txt requirements.txt ./
 RUN pip install --upgrade pip && \
-    pip install --user --no-cache-dir -r requirements.txt
+    pip install --user --no-cache-dir -r requirements.txt --index-url https://pypi.org/simple
 
 # --- STAGE 2: Final Runner ---
 FROM python:3.11-slim
