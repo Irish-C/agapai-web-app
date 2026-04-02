@@ -14,7 +14,6 @@ For UI screenshots and product-level description, see [APP.md](APP.md).
 
 - [Prerequisites](#prerequisites)
 - [Quick Setup (dev)](#quick-setup-dev)
-- [Run (dev & Docker)](#run-dev--docker)
 - [Database: Prisma & Seeding](#database-prisma--seeding)
 - [MediaMTX (streaming)](#mediamtx-streaming)
 - [Troubleshooting](#troubleshooting)
@@ -29,12 +28,13 @@ Install these before development:
 
 - Node.js 18+ (frontend)
 - Python 3.10+ (backend)
-- Docker Desktop (recommended for local DB / MediaMTX)
+- PostgreSQL 14+ (local database)
+- Redis (for frame caching and real-time messaging)
 - Git
 
 Notes:
-- You can run PostgreSQL locally or with Docker Compose (recommended for parity).
 - On Windows use PowerShell for the provided PowerShell commands; Git Bash also works for shell scripts.
+- Ensure PostgreSQL and Redis services are running before starting the backend.
 
 ---
 
@@ -60,11 +60,11 @@ python -m venv venv
 pip install -r requirements.txt
 ```
 
-3. Start Postgres (Docker Compose)
+3. Start PostgreSQL and Redis
 
 ```powershell
-# from repo root
-docker compose up -d postgres
+# Ensure PostgreSQL service is running (Windows: Services app or brew services start postgresql)
+# Ensure Redis is running locally (Windows: redis-server or WSL: redis-server)
 ```
 
 4. Generate Prisma client and apply migrations
@@ -97,43 +97,7 @@ Default local URLs:
 - Frontend: http://127.0.0.1:5173
 - Backend: http://127.0.0.1:5000
 
----
 
-## Run (dev & Docker)
-
-Recommended: use Docker Compose to reproduce a production-like environment (server + postgres). The Compose config also helps with MediaMTX when present.
-
-Build and run server + Postgres:
-
-```powershell
-# builds server image (client/dist should be built first if you want static assets baked into image)
-cd client
-npm ci
-npm run build
-cd ..
-
-docker compose up -d --build server postgres
-```
-
-**Env Files**
-- **.env.local**: Local development environment file (repo root). Copy from `.env.example` and edit values for your machine. Example:
-
-```powershell
-Copy-Item .env.example .env.local
-```
-
-- **.env.docker**: Docker runtime environment file (repo root). Used by `docker/docker-compose.yml` (referenced as `../.env.docker`). Do not commit secrets.
-
-The server code prefers `.env.local` when present and falls back to `server/.env` for compatibility.
-Tail logs:
-
-```powershell
-docker compose logs -f server --no-log-prefix --timestamps
-```
-
-Run only frontend or backend during development using `npm run dev-client` or `npm run dev-server` as needed.
-
----
 
 ## Database: Prisma & Seeding
 
@@ -156,30 +120,19 @@ $env:AGAPAI_SEED_PASSWORD="agapai143"
 python seed_db.py
 ```
 
-If you use Docker Compose you can run the seeder inside the built image:
-
-```powershell
-docker compose run --rm -e AGAPAI_SEED_PASSWORD=agapai143 seed
-```
-
 ---
 
 ## MediaMTX (streaming)
 
-MediaMTX provides RTSP/HLS/WebRTC bridging for camera streams. Two common options:
-
-1. Docker (recommended)
-
-```powershell
-docker compose up -d mediamtx
-```
-
-2. Native Windows binary
+MediaMTX provides RTSP/HLS/WebRTC bridging for camera streams. Run the local binary:
 
 ```powershell
 cd server
-# run Mediamtx with provided config
+# On Windows
 .\mediamtx.exe mediamtx.yml
+
+# On Linux/macOS
+./mediamtx mediamtx.yml
 ```
 
 Edit `server/mediamtx.yml` to add RTSP camera sources. Default ports used by the project: 8554 (RTSP), 8888 (HLS), 8889 (WebRTC HTTP).
@@ -188,10 +141,10 @@ Edit `server/mediamtx.yml` to add RTSP camera sources. Default ports used by the
 
 ## Troubleshooting (common)
 
-- Backend can't reach DB: ensure Postgres is running and `DATABASE_URL` is correct. When using Compose, container uses compose host `postgres`.
+- Backend can't reach DB: ensure PostgreSQL is running locally and `DATABASE_URL` environment variable points to it (default: `postgresql://localhost/agapai`).
+- Redis connection error: ensure Redis is running on `localhost:6379`. Set `REDIS_HOST` and `REDIS_PORT` in `.env.local` if using non-default values.
 - Prisma errors: re-run `npx prisma generate` then `npx prisma migrate deploy`.
-- Docker not found: install Docker Desktop and restart your shell.
-- Frontend fails to load assets after server rebuild: rebuild client (`npm run build`) and rebuild server image so `client/dist` is included.
+- Backend won't start: check that all required services (PostgreSQL, Redis) are running and accessible.
 
 For more detailed troubleshooting see the docs: `AUTO_RECONNECT_AND_SYNC.md`, `RECONNECT_VERIFICATION.md`, `SOCKET_IO_TESTING.md`.
 

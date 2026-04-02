@@ -10,7 +10,9 @@ server/venv/
 
 # Environment Files
 .env
+.env.local
 server/.env
+client/.env
 
 # Build & Dependency Artifacts
 node_modules
