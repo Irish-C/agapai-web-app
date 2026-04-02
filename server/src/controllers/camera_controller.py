@@ -4,7 +4,6 @@ import asyncio
 import time
 import uuid
 from datetime import datetime
-from ultralytics import YOLO
 from database import db
 import yaml
 import subprocess
@@ -13,6 +12,16 @@ import socket
 from urllib.parse import urlsplit, urlunsplit
 from src.utils.redis_pool import RedisConnectionPool
 import numpy as np
+
+
+# Lazy YOLO importer to avoid importing ultralytics when OpenVINO runtime is preferred
+def _get_YOLO_class():
+    try:
+        import importlib
+        mod = importlib.import_module('ultralytics')
+        return getattr(mod, 'YOLO', None)
+    except Exception:
+        return None
 
 # Get Redis client from singleton pool
 def get_redis():
@@ -114,13 +123,34 @@ except Exception:
 try:
     if os.path.exists(MODEL_PATH):
         print(f"[camera_controller] Model file exists, loading...")
-        # Respect OPENVINO_DEVICE if set (some runtimes read this env var)
-        YOLO_MODEL = YOLO(MODEL_PATH, task='detect')
-        # Do NOT call .to('cpu') for OpenVINO/ONNX/TensorRT models
-        print(f"[camera_controller] Loaded YOLO model: {MODEL_PATH}")
+        # Try to load via ultralytics if available (lazy import)
+        YOLO_cls = _get_YOLO_class()
+        if YOLO_cls is not None:
+            try:
+                YOLO_MODEL = YOLO_cls(MODEL_PATH, task='detect')
+                # Do NOT call .to('cpu') for OpenVINO/ONNX/TensorRT models
+                print(f"[camera_controller] Loaded ultralytics YOLO model: {MODEL_PATH}")
+            except Exception as e:
+                print(f"[camera_controller] Failed to load YOLO via ultralytics: {e}")
+                YOLO_MODEL = None
+        else:
+            print(f"[camera_controller] ultralytics not installed; skipping ultralytics load for: {MODEL_PATH}")
+            YOLO_MODEL = None
     else:
         print(f"[camera_controller] YOLO model not found at: {MODEL_PATH}")
 except Exception as e:
+    print(f"[camera_controller] Failed to load YOLO model: {e}")
+    import traceback
+    traceback.print_exc()
+# Extra diagnostic: report whether ultralytics module is available and its version
+try:
+    import importlib
+    ul_mod = importlib.import_module('ultralytics')
+    ul_ver = getattr(ul_mod, '__version__', None)
+    ul_file = getattr(ul_mod, '__file__', None)
+    print(f"[camera_controller] ultralytics present, version={ul_ver}, path={ul_file}")
+except Exception as e:
+    print("[camera_controller] ultralytics module not importable at runtime")
     print(f"[camera_controller] Failed to load YOLO model: {e}")
     import traceback
     traceback.print_exc()
@@ -188,12 +218,53 @@ async def stream_camera_loop(camera_id, rtsp_url):
 
     # Use TCP transport and small buffer for lower latency and fewer stale frames
     os.environ.setdefault("OPENCV_FFMPEG_CAPTURE_OPTIONS", "rtsp_transport;tcp|timeout;5000000")
-    cap = cv2.VideoCapture(normalized_url, cv2.CAP_FFMPEG)
-    try:
-        cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
-    except Exception:
-        # Not all OpenCV builds support setting buffer size; ignore if it fails
-        pass
+
+    def _build_mediamtx_rtsp(cam_id: int) -> str:
+        # Use configured MediaMTX URL (e.g. rtsp://mediamtx:8554) and the saved path name cam{ID}
+        try:
+            mtx = MEDIAMTX_URL
+            if not mtx:
+                return ''
+            return f"{mtx.rstrip('/')}/cam{cam_id}"
+        except Exception:
+            return ''
+
+    def _open_capture(preferred_url: str, fallback_url: str, cam_id: int):
+        # Try preferred URL (MediaMTX) first, then fallback to original URL.
+        caps = []
+        try:
+            if preferred_url:
+                caps.append(preferred_url)
+        except Exception:
+            pass
+        caps.append(fallback_url)
+
+        for u in caps:
+            try:
+                cap_obj = cv2.VideoCapture(u, cv2.CAP_FFMPEG)
+                try:
+                    cap_obj.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+                except Exception:
+                    pass
+                if cap_obj is not None and cap_obj.isOpened():
+                    if u != fallback_url:
+                        print(f"[stream_camera_loop] Camera {camera_id}: using MediaMTX URL {u}")
+                    return cap_obj
+                try:
+                    cap_obj.release()
+                except Exception:
+                    pass
+            except Exception:
+                continue
+
+        # Last resort: try opening without FFMPEG flag
+        try:
+            return cv2.VideoCapture(fallback_url)
+        except Exception:
+            return None
+
+    mediamtx_candidate = _build_mediamtx_rtsp(camera_id)
+    cap = _open_capture(mediamtx_candidate, normalized_url, camera_id)
 
     # Inference worker queue: producer (capture) -> consumer (inference)
     infer_queue = asyncio.Queue(maxsize=1)
@@ -209,21 +280,18 @@ async def stream_camera_loop(camera_id, rtsp_url):
         while True:
             try:
                 ts, small_img, full_shape = await q.get()
-            except asyncio.CancelledError:
-                break
 
-            try:
-                # Run blocking predict off the event loop
-                t0 = time.perf_counter()
-                # Run prediction on the resized small image but request the model input size
-                # Ultralytics will resize the provided image to the requested imgsz internally.
-                results = await asyncio.to_thread(
-                    lambda: YOLO_MODEL.predict(source=small_img, conf=0.3, imgsz=(model_in_size, model_in_size), verbose=False)
-                )
-                t1 = time.perf_counter()
-                # Log prediction time (sampled)
-                if int(time.time()) % 10 == 0:
-                    print(f"[perf] cam{camera_id} predict_time={(t1-t0):.3f}s")
+                # Run blocking predict off the event loop on the full-resolution frame
+                try:
+                    t0 = time.perf_counter()
+                    results = await asyncio.to_thread(
+                        lambda: YOLO_MODEL.predict(source=full_frame, conf=0.35, imgsz=(model_in_size, model_in_size), verbose=False)
+                    )
+                    t1 = time.perf_counter()
+                    if int(time.time()) % 10 == 0:
+                        print(f"[perf] cam{camera_id} predict_time={(t1-t0):.3f}s")
+                except Exception:
+                    results = None
 
                 # Fetch latest raw full frame bytes from Redis as fallback
                 try:
@@ -236,7 +304,7 @@ async def stream_camera_loop(camera_id, rtsp_url):
                     # Nothing to annotate; continue
                     continue
 
-                # Decode raw bytes to BGR image
+                # Decode raw bytes to BGR image (full resolution)
                 try:
                     arr = np.frombuffer(raw, dtype=np.uint8)
                     full_frame = cv2.imdecode(arr, cv2.IMREAD_COLOR)
@@ -245,32 +313,18 @@ async def stream_camera_loop(camera_id, rtsp_url):
                 except Exception:
                     continue
 
-                fh, fw = full_frame.shape[:2]
-                # Detections are reported in the model input coordinate space (model_in_size)
-                scale_x = fw / model_in_size
-                scale_y = fh / model_in_size
-
-                # Draw detections onto full frame
+                # If we have results from ultralytics, prefer using r.plot() to get annotated image
                 try:
                     if results and len(results) > 0:
                         r0 = results[0]
-                        for box in (r0.boxes or []):
-                            x1, y1, x2, y2 = map(float, box.xyxy[0])
-                            x1f = int(x1 * scale_x)
-                            y1f = int(y1 * scale_y)
-                            x2f = int(x2 * scale_x)
-                            y2f = int(y2 * scale_y)
-                            cls_id = int(box.cls[0])
-                            conf = float(box.conf[0]) if hasattr(box, 'conf') else 0.0
-                            cls_name = YOLO_MODEL.names.get(cls_id, str(cls_id))
-                            label = f"{cls_name} {conf:.2f}"
-                            # OpenCV manual drawing disabled: annotations will not be drawn here.
-                            # cv2.rectangle(full_frame, (x1f, y1f), (x2f, y2f), (0, 255, 0), 2)
-                            # (tw, th), _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2)
-                            # cv2.rectangle(full_frame, (x1f, y1f - th - 6), (x1f + tw + 2, y1f), (0, 255, 0), -1)
-                            # cv2.putText(full_frame, label, (x1f + 1, y1f - 4), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 0), 2, cv2.LINE_AA)
+                        try:
+                            annotated = r0.plot() if hasattr(r0, 'plot') else None
+                            if annotated is not None:
+                                full_frame = annotated
+                        except Exception as e:
+                            # Fall back to manual drawing if r.plot() fails
+                            print(f"[infer_worker] r.plot() failed: {e}")
                 except Exception:
-                    # Fail gracefully on drawing errors
                     pass
 
                 # Encode annotated frame and write to Redis (lower quality to save bandwidth)
@@ -281,6 +335,8 @@ async def stream_camera_loop(camera_id, rtsp_url):
                 except Exception:
                     pass
 
+            except asyncio.CancelledError:
+                break
             except Exception as e:
                 print(f"[infer_worker] Error in worker for camera {camera_id}: {e}")
                 continue
@@ -438,7 +494,9 @@ async def stream_camera_loop(camera_id, rtsp_url):
                 print(f"[stream_camera_loop] Stream failed for camera {camera_id}. Retrying in 5s...")
                 await emit_camera_status('offline', 'No frames received')
                 await asyncio.sleep(5)
-                cap = cv2.VideoCapture(normalized_url, cv2.CAP_FFMPEG)
+                # Re-open using the same MediaMTX-first strategy
+                mediamtx_candidate = _build_mediamtx_rtsp(camera_id)
+                cap = _open_capture(mediamtx_candidate, normalized_url, camera_id)
                 connection_start_time = time.time()  # Reset timeout when reconnecting
                 continue
 
@@ -464,7 +522,8 @@ async def stream_camera_loop(camera_id, rtsp_url):
                     print(f"[stream_camera_loop] Camera {camera_id} connection timeout ({connection_timeout}s)")
                     await emit_camera_status('error', f'Connection timeout after {int(connection_timeout)}s')
                     await asyncio.sleep(5)
-                    cap = cv2.VideoCapture(normalized_url, cv2.CAP_FFMPEG)
+                    mediamtx_candidate = _build_mediamtx_rtsp(camera_id)
+                    cap = _open_capture(mediamtx_candidate, normalized_url, camera_id)
                     connection_start_time = time.time()  # Reset for next attempt
                     continue
 

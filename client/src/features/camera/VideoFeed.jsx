@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, memo } from 'react';
 import { FaExpand, FaTimes } from 'react-icons/fa';
 import { socket, addSubscribedCamera, removeSubscribedCamera } from '../../services/socket.js';
+import streamService from '../../services/streamService.js';
 
 // Component to handle MJPEG streaming using Web Worker
 function MJPEGCanvas({ camId, cameraName, onStatusChange }) {
@@ -78,20 +79,35 @@ function MJPEGCanvas({ camId, cameraName, onStatusChange }) {
             isRendering = true;
             const frameData = frameQueue.shift();
             try {
-              const blob = new Blob([frameData], { type: 'image/jpeg' });
-              // use createImageBitmap for faster, non-blocking decode
-              const bitmap = await createImageBitmap(blob);
-              if (bitmap && bitmap.width > 0 && bitmap.height > 0) {
-                // Only resize canvas when resolution actually changes
-                if (bitmap.width !== lastBitmapWidth || bitmap.height !== lastBitmapHeight) {
-                  canvas.width = bitmap.width;
-                  canvas.height = bitmap.height;
-                  lastBitmapWidth = bitmap.width;
-                  lastBitmapHeight = bitmap.height;
+              // If worker decoded an ImageBitmap, draw it directly (fast, no extra decode)
+              if (typeof ImageBitmap !== 'undefined' && frameData instanceof ImageBitmap) {
+                const bitmap = frameData;
+                if (bitmap && bitmap.width > 0 && bitmap.height > 0) {
+                  if (bitmap.width !== lastBitmapWidth || bitmap.height !== lastBitmapHeight) {
+                    canvas.width = bitmap.width;
+                    canvas.height = bitmap.height;
+                    lastBitmapWidth = bitmap.width;
+                    lastBitmapHeight = bitmap.height;
+                  }
+                  ctx.drawImage(bitmap, 0, 0);
+                  lastRenderedTimestamp = Date.now();
+                  try { bitmap.close(); } catch (e) {}
                 }
-                ctx.drawImage(bitmap, 0, 0);
-                lastRenderedTimestamp = Date.now();
-                bitmap.close?.();
+              } else {
+                // Fallback: raw Uint8Array frame - decode on main thread
+                const blob = new Blob([frameData], { type: 'image/jpeg' });
+                const bitmap = await createImageBitmap(blob);
+                if (bitmap && bitmap.width > 0 && bitmap.height > 0) {
+                  if (bitmap.width !== lastBitmapWidth || bitmap.height !== lastBitmapHeight) {
+                    canvas.width = bitmap.width;
+                    canvas.height = bitmap.height;
+                    lastBitmapWidth = bitmap.width;
+                    lastBitmapHeight = bitmap.height;
+                  }
+                  ctx.drawImage(bitmap, 0, 0);
+                  lastRenderedTimestamp = Date.now();
+                  try { bitmap.close?.(); } catch (e) {}
+                }
               }
             } catch (err) {
               console.error('Frame rendering error:', err);
@@ -99,7 +115,7 @@ function MJPEGCanvas({ camId, cameraName, onStatusChange }) {
               isRendering = false;
             }
           }
-          
+
           // Check if canvas is actually updating (not frozen at render level)
           const now = Date.now();
           if (now - lastCanvasUpdateCheck > FROZEN_STATE_TIMEOUT) {
@@ -111,7 +127,7 @@ function MJPEGCanvas({ camId, cameraName, onStatusChange }) {
             }
             lastCanvasUpdateCheck = now;
           }
-          
+
           if (!signal.aborted) {
             requestAnimationFrame(renderFrame);
           }
@@ -123,15 +139,31 @@ function MJPEGCanvas({ camId, cameraName, onStatusChange }) {
         // Handle worker messages
         if (workerRef.current) {
           workerRef.current.onmessage = (event) => {
-            const { type, frames, fps } = event.data;
+            const { type, frames, fps, bitmap } = event.data;
 
-            if (type === 'frames' && frames) {
+            if (type === 'bitmap' && bitmap) {
+              try {
+                // If queue already holds an ImageBitmap, close it to free memory
+                const last = frameQueue[frameQueue.length - 1];
+                if (last && typeof ImageBitmap !== 'undefined' && last instanceof ImageBitmap) {
+                  try { last.close(); } catch (e) {}
+                }
+
+                if (frameQueue.length < FRAME_QUEUE_MAX) {
+                  frameQueue.push(bitmap);
+                } else {
+                  frameQueue[frameQueue.length - 1] = bitmap;
+                }
+              } catch (e) {
+                // ignore
+              }
+            } else if (type === 'frames' && frames) {
               frames.forEach(buffer => {
                 try {
                   const newBuf = new Uint8Array(buffer);
                   // Cheap duplicate detection: compare length and first bytes
                   const last = frameQueue[frameQueue.length - 1];
-                  if (last && last.length === newBuf.length) {
+                  if (last && !(typeof ImageBitmap !== 'undefined' && last instanceof ImageBitmap) && last.length === newBuf.length) {
                     let same = true;
                     const cmpLen = Math.min(16, newBuf.length);
                     for (let i = 0; i < cmpLen; i++) {
@@ -140,11 +172,15 @@ function MJPEGCanvas({ camId, cameraName, onStatusChange }) {
                     if (same) return; // skip obvious duplicate
                   }
 
-                  if (frameQueue.length < FRAME_QUEUE_MAX) {
-                    frameQueue.push(newBuf);
-                  } else {
-                    // Overwrite the queued frame with the newest one (drop-oldest)
+                  // If last slot contains an ImageBitmap, close it before replacing
+                  if (frameQueue.length === FRAME_QUEUE_MAX) {
+                    const lastSlot = frameQueue[frameQueue.length - 1];
+                    if (lastSlot && typeof ImageBitmap !== 'undefined' && lastSlot instanceof ImageBitmap) {
+                      try { lastSlot.close(); } catch (e) {}
+                    }
                     frameQueue[frameQueue.length - 1] = newBuf;
+                  } else {
+                    frameQueue.push(newBuf);
                   }
                 } catch (e) {
                   // ignore malformed frame
@@ -323,7 +359,8 @@ function VideoFeed({
   cameraName,
   location,
   isFocused,
-  onFocusChange
+  onFocusChange,
+  streamUrl
 }) {
   const [currentDateTime, setCurrentDateTime] = useState(new Date());
   const [cameraStatus, setCameraStatus] = useState('connecting'); // connecting, online, offline, error
@@ -333,11 +370,77 @@ function VideoFeed({
     } catch (e) { return false; }
   });
   const subscriptionRef = useRef(null); // Track if subscribed to prevent duplicate subscribe calls
+  const videoRef = useRef(null);
+  const pcRef = useRef(null);
+  const [streamMode, setStreamMode] = useState(null); // 'webrtc' | 'hls' | 'mjpeg'
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentDateTime(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
+
+  // Choose stream preference: WebRTC (WHEP) > HLS (.m3u8) > MJPEG
+  useEffect(() => {
+    if (!streamUrl) {
+      setStreamMode('mjpeg');
+      return;
+    }
+
+    try {
+      const url = String(streamUrl);
+      if (url.indexOf('/whep') !== -1 || url.toLowerCase().includes('webrtc')) {
+        setStreamMode('webrtc');
+      } else if (url.endsWith('.m3u8')) {
+        setStreamMode('hls');
+      } else {
+        setStreamMode('mjpeg');
+      }
+    } catch (e) {
+      setStreamMode('mjpeg');
+    }
+  }, [streamUrl]);
+
+  // Start/stop streams based on chosen mode
+  useEffect(() => {
+    let mounted = true;
+
+    const startWebRTC = async () => {
+      if (!videoRef.current) return;
+      try {
+        pcRef.current = await streamService.startWebRTCStream(camId, videoRef.current);
+      } catch (e) {
+        console.error('[VideoFeed] WebRTC start failed, falling back to MJPEG/HLS:', e);
+        if (mounted) setStreamMode('mjpeg');
+      }
+    };
+
+    const startHLS = async () => {
+      const v = videoRef.current;
+      if (!v) return;
+      v.crossOrigin = 'anonymous';
+      v.src = streamUrl;
+      v.play().catch(() => {});
+    };
+
+    if (streamMode === 'webrtc') {
+      startWebRTC();
+    } else if (streamMode === 'hls') {
+      startHLS();
+    }
+
+    return () => {
+      mounted = false;
+      // Cleanup WebRTC
+      if (pcRef.current) {
+        try { streamService.stopWebRTCStream(pcRef.current, videoRef.current); } catch (e) {}
+        pcRef.current = null;
+      }
+      // Stop HLS/video
+      if (videoRef.current) {
+        try { videoRef.current.pause(); videoRef.current.src = ''; } catch (e) {}
+      }
+    };
+  }, [streamMode, streamUrl, camId]);
 
   // Subscribe to camera status updates (for connection status indicator)
   useEffect(() => {
@@ -409,14 +512,26 @@ function VideoFeed({
       </div>
     );
   } else {
+    // Render preferred stream: WebRTC/HLS uses <video>, otherwise MJPEGCanvas
     content = (
       <>
-        {/* MJPEG Stream using fetch for better compatibility */}
-        <MJPEGCanvas
-          camId={camId}
-          cameraName={cameraName}
-          onStatusChange={setCameraStatus}
-        />
+        {streamMode === 'webrtc' || streamMode === 'hls' ? (
+          <video
+            ref={videoRef}
+            className="block max-w-full max-h-full"
+            style={{ display: 'block', backgroundColor: '#000', width: 'auto', height: 'auto', maxWidth: '100%', maxHeight: '100%' }}
+            playsInline
+            muted
+            controls={false}
+          />
+        ) : (
+          // MJPEG Stream using fetch for better compatibility
+          <MJPEGCanvas
+            camId={camId}
+            cameraName={cameraName}
+            onStatusChange={setCameraStatus}
+          />
+        )}
         
         {/* Loading/Error overlay (only visible when MJPEG is not connecting) */}
         {cameraStatus !== 'online' && (

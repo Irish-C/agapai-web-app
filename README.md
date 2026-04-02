@@ -115,6 +115,16 @@ cd ..
 docker compose up -d --build server postgres
 ```
 
+**Env Files**
+- **.env.local**: Local development environment file (repo root). Copy from `.env.example` and edit values for your machine. Example:
+
+```powershell
+Copy-Item .env.example .env.local
+```
+
+- **.env.docker**: Docker runtime environment file (repo root). Used by `docker/docker-compose.yml` (referenced as `../.env.docker`). Do not commit secrets.
+
+The server code prefers `.env.local` when present and falls back to `server/.env` for compatibility.
 Tail logs:
 
 ```powershell

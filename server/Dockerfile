@@ -1,6 +1,9 @@
 # --- STAGE 1: Builder ---
 FROM python:3.11-slim AS builder
 WORKDIR /app
+ARG DEBIAN_FRONTEND=noninteractive
+ENV DEBIAN_FRONTEND=noninteractive TZ=Etc/UTC
+ENV PATH="/root/.local/bin:${PATH}"
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
 
 # Prevent system pip config from adding extra indexes (e.g. PyTorch)
@@ -21,6 +24,8 @@ ENV PIP_INDEX_URL=https://pypi.org/simple
 ENV PIP_EXTRA_INDEX_URL=
 RUN pip install --upgrade pip && \
     pip install --user --no-cache-dir -r requirements-pruned.txt
+# Ensure ultralytics is available (install explicitly to avoid transient index issues)
+RUN /bin/sh -c "pip install --user --no-cache-dir ultralytics || true"
 
 # --- STAGE 2: Final Runner ---
 FROM python:3.11-slim

@@ -6,6 +6,9 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from typing import Any
+import uuid
+import time
+import os
 from fastapi.staticfiles import StaticFiles
 import socketio
 
@@ -29,7 +32,7 @@ from src.utils.rate_limiter import (
 )
 
 # Import the background stream logic from the camera controller
-from src.controllers.camera_controller import ensure_mediamtx_running, start_camera_processing
+from src.controllers.camera_controller import ensure_mediamtx_running, start_camera_processing, analyze_camera_snapshot
 
 from fastapi.responses import JSONResponse
 import json
@@ -50,9 +53,16 @@ class PrismaJSONResponse(JSONResponse):
         return json.dumps(content).encode("utf-8")
 
 # --- 1. LOAD ENVIRONMENT ---
-# load_dotenv(dotenv_path="server/.env")
-env_path = Path(__file__).parent / ".env"
-load_dotenv(dotenv_path=env_path)
+# Prefer a repo-level `.env.local` for developer machines, fall back to
+# the service-local `server/.env` when not present. Docker Compose injects
+# `./.env.docker` into the container so it does not rely on these files.
+repo_root = Path(__file__).parent.parent
+local_env = repo_root / ".env.local"
+server_env = Path(__file__).parent / ".env"
+if local_env.exists():
+    load_dotenv(dotenv_path=local_env)
+else:
+    load_dotenv(dotenv_path=server_env)
 
 # DEBUG: This will tell us exactly what Python found
 # print(f"DEBUG: Looking for .env at: {env_path}")
@@ -273,6 +283,99 @@ async def video_feed(camera_id: str | None = None):
         print(f"[video_feed] Error initializing stream for camera {camera_id}: {e}")
         return JSONResponse(status_code=500, content={'error': str(e)})
 
+
+@app.post('/api/cameras/{camera_id}/snapshot')
+async def capture_camera_snapshot(camera_id: str):
+    """Capture latest frame for camera from Redis, save snapshot, and create DB event log.
+
+    Returns the public snapshot URL and DB event id when successful.
+    """
+    try:
+        cam_id = str(camera_id)
+        r = RedisConnectionPool.get()
+        # Try raw latest full-resolution frame key first, then annotated/latest
+        keys = [f'latest_frame_raw_{cam_id}', f'latest_frame_{cam_id}', 'latest_frame']
+        frame_bytes = None
+        for k in keys:
+            try:
+                val = r.get(k)
+            except Exception:
+                val = None
+            if val:
+                frame_bytes = val
+                break
+
+        if not frame_bytes:
+            return JSONResponse(status_code=404, content={'status': 'error', 'message': 'No frame available'})
+
+        # Save snapshot file
+        filename = f"cam{cam_id}_manual_{int(time.time())}_{uuid.uuid4().hex[:8]}.jpg"
+        snapshots_dir = os.path.join(os.path.dirname(__file__), 'static', 'snapshots')
+        os.makedirs(snapshots_dir, exist_ok=True)
+        file_path = os.path.join(snapshots_dir, filename)
+        with open(file_path, 'wb') as f:
+            f.write(frame_bytes)
+
+        # Persist DB entries similar to persist_event in camera_controller
+        # Ensure event type and class
+        event_type_obj = await db.eventtype.find_first(where={'event_type_name': 'Snapshot'})
+        if not event_type_obj:
+            event_type_obj = await db.eventtype.create(data={'event_type_name': 'Snapshot'})
+
+        class_name = 'Manual Snapshot'
+        event_class_obj = await db.eventclass.find_first(where={'class_name': class_name})
+        if not event_class_obj:
+            event_class_obj = await db.eventclass.create(data={'class_name': class_name, 'event_type_id': event_type_obj.id})
+
+        host = os.getenv('VITE_API_URL') or f'http://127.0.0.1:5000'
+        snapshot_url = f"{host.rstrip('/')}/snapshots/{filename}"
+
+        new_event = await db.eventlog.create(
+            data={
+                'cam_id': int(cam_id),
+                'event_class_id': event_class_obj.id,
+                'file_path': snapshot_url,
+            },
+            include={'camera': True, 'event_class': True}
+        )
+
+        # Optionally emit socket event for new alert
+        try:
+            from app import socketio_server, connected_sids
+            if connected_sids:
+                await socketio_server.emit('new_alert', {
+                    'id': str(new_event.id),
+                    'type': new_event.event_class.class_name,
+                    'location': new_event.camera.cam_name if new_event.camera else 'Unknown',
+                    'timestamp': new_event.timestamp.isoformat(),
+                    'snapshot_url': new_event.file_path,
+                    'status': 'unacknowledged'
+                })
+        except Exception:
+            pass
+
+        return {'status': 'success', 'snapshot_url': snapshot_url, 'event_id': str(new_event.id)}
+    except Exception as e:
+        print(f"[capture_camera_snapshot] Error: {e}")
+        return JSONResponse(status_code=500, content={'status': 'error', 'message': str(e)})
+
+
+@app.post('/api/cameras/{camera_id}/analyze')
+async def analyze_camera_event(camera_id: str):
+    """Run server-side AI (YOLO/OpenVINO) on the latest frame and persist snapshot if detections found."""
+    try:
+        cam_id = int(camera_id)
+    except Exception:
+        return JSONResponse(status_code=400, content={'status': 'error', 'message': 'invalid camera id'})
+
+    try:
+        resp, status = await analyze_camera_snapshot(cam_id)
+        return JSONResponse(status_code=status if isinstance(status, int) else 200, content=resp)
+    except Exception as e:
+        print(f"[analyze_camera_event] Error: {e}")
+        return JSONResponse(status_code=500, content={'status': 'error', 'message': str(e)})
+
+
 # --- Published Cameras Sync Endpoints ---
 @app.post('/api/sync_published_cameras')
 async def sync_published_cameras(request: Request):
@@ -369,7 +472,7 @@ async def subscribe_camera(sid, data):
         if camera_id is None:
             return
         room = f"camera_{camera_id}"
-        await socketio_server.enter_room(sid, room)
+        socketio_server.enter_room(sid, room)
         
         # ✅ NEW: Set as active camera for AI processing
         r = RedisConnectionPool.get()
@@ -408,7 +511,7 @@ async def unsubscribe_camera(sid, data):
         if camera_id is None:
             return
         room = f"camera_{camera_id}"
-        await socketio_server.leave_room(sid, room)
+        socketio_server.enter_room(sid, room)
         print(f"Socket.IO unsubscribe: sid={sid} -> {room}")
     except Exception as e:
         print(f"unsubscribe_camera error: {e}")

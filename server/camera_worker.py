@@ -3,10 +3,19 @@ import time
 import cv2
 import asyncio
 import json
-from ultralytics import YOLO
 from database import db
 from src.utils.redis_pool import RedisConnectionPool
+# Import publish helper to register camera paths with MediaMTX
+from src.controllers.camera_controller import publish_camera_to_mediamtx
 
+# Lazy YOLO importer to avoid importing ultralytics when using OpenVINO-only deployments
+def _get_YOLO_class():
+    try:
+        import importlib
+        mod = importlib.import_module('ultralytics')
+        return getattr(mod, 'YOLO', None)
+    except Exception:
+        return None
 # One-time diagnostic log tracker for camera_frame emits
 FIRST_EMIT_LOGGED: set = set()
 
@@ -24,6 +33,18 @@ async def start_camera_processing():
         # 1. Start the general background loops for all active cameras
         for cam in active_cameras:
             print(f"Starting background stream for: {cam.cam_name}")
+            # Fire-and-forget publish to MediaMTX so startup doesn't block.
+            async def _publish_async(cid):
+                try:
+                    resp, status = await publish_camera_to_mediamtx(cid)
+                    if status == 200 and isinstance(resp, dict) and resp.get('status') == 'ok':
+                        print(f"[start_camera_processing] Published camera {cid} to MediaMTX: {resp.get('path')}")
+                    else:
+                        print(f"[start_camera_processing] Warning: publish for camera {cid} returned {status} {resp}")
+                except Exception as e:
+                    print(f"[start_camera_processing] Failed to publish camera {cid} to MediaMTX: {e}")
+
+            asyncio.create_task(_publish_async(cam.id))
             asyncio.create_task(stream_camera_loop(cam.id, cam.stream_url))
         
         # 2. Start the specialized CameraWorker (for AI/Redis processing)
@@ -42,9 +63,53 @@ async def stream_camera_loop(camera_id, rtsp_url):
         print(f"Skipping camera {camera_id}: No URL provided.")
         return
 
-    cap = cv2.VideoCapture(rtsp_url)
+    # Prefer MediaMTX proxy path when available to avoid pulling the same
+    # camera stream multiple times (centralize pulls through MediaMTX).
     redis = RedisConnectionPool.get()
-    
+
+    def _build_mediamtx_rtsp(cam_id: int) -> str:
+        mtx = os.getenv('MEDIAMTX_URL') or os.getenv('MTX_URL')
+        if not mtx:
+            return ''
+        return f"{mtx.rstrip('/')}/cam{cam_id}"
+
+    # Try MediaMTX first (if configured), then fall back to the original RTSP URL
+    candidates = []
+    try:
+        mtx_rtsp = _build_mediamtx_rtsp(camera_id)
+        if mtx_rtsp:
+            candidates.append(mtx_rtsp)
+    except Exception:
+        mtx_rtsp = ''
+    candidates.append(rtsp_url)
+
+    cap = None
+    for url in candidates:
+        try:
+            # Use FFMPEG backend when available for robust RTSP handling
+            cap = cv2.VideoCapture(url, cv2.CAP_FFMPEG)
+            try:
+                cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+            except Exception:
+                pass
+            if cap is not None and cap.isOpened():
+                if url != rtsp_url:
+                    print(f"[stream_camera_loop] Camera {camera_id}: using MediaMTX URL {url}")
+                break
+            else:
+                # release and try next
+                try:
+                    cap.release()
+                except Exception:
+                    pass
+                cap = None
+        except Exception:
+            cap = None
+
+    if cap is None:
+        # Last resort: attempt to open the raw URL without FFMPEG flag
+        cap = cv2.VideoCapture(rtsp_url)
+
     try:
         while True:
             if not cap.isOpened():
@@ -55,7 +120,8 @@ async def stream_camera_loop(camera_id, rtsp_url):
 
             ret, frame = cap.read()
             if not ret:
-                await asyncio.sleep(1)
+                # Shorter retry delay to avoid large 1s stalls; align with target FPS
+                await asyncio.sleep(0.04)
                 continue
 
             # Encode to JPEG at reduced quality and write to Redis for MJPEG consumers.
@@ -94,10 +160,18 @@ class CameraWorker:
         model_path = os.path.join(os.path.dirname(__file__), 'ml', 'yolov11_fin.pt')
         if os.path.exists(model_path):
             try:
-                self.yolo = YOLO(model_path)
-                self.yolo.to('cpu')
-                self.yolo_enabled = True
-                print(f"[CameraWorker] Loaded YOLO model: {model_path}")
+                YOLO = _get_YOLO_class()
+                if YOLO is not None:
+                    self.yolo = YOLO(model_path)
+                    try:
+                        self.yolo.to('cpu')
+                    except Exception:
+                        # Some model backends may not support .to(); ignore if it fails
+                        pass
+                    self.yolo_enabled = True
+                    print(f"[CameraWorker] Loaded ultralytics YOLO model: {model_path}")
+                else:
+                    print(f"[CameraWorker] ultralytics not available; skipping YOLO load for: {model_path}")
             except Exception as e:
                 print(f"[CameraWorker] Failed to load YOLO model: {e}")
         else:

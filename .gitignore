@@ -15,8 +15,10 @@ build/
 server/venv
 server/.venv
 server/.env
+server/.venv/
 server/yolovenv
 client/.env
+client/.env.local
 
 # Virtualenvs and Python caches
 .venv/
@@ -67,6 +69,7 @@ yarn-error.log*
 
 # Environment-specific
 /.env.local
+/.env.development
 /.env.development.local
 /.env.test.local
 /.env.production.local
