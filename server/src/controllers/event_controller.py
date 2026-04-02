@@ -27,8 +27,8 @@ async def create_event_logic(data):
             }
         )
 
-        # Use the socketio_server instance defined in app.py
-        from app import socketio_server 
+        # Use the socketio_server instance from socket_manager
+        from src.services.socket_manager import socketio_server 
         payload = {
             'id': str(new_event.id),
             'type': new_event.event_class.class_name,

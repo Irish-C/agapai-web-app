@@ -12,6 +12,7 @@ import socket
 from urllib.parse import urlsplit, urlunsplit
 from src.utils.redis_pool import RedisConnectionPool
 import numpy as np
+import glob
 
 
 # Lazy YOLO importer to avoid importing ultralytics when OpenVINO runtime is preferred
@@ -95,6 +96,31 @@ async def ensure_mediamtx_running() -> bool:
 SNAPSHOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../static/snapshots'))
 os.makedirs(SNAPSHOT_DIR, exist_ok=True)
 SNAPSHOT_BASE_URL = os.getenv('SNAPSHOT_BASE_URL') or os.getenv('VITE_API_URL') or 'http://localhost:5000'
+
+
+def _prune_bad_frames_for_camera(camera_id: int, keep: int = 50):
+    """Prune saved diagnostic frames for a camera to avoid unbounded disk growth.
+    Keeps the most recent `keep` files matching known diagnostic prefixes.
+    """
+    try:
+        patterns = [
+            f"bad_decode_cam{camera_id}_*",
+            f"flat_frame_cam{camera_id}_*",
+            f"empty_frame_cam{camera_id}_*",
+        ]
+        files = []
+        for p in patterns:
+            files.extend(glob.glob(os.path.join(SNAPSHOT_DIR, p)))
+        if not files:
+            return
+        files.sort(key=lambda p: os.path.getmtime(p), reverse=True)
+        for old in files[keep:]:
+            try:
+                os.remove(old)
+            except Exception:
+                pass
+    except Exception as e:
+        print(f"[camera_controller] Failed while pruning bad frames for cam{camera_id}: {e}")
 
 # Load YOLO model if available (OpenVINO or .pt)
 MODEL_PATH = os.path.join(os.path.dirname(__file__), '../../ml/best_openvino_model')
@@ -309,8 +335,25 @@ async def stream_camera_loop(camera_id, rtsp_url):
                     arr = np.frombuffer(raw, dtype=np.uint8)
                     full_frame = cv2.imdecode(arr, cv2.IMREAD_COLOR)
                     if full_frame is None:
+                        # Save raw bytes for offline inspection when decode fails
+                        try:
+                            bad_fname = f"bad_decode_cam{camera_id}_{int(time.time())}_{uuid.uuid4().hex[:8]}.jpg"
+                            bad_path = os.path.join(SNAPSHOT_DIR, bad_fname)
+                            with open(bad_path, 'wb') as bf:
+                                bf.write(raw)
+                            print(f"[infer_worker] Failed to decode raw frame for cam{camera_id}, saved to {bad_path}")
+                        except Exception as _e:
+                            print(f"[infer_worker] Failed to save bad decode raw for cam{camera_id}: {_e}")
+
+                        # Prune old diagnostic frames for this camera
+                        try:
+                            _prune_bad_frames_for_camera(camera_id, keep=50)
+                        except Exception:
+                            pass
+
                         continue
-                except Exception:
+                except Exception as _e:
+                    print(f"[infer_worker] Exception while decoding raw bytes for cam{camera_id}: {_e}")
                     continue
 
                 # If we have results from ultralytics, prefer using r.plot() to get annotated image
@@ -355,7 +398,7 @@ async def stream_camera_loop(camera_id, rtsp_url):
         if now - last_status_emit < 1.0:  # Avoid spam, max 1 per second
             return
         
-        from app import socketio_server
+        from src.services.socket_manager import socketio_server
         try:
             message = f"{status_str.upper()}"
             if reason:
@@ -423,7 +466,7 @@ async def stream_camera_loop(camera_id, rtsp_url):
                         emit_flag = bool(getattr(gs, 'emit_inactivity', False))
 
                 if emit_flag:
-                    from app import socketio_server, connected_sids
+                    from src.services.socket_manager import socketio_server, connected_sids
                     payload = {
                         'id': str(new_event.id),
                         'type': new_event.event_class.class_name,
@@ -529,6 +572,53 @@ async def stream_camera_loop(camera_id, rtsp_url):
 
             now = time.time()
             frame_counter += 1
+
+            # Quick sanity check for corrupted frames (very low variance / flat frames)
+            try:
+                if frame is None or getattr(frame, 'size', 0) == 0:
+                    print(f"[stream_camera_loop] Camera {camera_id}: received empty or null frame at count {frame_counter}")
+                    # attempt to save a raw capture if possible
+                    try:
+                        # encode whatever we have (may fail if frame is None)
+                        if frame is not None:
+                            ok_enc, buf = cv2.imencode('.jpg', frame)
+                            if ok_enc:
+                                fname = f"empty_frame_cam{camera_id}_{int(time.time())}_{uuid.uuid4().hex[:8]}.jpg"
+                                path = os.path.join(SNAPSHOT_DIR, fname)
+                                with open(path, 'wb') as f:
+                                    f.write(buf.tobytes())
+                                print(f"[stream_camera_loop] Saved empty-frame capture to {path}")
+                                try:
+                                    _prune_bad_frames_for_camera(camera_id, keep=50)
+                                except Exception:
+                                    pass
+                    except Exception as _e:
+                        print(f"[stream_camera_loop] Failed to save empty-frame for cam{camera_id}: {_e}")
+                    await asyncio.sleep(0.5)
+                    continue
+
+                # Flat/near-constant frames (possible decode corruption) — detect low variance
+                try:
+                    if np.std(frame) < 2.0:
+                        fname = f"flat_frame_cam{camera_id}_{int(time.time())}_{uuid.uuid4().hex[:8]}.jpg"
+                        path = os.path.join(SNAPSHOT_DIR, fname)
+                        try:
+                            ok_enc, buf = cv2.imencode('.jpg', frame)
+                            if ok_enc:
+                                with open(path, 'wb') as f:
+                                    f.write(buf.tobytes())
+                                print(f"[stream_camera_loop] Low-variance (flat) frame detected for cam{camera_id}, saved to {path}")
+                                try:
+                                    _prune_bad_frames_for_camera(camera_id, keep=50)
+                                except Exception:
+                                    pass
+                        except Exception as _e:
+                            print(f"[stream_camera_loop] Failed to save flat frame for cam{camera_id}: {_e}")
+                        # don't drop immediately — continue processing but note the event
+                except Exception:
+                    pass
+            except Exception:
+                pass
 
             # Track general activity via simple frame differencing (no alert emitted)
             gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
@@ -667,7 +757,7 @@ async def stream_camera_loop(camera_id, rtsp_url):
                 elif emit_fall:
                     # Emit realtime popup even when database persistence is disabled.
                     try:
-                        from app import socketio_server, connected_sids
+                        from src.services.socket_manager import socketio_server, connected_sids
 
                         if connected_sids:
                             camera = await db.camera.find_unique(where={'id': int(camera_id)})
@@ -818,6 +908,100 @@ async def create_camera_logic(camera_data):
         return {"status": "success", "camera_id": str(new_camera.id)}, 201
     except Exception as e:
         return {"error": str(e)}, 500
+
+
+async def analyze_camera_snapshot(camera_id: int):
+    """Run AI on the latest frame for a camera and persist a snapshot if detections are found.
+
+    Returns a tuple `(response_dict, status_code)` similar to other controller helpers.
+    """
+    try:
+        r = get_redis()
+        keys = [f'latest_frame_raw_{camera_id}', f'latest_frame_{camera_id}', 'latest_frame']
+        frame_bytes = None
+        for k in keys:
+            try:
+                val = r.get(k)
+            except Exception:
+                val = None
+            if val:
+                frame_bytes = val
+                break
+
+        if not frame_bytes:
+            return {"status": "error", "message": "No frame available"}, 404
+
+        arr = np.frombuffer(frame_bytes, dtype=np.uint8)
+        img = cv2.imdecode(arr, cv2.IMREAD_COLOR)
+        if img is None:
+            return {"status": "error", "message": "Failed to decode frame"}, 500
+
+        if YOLO_MODEL is None:
+            return {"status": "error", "message": "AI model not loaded"}, 503
+
+        try:
+            results = await asyncio.to_thread(lambda: YOLO_MODEL.predict(source=img, conf=0.3, imgsz=640, verbose=False))
+        except Exception as e:
+            print(f"[analyze_camera_snapshot] YOLO predict failed: {e}")
+            results = None
+
+        if not results or len(results) == 0 or (getattr(results[0], 'boxes', None) is None or len(results[0].boxes) == 0):
+            return {"status": "no_detections"}, 200
+
+        # Save snapshot for the first result
+        try:
+            filename = f"cam{camera_id}_ai_{int(time.time())}_{uuid.uuid4().hex[:8]}.jpg"
+            file_path = os.path.join(SNAPSHOT_DIR, filename)
+            _, buf = cv2.imencode('.jpg', img)
+            with open(file_path, 'wb') as f:
+                f.write(buf.tobytes())
+            snapshot_url = f"{SNAPSHOT_BASE_URL.rstrip('/')}/snapshots/{filename}"
+        except Exception as e:
+            print(f"[analyze_camera_snapshot] Failed to save snapshot: {e}")
+            snapshot_url = ''
+
+        # Ensure event type and class
+        try:
+            event_type_obj = await db.eventtype.find_first(where={'event_type_name': 'Snapshot'})
+            if not event_type_obj:
+                event_type_obj = await db.eventtype.create(data={'event_type_name': 'Snapshot'})
+
+            class_name = 'AI Detection'
+            event_class_obj = await db.eventclass.find_first(where={'class_name': class_name})
+            if not event_class_obj:
+                event_class_obj = await db.eventclass.create(data={'class_name': class_name, 'event_type_id': event_type_obj.id})
+
+            new_event = await db.eventlog.create(
+                data={
+                    'cam_id': int(camera_id),
+                    'event_class_id': event_class_obj.id,
+                    'file_path': snapshot_url,
+                },
+                include={'camera': True, 'event_class': True}
+            )
+        except Exception as e:
+            print(f"[analyze_camera_snapshot] DB persist failed: {e}")
+            return {"status": "error", "message": str(e)}, 500
+
+        # Emit socket event if clients connected
+        try:
+            from src.services.socket_manager import socketio_server, connected_sids
+            if connected_sids:
+                await socketio_server.emit('new_alert', {
+                    'id': str(new_event.id),
+                    'type': new_event.event_class.class_name,
+                    'location': new_event.camera.cam_name if new_event.camera else 'Unknown',
+                    'timestamp': new_event.timestamp.isoformat(),
+                    'snapshot_url': new_event.file_path,
+                    'status': 'unacknowledged'
+                })
+        except Exception:
+            pass
+
+        return {"status": "success", "detections": len(results[0].boxes) if getattr(results[0], 'boxes', None) is not None else 1, "event_id": str(new_event.id)}, 200
+    except Exception as e:
+        print(f"[analyze_camera_snapshot] Unexpected error: {e}")
+        return {"status": "error", "message": str(e)}, 500
 
 # PATCH logic for updating camera details
 async def update_camera_logic(camera_id, camera_data):

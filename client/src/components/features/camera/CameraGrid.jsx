@@ -37,19 +37,23 @@ export default function CameraGrid() {
 
     const focusedCamera = cameraList.find(c => c.id === focusedCameraId);
 
-    // Updated helper function to generate HLS stream URLs from MediaMTX
+    // Helper to generate a stream URL. Preference can be set via VITE_PREFERRED_STREAM
+    // Supported: 'hls' (returns MediaMTX HLS .m3u8) or 'webrtc' (returns a sentinel webrtc URL)
     const getStreamUrl = (camId) => {
-        const serverUrl = "http://127.0.0.1:8888"; // Replace with your MediaMTX server's IP or domain
-        return `${serverUrl}/${camId}/index.m3u8`; // HLS stream URL
+        const preferred = import.meta.env.VITE_PREFERRED_STREAM || 'hls';
+        if (String(preferred).toLowerCase() === 'webrtc') {
+            // VideoFeed treats URLs containing 'webrtc' or '/whep' as a hint to use WHEP/WebRTC.
+            return `webrtc://camera/${camId}`;
+        }
+
+        const serverUrl = import.meta.env.VITE_MEDIAMTX_URL || 'http://127.0.0.1:8888';
+        return `${serverUrl.replace(/\/$/, '')}/${camId}/index.m3u8`;
     };
 
     const header = (
         <div className="flex items-center text-2xl font-extrabold text-gray-900 mb-4 border-b pb-2">
             <FaVideo className="mr-3 text-gray-900" />
             Live View
-            <span className={`ml-4 px-3 py-1 text-sm rounded-full font-semibold ${isConnected ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                <FaPlug className='inline-block mr-1' /> {isConnected ? 'WebSocket Live' : 'WebSocket Disconnected'}
-            </span>
         </div>
     );
 

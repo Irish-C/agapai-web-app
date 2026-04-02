@@ -57,12 +57,17 @@ class RedisConnectionPool:
                 host = os.getenv("REDIS_HOST", "redis")
                 port = int(os.getenv("REDIS_PORT", "6379"))
                 db = int(os.getenv("REDIS_DB", "0"))
-                cls._pool = redis.ConnectionPool(host=host, port=port, db=db)
+                cls._pool = redis.ConnectionPool(
+                    host=host, 
+                    port=port, 
+                    db=db,
+                    decode_responses=False  # Handle raw bytes (e.g., image frames)
+                )
                 logger.info(f"[RedisPool] Connection pool initialized (host={host} port={port} db={db})")
             except Exception as e:
                 logger.error(f"[RedisPool] Failed to create connection pool: {e}")
                 raise
-        return redis.Redis(connection_pool=cls._pool)
+        return redis.Redis(connection_pool=cls._pool, decode_responses=False)
     
     @classmethod
     def close(cls):

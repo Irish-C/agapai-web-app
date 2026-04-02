@@ -134,14 +134,6 @@ export default function CameraGrid() {
       <div className="flex items-center text-2xl font-extrabold text-gray-900">
         <FaVideo className="mr-3 text-gray-900" />
         Live View
-        <span
-          className={`ml-4 px-3 py-1 text-sm rounded-full font-semibold ${
-            isConnected ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
-          }`}
-        >
-          <FaPlug className="inline-block mr-1" />
-          {isConnected ? 'WebSocket Live' : 'WebSocket Disconnected'}
-        </span>
       </div>
       <button
         onClick={refreshCameras}

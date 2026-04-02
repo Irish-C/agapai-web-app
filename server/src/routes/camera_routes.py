@@ -1,7 +1,9 @@
 import asyncio
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
+from fastapi.responses import JSONResponse
 from src.utils.input_sanitization import get_sanitized_json, sanitize_input
 from src.utils.serialization import safe_json_response
+from src.utils.redis_pool import RedisConnectionPool
 
 from src.controllers.camera_controller import (
     get_cameras_logic,
@@ -46,7 +48,6 @@ async def create_camera(camera_data: dict, user_id: str = Depends(require_admin_
     return safe_json_response(status_code=code, content=result)
 
 # PATCH endpoint for updating camera details
-from fastapi import Request
 @router.patch('/cameras/{camera_id}')
 async def update_camera(camera_id: int, request: Request, user_id: str = Depends(require_admin_user_id)):
     camera_data = await get_sanitized_json(request)
@@ -71,3 +72,35 @@ async def unpublish_camera(camera_id: int, user_id: str = Depends(require_admin_
     """Remove camera path from MediaMTX and restart MediaMTX."""
     result, code = await unpublish_camera_from_mediamtx(camera_id)
     return safe_json_response(status_code=code, content=result)
+
+
+@router.post('/set_active_camera')
+async def set_active_camera(request: Request):
+    data = await get_sanitized_json(request)
+    camera_id = data.get('camera_id')
+    r = RedisConnectionPool.get()
+    r.set('active_camera_id', camera_id)
+    return {'status': 'success', 'active_camera_id': camera_id}
+
+
+@router.post('/sync_published_cameras')
+async def sync_published_cameras(request: Request):
+    """Sync published cameras from frontend to backend Redis."""
+    try:
+        data = await get_sanitized_json(request)
+        camera_ids = data.get('cameras', [])
+        
+        # Convert to strings and store in Redis set
+        camera_ids_str = [str(cid) for cid in camera_ids]
+        r = RedisConnectionPool.get()
+        
+        # Clear old set and add new one
+        r.delete('published_cameras')
+        if camera_ids_str:
+            r.sadd('published_cameras', *camera_ids_str)
+        
+        print(f"[sync_published_cameras] Updated published cameras: {camera_ids_str}")
+        return {'status': 'success', 'cameras': camera_ids_str}
+    except Exception as e:
+        print(f"[sync_published_cameras] Error: {e}")
+        return JSONResponse(status_code=500, content={'error': str(e)})

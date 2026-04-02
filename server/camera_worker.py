@@ -411,7 +411,7 @@ class CameraWorker:
         return annotated_frame, detected
 
     async def send_alert(self):
-        from app import socketio_server, connected_sids
+        from src.services.socket_manager import socketio_server, connected_sids
         if connected_sids:
             await socketio_server.emit("incident_alert", {
                 "camera_id": str(self.active_camera_id), 

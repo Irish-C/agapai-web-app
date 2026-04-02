@@ -4,9 +4,15 @@
 const API_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:5000';
 
 async function publishCamera(cameraId) {
+  const headers = { 'Content-Type': 'application/json' };
+  try {
+    const token = localStorage.getItem('authToken');
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+  } catch (e) {}
+
   const res = await fetch(`${API_URL}/api/cameras/${cameraId}/publish`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers,
   });
   if (!res.ok) throw new Error(`Publish failed: ${res.status}`);
   return res.json();

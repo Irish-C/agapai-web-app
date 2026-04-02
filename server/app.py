@@ -1,56 +1,36 @@
 import os
+import sys
 import asyncio
+import socketio
 from dotenv import load_dotenv
 from pathlib import Path
+
+# Ensure server/ is on sys.path so imports like `from src...` resolve when
+# running uvicorn from the repository root.
+server_root = Path(__file__).parent.resolve()
+if str(server_root) not in sys.path:
+    sys.path.insert(0, str(server_root))
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
-from typing import Any
-import uuid
-import time
-import os
 from fastapi.staticfiles import StaticFiles
-import socketio
-
-import json
-from fastapi.encoders import jsonable_encoder
+from fastapi.responses import StreamingResponse
 
 from database import db
-from seed_db import seed_database
+from src.utils.responses import PrismaJSONResponse
 from src.routes.user_routes import router as user_router
 from src.routes.camera_routes import router as camera_router
 from src.routes.event_routes import router as event_router
 from src.routes.settings_routes import router as settings_router
 from src.routes.location_routes import router as location_router
 from src.routes.contact_routes import router as contact_router
-from src.utils.input_sanitization import get_sanitized_json, sanitize_input
+from src.routes.video_routes import router as video_router
 from src.utils.auth import get_token_user_id_from_header
-from src.utils.rate_limiter import (
-    enforce_ip_rate_limit,
-    API_GLOBAL_RATE_LIMIT,
-    API_GLOBAL_RATE_WINDOW_SECONDS,
-)
 
 # Import the background stream logic from the camera controller
-from src.controllers.camera_controller import ensure_mediamtx_running, start_camera_processing, analyze_camera_snapshot
-
-from fastapi.responses import JSONResponse
-import json
-
-class PrismaJSONResponse(JSONResponse):
-    def render(self, content: Any) -> bytes:
-        def format_bigint(obj):
-            # JavaScript's Max Safe Integer limit
-            if isinstance(obj, int) and (obj > 9007199254740991 or obj < -9007199254740991):
-                return str(obj)
-            if isinstance(obj, list):
-                return [format_bigint(i) for i in obj]
-            if isinstance(obj, dict):
-                return {k: format_bigint(v) for k, v in obj.items()}
-            return obj
-
-        content = format_bigint(jsonable_encoder(content))
-        return json.dumps(content).encode("utf-8")
+from src.controllers.camera_controller import ensure_mediamtx_running, start_camera_processing, analyze_camera_snapshot, YOLO_MODEL
+import cv2
+import numpy as np
 
 # --- 1. LOAD ENVIRONMENT ---
 # Prefer a repo-level `.env.local` for developer machines, fall back to
@@ -64,27 +44,16 @@ if local_env.exists():
 else:
     load_dotenv(dotenv_path=server_env)
 
-# DEBUG: This will tell us exactly what Python found
-# print(f"DEBUG: Looking for .env at: {env_path}")
-# print(f"DEBUG: DATABASE_URL is: {os.getenv('DATABASE_URL')}")
+## print(f"DEBUG: Looking for .env at: {env_path}")
+## print(f"DEBUG: DATABASE_URL is: {os.getenv('DATABASE_URL')}")
 
-# --- 2. Socket.IO (ASGI) ---
-socketio_server = socketio.AsyncServer(
-    async_mode='asgi',
-    # For development allow all origins (tighten in production)
-    cors_allowed_origins='*',
-    # Longer heartbeat for polling transport (dev uses polling which is slower)
-    ping_interval=15,
-    ping_timeout=35,
-    # Enable logging to help trace disconnects during debugging
-    # Disable per-emit debug logging to avoid console spam when streaming
-    logger=False,
-    engineio_logger=False,
-)
+# --- 2. Socket.IO (ASGI) - centralized in socket_manager to prevent circular imports ---
+from src.services.socket_manager import socketio_server, connected_sids
 
-# Track currently connected Socket.IO session ids. Other modules may import
-# this set and avoid emitting frames when there are no connected clients.
-connected_sids: set = set()
+import redis.asyncio as aioredis
+
+# Async redis pool used for streaming frames without blocking the event loop
+redis_pool = aioredis.from_url("redis://localhost:6379", decode_responses=False)
 
 # --- 3. FASTAPI app with lifespan ---
 from contextlib import asynccontextmanager
@@ -123,62 +92,9 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(lifespan=lifespan, default_response_class=PrismaJSONResponse)
 
-@app.middleware("http")
-async def bigint_middleware(request, call_next):
-    # Sanitize incoming JSON bodies so controllers receive cleaned data.
-    # This reads the raw body, sanitizes it with `sanitize_input`, and
-    # injects a new receive() coroutine so downstream `await request.json()`
-    # returns the sanitized payload.
-    
-    # Skip socket.io routes - they need to pass through unmodified
-    if request.url.path.startswith('/socket.io'):
-        return await call_next(request)
-
-    # Global API rate limiting (separate stricter rule on /api/login route).
-    if request.url.path.startswith('/api') and request.url.path != '/api/login':
-        allowed, retry_after = await enforce_ip_rate_limit(
-            request=request,
-            namespace='api_global',
-            limit=API_GLOBAL_RATE_LIMIT,
-            window_seconds=API_GLOBAL_RATE_WINDOW_SECONDS,
-        )
-        if not allowed:
-            return JSONResponse(
-                status_code=429,
-                content={
-                    'status': 'error',
-                    'message': 'Rate limit exceeded. Please retry later.',
-                    'retry_after_seconds': retry_after,
-                },
-                headers={'Retry-After': str(retry_after)},
-            )
-    
-    try:
-        content_type = request.headers.get('content-type', '')
-        if 'application/json' in content_type.lower():
-            body_bytes = await request.body()
-            if body_bytes:
-                try:
-                    payload = json.loads(body_bytes)
-                    sanitized = sanitize_input(payload)
-                    new_body = json.dumps(sanitized).encode('utf-8')
-
-                    async def receive():
-                        return {"type": "http.request", "body": new_body}
-
-                    # Replace the request's receive with one that returns the
-                    # sanitized body. This makes `await request.json()` return
-                    # the sanitized payload.
-                    request._receive = receive
-                except Exception:
-                    # If parsing/sanitization fails, fall back to original body
-                    pass
-    except Exception:
-        # Be defensive: do not block requests because sanitization failed.
-        pass
-
-    response = await call_next(request)
-    return response
+# --- Middleware ---
+from src.middleware.sanitization import bigint_middleware
+app.middleware("http")(bigint_middleware)
 
 app.add_middleware(
     CORSMiddleware,
@@ -194,210 +110,31 @@ app.include_router(event_router, prefix='/api')
 app.include_router(settings_router, prefix='/api')
 app.include_router(location_router, prefix='/api')
 app.include_router(contact_router, prefix="/api")
+app.include_router(video_router)
 
-# --- 4. DB lifecycle + Camera Startup ---
-# Startup/shutdown handled by lifespan above
 # --- 4. DB lifecycle + Camera Startup ---
 # Startup/shutdown handled by lifespan above
 
 # --- 5. Utility routes ---
-@app.post('/api/seed_db')
-async def seed_db_route():
-    try:
-        await seed_database()
-        return {'status': 'success', 'message': 'Database seeded'}
-    except Exception as e:
-        return JSONResponse(status_code=500, content={'status': 'error', 'message': str(e)})
+
 
 # --- 6. Health / readiness endpoints ---
 @app.get('/health')
 async def health_check():
     return {'status': 'ok', 'database_connected': db.is_connected()}
 
-# --- 10. Admin Set Active Camera Endpoint ---
-from fastapi import Request
-@app.post('/api/set_active_camera')
-async def set_active_camera(request: Request):
-    data = await get_sanitized_json(request)
-    camera_id = data.get('camera_id')
-    r = redis.Redis(host='redis', port=6379, db=0)
-    r.ping()
-    print("✓ Redis is running")
-    r.set('active_camera_id', camera_id)
-    return {'status': 'success', 'active_camera_id': camera_id}
+# --- 10. Admin Set Active Camera Endpoint (moved to camera_routes.py) ---
 
 # --- 11. Get Active Camera Endpoint ---
 @app.get('/api/get_active_camera')
 async def get_active_camera():
-    r = redis.Redis(host='redis', port=6379, db=0)
-    r.ping()
-    print("✓ Redis is running")
+    r = RedisConnectionPool.get()
     camera_id = r.get('active_camera_id')
     if camera_id:
         camera_id = camera_id.decode()
     return {'active_camera_id': camera_id}
 
-# --- 9. Video Feed Endpoint ---
-from fastapi.responses import StreamingResponse
-import redis
-import asyncio
-
-@app.get('/video_feed')
-async def video_feed(camera_id: str | None = None):
-    """MJPEG streaming endpoint.
-
-    - If `camera_id` is provided, it reads from Redis key `latest_frame_{camera_id}`.
-    - Otherwise, it falls back to the global `latest_frame` key.
-    """
-
-    try:
-        camera_id = sanitize_input(camera_id) if camera_id else None
-        if camera_id:
-            camera_id = str(camera_id)
-        
-        r = RedisConnectionPool.get()
-        stream_key = f"latest_frame_{camera_id}" if camera_id else "latest_frame"
-        
-        # Test Redis connection
-        r.ping()
-
-        async def generate():
-            chunk_count = 0
-            while True:
-                try:
-                    frame_bytes = r.get(stream_key)
-                    if frame_bytes:
-                        chunk_count += 1
-                        yield (b'--frame\r\n'
-                               b'Content-Type: image/jpeg\r\n'
-                               b'Content-Length: ' + str(len(frame_bytes)).encode() + b'\r\n\r\n' 
-                               + frame_bytes + b'\r\n')
-                    # If no frame, just sleep and retry (don't send broken MJPEG)
-                    await asyncio.sleep(0.020)  # ~50fps for lower latency
-                except Exception as e:
-                    print(f"[video_feed] Streaming error: {e}")
-                    break
-
-        return StreamingResponse(generate(), media_type='multipart/x-mixed-replace; boundary=frame')
-    except Exception as e:
-        print(f"[video_feed] Error initializing stream for camera {camera_id}: {e}")
-        return JSONResponse(status_code=500, content={'error': str(e)})
-
-
-@app.post('/api/cameras/{camera_id}/snapshot')
-async def capture_camera_snapshot(camera_id: str):
-    """Capture latest frame for camera from Redis, save snapshot, and create DB event log.
-
-    Returns the public snapshot URL and DB event id when successful.
-    """
-    try:
-        cam_id = str(camera_id)
-        r = RedisConnectionPool.get()
-        # Try raw latest full-resolution frame key first, then annotated/latest
-        keys = [f'latest_frame_raw_{cam_id}', f'latest_frame_{cam_id}', 'latest_frame']
-        frame_bytes = None
-        for k in keys:
-            try:
-                val = r.get(k)
-            except Exception:
-                val = None
-            if val:
-                frame_bytes = val
-                break
-
-        if not frame_bytes:
-            return JSONResponse(status_code=404, content={'status': 'error', 'message': 'No frame available'})
-
-        # Save snapshot file
-        filename = f"cam{cam_id}_manual_{int(time.time())}_{uuid.uuid4().hex[:8]}.jpg"
-        snapshots_dir = os.path.join(os.path.dirname(__file__), 'static', 'snapshots')
-        os.makedirs(snapshots_dir, exist_ok=True)
-        file_path = os.path.join(snapshots_dir, filename)
-        with open(file_path, 'wb') as f:
-            f.write(frame_bytes)
-
-        # Persist DB entries similar to persist_event in camera_controller
-        # Ensure event type and class
-        event_type_obj = await db.eventtype.find_first(where={'event_type_name': 'Snapshot'})
-        if not event_type_obj:
-            event_type_obj = await db.eventtype.create(data={'event_type_name': 'Snapshot'})
-
-        class_name = 'Manual Snapshot'
-        event_class_obj = await db.eventclass.find_first(where={'class_name': class_name})
-        if not event_class_obj:
-            event_class_obj = await db.eventclass.create(data={'class_name': class_name, 'event_type_id': event_type_obj.id})
-
-        host = os.getenv('VITE_API_URL') or f'http://127.0.0.1:5000'
-        snapshot_url = f"{host.rstrip('/')}/snapshots/{filename}"
-
-        new_event = await db.eventlog.create(
-            data={
-                'cam_id': int(cam_id),
-                'event_class_id': event_class_obj.id,
-                'file_path': snapshot_url,
-            },
-            include={'camera': True, 'event_class': True}
-        )
-
-        # Optionally emit socket event for new alert
-        try:
-            from app import socketio_server, connected_sids
-            if connected_sids:
-                await socketio_server.emit('new_alert', {
-                    'id': str(new_event.id),
-                    'type': new_event.event_class.class_name,
-                    'location': new_event.camera.cam_name if new_event.camera else 'Unknown',
-                    'timestamp': new_event.timestamp.isoformat(),
-                    'snapshot_url': new_event.file_path,
-                    'status': 'unacknowledged'
-                })
-        except Exception:
-            pass
-
-        return {'status': 'success', 'snapshot_url': snapshot_url, 'event_id': str(new_event.id)}
-    except Exception as e:
-        print(f"[capture_camera_snapshot] Error: {e}")
-        return JSONResponse(status_code=500, content={'status': 'error', 'message': str(e)})
-
-
-@app.post('/api/cameras/{camera_id}/analyze')
-async def analyze_camera_event(camera_id: str):
-    """Run server-side AI (YOLO/OpenVINO) on the latest frame and persist snapshot if detections found."""
-    try:
-        cam_id = int(camera_id)
-    except Exception:
-        return JSONResponse(status_code=400, content={'status': 'error', 'message': 'invalid camera id'})
-
-    try:
-        resp, status = await analyze_camera_snapshot(cam_id)
-        return JSONResponse(status_code=status if isinstance(status, int) else 200, content=resp)
-    except Exception as e:
-        print(f"[analyze_camera_event] Error: {e}")
-        return JSONResponse(status_code=500, content={'status': 'error', 'message': str(e)})
-
-
-# --- Published Cameras Sync Endpoints ---
-@app.post('/api/sync_published_cameras')
-async def sync_published_cameras(request: Request):
-    """Sync published cameras from frontend to backend Redis."""
-    try:
-        data = await get_sanitized_json(request)
-        camera_ids = data.get('cameras', [])
-        
-        # Convert to strings and store in Redis set
-        camera_ids_str = [str(cid) for cid in camera_ids]
-        r = RedisConnectionPool.get()
-        
-        # Clear old set and add new one
-        r.delete('published_cameras')
-        if camera_ids_str:
-            r.sadd('published_cameras', *camera_ids_str)
-        
-        print(f"[sync_published_cameras] Updated published cameras: {camera_ids_str}")
-        return {'status': 'success', 'cameras': camera_ids_str}
-    except Exception as e:
-        print(f"[sync_published_cameras] Error: {e}")
-        return JSONResponse(status_code=500, content={'error': str(e)})
+# --- Published Cameras Sync Endpoints (moved to camera_routes.py) ---
 
 @app.get('/api/get_published_cameras')
 async def get_published_cameras():
@@ -408,6 +145,52 @@ async def get_published_cameras():
         return {'status': 'success', 'cameras': list(camera_ids)}
     except Exception as e:
         return JSONResponse(status_code=500, content={'error': str(e)})
+
+
+@app.get('/video_feed')
+async def video_feed(camera_id: str | None = None):
+    stream_key = f"latest_frame_{camera_id}" if camera_id else "latest_frame"
+
+    async def generate():
+        last_frame_data = None
+        stale_count = 0
+        
+        while True:
+            frame_bytes = await redis_pool.get(stream_key)
+
+            if not frame_bytes:
+                await asyncio.sleep(0.01)
+                continue
+
+            # Ensure frame_bytes is actually bytes, not a string
+            if isinstance(frame_bytes, str):
+                frame_bytes = frame_bytes.encode('latin-1')
+
+            # Freshness check: track consecutive identical frames
+            if frame_bytes == last_frame_data:
+                stale_count += 1
+            else:
+                stale_count = 0
+                last_frame_data = frame_bytes
+
+            # If frame hasn't changed for ~3 seconds (100 frames at 30fps), close connection
+            if stale_count > 100:
+                print(f"[STALE] Stream {stream_key} has no new frames for ~3 seconds. Closing connection.")
+                break
+
+            yield (
+                b'--frame\r\n'
+                b'Content-Type: image/jpeg\r\n'
+                b'Content-Length: ' + str(len(frame_bytes)).encode() + b'\r\n\r\n'
+                + frame_bytes + b'\r\n'
+            )
+
+            await asyncio.sleep(0.03)
+
+    return StreamingResponse(
+        generate(),
+        media_type='multipart/x-mixed-replace; boundary=frame'
+    )
 
 # --- 7. Snapshot static folder (used for alert snapshots) ---
 SNAPSHOTS_DIR = os.path.join(os.path.dirname(__file__), 'static', 'snapshots')
@@ -426,108 +209,7 @@ else:
     async def root_health_check():
         return {'status': 'ok', 'message': 'Backend is running (no static build detected)'}
 
-# --- 8. Socket.IO events ---
-@socketio_server.event
-async def connect(sid, environ):
-    addr = environ.get('REMOTE_ADDR') if environ else None
-    print(f"Socket.IO connect: sid={sid}, addr={addr}")
-    connected_sids.add(sid)
-
-@socketio_server.event
-async def disconnect(sid):
-    print(f"Socket.IO disconnect: sid={sid}")
-    try:
-        connected_sids.discard(sid)
-    except Exception:
-        pass
-
-
-# Allow clients to subscribe/unsubscribe to specific camera rooms so we can
-# emit frames only to viewers of that camera instead of broadcasting globally.
-@socketio_server.on('subscribe_camera')
-async def subscribe_camera(sid, data):
-    try:
-        token = None
-        if isinstance(data, dict):
-            token = data.get('token')
-
-        user_id = None
-        if token:
-            user_id = get_token_user_id_from_header(f"Bearer {token}")
-
-        if not user_id:
-            environ = socketio_server.get_environ(sid)
-            if environ:
-                user_id = get_token_user_id_from_header(environ.get('HTTP_AUTHORIZATION'))
-
-        if not user_id:
-            await socketio_server.emit('auth_error', {'message': 'Authentication required'}, to=sid)
-            return
-
-        camera_id = None
-        if isinstance(data, dict):
-            camera_id = data.get('camera_id') or data.get('cam_id')
-        else:
-            camera_id = data
-        if camera_id is None:
-            return
-        room = f"camera_{camera_id}"
-        socketio_server.enter_room(sid, room)
-        
-        # ✅ NEW: Set as active camera for AI processing
-        r = RedisConnectionPool.get()
-        r.set('active_camera_id', str(camera_id))
-        
-        print(f"Socket.IO subscribe: sid={sid} -> {room} (AI focus set)")
-    except Exception as e:
-        print(f"subscribe_camera error: {e}")
-
-
-@socketio_server.on('unsubscribe_camera')
-async def unsubscribe_camera(sid, data):
-    try:
-        token = None
-        if isinstance(data, dict):
-            token = data.get('token')
-
-        user_id = None
-        if token:
-            user_id = get_token_user_id_from_header(f"Bearer {token}")
-
-        if not user_id:
-            environ = socketio_server.get_environ(sid)
-            if environ:
-                user_id = get_token_user_id_from_header(environ.get('HTTP_AUTHORIZATION'))
-
-        if not user_id:
-            await socketio_server.emit('auth_error', {'message': 'Authentication required'}, to=sid)
-            return
-
-        camera_id = None
-        if isinstance(data, dict):
-            camera_id = data.get('camera_id') or data.get('cam_id')
-        else:
-            camera_id = data
-        if camera_id is None:
-            return
-        room = f"camera_{camera_id}"
-        socketio_server.enter_room(sid, room)
-        print(f"Socket.IO unsubscribe: sid={sid} -> {room}")
-    except Exception as e:
-        print(f"unsubscribe_camera error: {e}")
-
-
-# Health check: respond to client pings with pong
-@socketio_server.on('ping')
-async def handle_ping(sid, data):
-    """Health check handler: client sends ping, we respond with pong."""
-    try:
-        timestamp = data.get('timestamp') if isinstance(data, dict) else None
-        await socketio_server.emit('pong', {'timestamp': timestamp}, to=sid)
-        # Uncomment for verbose health check logs
-        # print(f"SocketIO health check: ping from {sid}, pong sent")
-    except Exception as e:
-        print(f"SocketIO health check error: {e}")
+# --- 8. Socket.IO events (moved to src/services/socket_manager.py) ---
 
 # ASGI app entrypoint
 asgi_app = socketio.ASGIApp(
@@ -538,4 +220,13 @@ asgi_app = socketio.ASGIApp(
 
 if __name__ == '__main__':
     import uvicorn
-    uvicorn.run('app:asgi_app', host='127.0.0.1', port=5000, reload=True)
+    import sys
+    try:
+        uvicorn.run('app:asgi_app', host='127.0.0.1', port=5000, reload=True)
+    except KeyboardInterrupt:
+        print('Shutting down (KeyboardInterrupt).')
+        sys.exit(0)
+    except Exception as e:
+        # Re-raise unexpected exceptions so they are visible during development
+        print(f'Server exited with exception: {e}')
+        raise

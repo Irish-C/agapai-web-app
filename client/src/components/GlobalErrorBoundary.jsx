@@ -50,7 +50,7 @@ class GlobalErrorBoundary extends React.Component {
               onClick={this.handleReset}
               className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-full transition duration-200"
             >
-              Return to Dashboard
+              Return to Home
             </button>
           </div>
         </div>

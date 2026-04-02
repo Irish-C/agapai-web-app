@@ -1,358 +1,10 @@
-import { useState, useEffect, useRef, memo } from 'react';
-import { FaExpand, FaTimes } from 'react-icons/fa';
-import { socket, addSubscribedCamera, removeSubscribedCamera } from '../../services/socket.js';
-import streamService from '../../services/streamService.js';
+import React, { useState, useEffect, useRef, memo } from 'react';
+// Utility to check if running in development
+const isDev = typeof process !== 'undefined' && process.env && process.env.NODE_ENV !== 'production';
+import { FaExpand, FaTimes, FaCamera } from 'react-icons/fa';
+import MJPEGCanvas from './components/Video/MJPEGCanvas.jsx';
+import { useCameraStream, useObjectDetection, useCameraSubscription } from './hooks/index.js';
 
-// Component to handle MJPEG streaming using Web Worker
-function MJPEGCanvas({ camId, cameraName, onStatusChange }) {
-  const canvasRef = useRef(null);
-  const abortControllerRef = useRef(null);
-  const workerRef = useRef(null);
-
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    const ctx = canvas.getContext('2d');
-
-    // Create Web Worker for MJPEG parsing
-    try {
-      workerRef.current = new Worker(
-        new URL('./mjpegParser.worker.js', import.meta.url)
-      );
-    } catch (err) {
-      console.error('[MJPEGCanvas] Failed to create worker:', err);
-    }
-
-    let retryCount = 0;
-    const MAX_RETRIES = 10;
-    const BASE_RETRY_DELAY = 300; // 300ms - faster reconnection attempts
-    let componentMounted = true;
-
-    const startStreaming = async () => {
-      if (!componentMounted) return;
-
-      // Create a FRESH AbortController for each attempt
-      abortControllerRef.current = new AbortController();
-      const signal = abortControllerRef.current.signal;
-
-      try {
-        onStatusChange('connecting');
-        console.log(`[MJPEGCanvas] Starting stream for camera ${camId}`);
-        
-        // Set a connection timeout of 5 seconds
-        const connectionTimeoutId = setTimeout(() => {
-          if (signal.aborted === false) {
-            console.warn(`[MJPEGCanvas] Stream connection timeout after 5s`);
-            abortControllerRef.current?.abort();
-          }
-        }, 5000);
-
-        const response = await fetch(
-          `/video_feed?camera_id=${camId}`,
-          { signal }
-        );
-
-        clearTimeout(connectionTimeoutId); // Clear timeout once connected
-
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}`);
-        }
-
-        console.log(`[MJPEGCanvas] Connected to stream, content-type: ${response.headers.get('content-type')}`);
-        onStatusChange('online');
-        retryCount = 0; // Reset retry count on success
-        const reader = response.body?.getReader();
-        if (!reader) throw new Error('No stream reader');
-
-        const frameQueue = [];
-        const FRAME_QUEUE_MAX = 1; // keep only the newest frame to minimize latency
-        let isRendering = false;
-        let lastRenderedTimestamp = Date.now();
-        let lastCanvasUpdateCheck = Date.now();
-        let lastBitmapWidth = 0;
-        let lastBitmapHeight = 0;
-
-        // Rendering loop using requestAnimationFrame
-        const renderFrame = async () => {
-          if (frameQueue.length > 0 && canvas.offsetParent && !isRendering) {
-            isRendering = true;
-            const frameData = frameQueue.shift();
-            try {
-              // If worker decoded an ImageBitmap, draw it directly (fast, no extra decode)
-              if (typeof ImageBitmap !== 'undefined' && frameData instanceof ImageBitmap) {
-                const bitmap = frameData;
-                if (bitmap && bitmap.width > 0 && bitmap.height > 0) {
-                  if (bitmap.width !== lastBitmapWidth || bitmap.height !== lastBitmapHeight) {
-                    canvas.width = bitmap.width;
-                    canvas.height = bitmap.height;
-                    lastBitmapWidth = bitmap.width;
-                    lastBitmapHeight = bitmap.height;
-                  }
-                  ctx.drawImage(bitmap, 0, 0);
-                  lastRenderedTimestamp = Date.now();
-                  try { bitmap.close(); } catch (e) {}
-                }
-              } else {
-                // Fallback: raw Uint8Array frame - decode on main thread
-                const blob = new Blob([frameData], { type: 'image/jpeg' });
-                const bitmap = await createImageBitmap(blob);
-                if (bitmap && bitmap.width > 0 && bitmap.height > 0) {
-                  if (bitmap.width !== lastBitmapWidth || bitmap.height !== lastBitmapHeight) {
-                    canvas.width = bitmap.width;
-                    canvas.height = bitmap.height;
-                    lastBitmapWidth = bitmap.width;
-                    lastBitmapHeight = bitmap.height;
-                  }
-                  ctx.drawImage(bitmap, 0, 0);
-                  lastRenderedTimestamp = Date.now();
-                  try { bitmap.close?.(); } catch (e) {}
-                }
-              }
-            } catch (err) {
-              console.error('Frame rendering error:', err);
-            } finally {
-              isRendering = false;
-            }
-          }
-
-          // Check if canvas is actually updating (not frozen at render level)
-          const now = Date.now();
-          if (now - lastCanvasUpdateCheck > FROZEN_STATE_TIMEOUT) {
-            const timeSinceLastRender = now - lastRenderedTimestamp;
-            if (timeSinceLastRender > FROZEN_STATE_TIMEOUT && frameQueue.length === 0) {
-              console.warn(`[MJPEGCanvas] Canvas hasn't updated in ${timeSinceLastRender}ms despite stream being open (render frozen), reconnecting...`);
-              onStatusChange('offline');
-              abortControllerRef.current?.abort();
-            }
-            lastCanvasUpdateCheck = now;
-          }
-
-          if (!signal.aborted) {
-            requestAnimationFrame(renderFrame);
-          }
-        };
-
-        // Start render loop
-        requestAnimationFrame(renderFrame);
-
-        // Handle worker messages
-        if (workerRef.current) {
-          workerRef.current.onmessage = (event) => {
-            const { type, frames, fps, bitmap } = event.data;
-
-            if (type === 'bitmap' && bitmap) {
-              try {
-                // If queue already holds an ImageBitmap, close it to free memory
-                const last = frameQueue[frameQueue.length - 1];
-                if (last && typeof ImageBitmap !== 'undefined' && last instanceof ImageBitmap) {
-                  try { last.close(); } catch (e) {}
-                }
-
-                if (frameQueue.length < FRAME_QUEUE_MAX) {
-                  frameQueue.push(bitmap);
-                } else {
-                  frameQueue[frameQueue.length - 1] = bitmap;
-                }
-              } catch (e) {
-                // ignore
-              }
-            } else if (type === 'frames' && frames) {
-              frames.forEach(buffer => {
-                try {
-                  const newBuf = new Uint8Array(buffer);
-                  // Cheap duplicate detection: compare length and first bytes
-                  const last = frameQueue[frameQueue.length - 1];
-                  if (last && !(typeof ImageBitmap !== 'undefined' && last instanceof ImageBitmap) && last.length === newBuf.length) {
-                    let same = true;
-                    const cmpLen = Math.min(16, newBuf.length);
-                    for (let i = 0; i < cmpLen; i++) {
-                      if (last[i] !== newBuf[i]) { same = false; break; }
-                    }
-                    if (same) return; // skip obvious duplicate
-                  }
-
-                  // If last slot contains an ImageBitmap, close it before replacing
-                  if (frameQueue.length === FRAME_QUEUE_MAX) {
-                    const lastSlot = frameQueue[frameQueue.length - 1];
-                    if (lastSlot && typeof ImageBitmap !== 'undefined' && lastSlot instanceof ImageBitmap) {
-                      try { lastSlot.close(); } catch (e) {}
-                    }
-                    frameQueue[frameQueue.length - 1] = newBuf;
-                  } else {
-                    frameQueue.push(newBuf);
-                  }
-                } catch (e) {
-                  // ignore malformed frame
-                }
-              });
-            } else if (type === 'fps') {
-              console.log(`[MJPEGCanvas] Stream FPS: ${fps}`);
-            }
-          };
-        }
-
-        // Main read loop - just forward data to worker
-        let frameTimeoutId = null;
-        let frozenCheckId = null;
-        let readerTimeoutId = null;
-        const FRAME_TIMEOUT = 5000; // 5 seconds without ANY data = offline
-        const FROZEN_STATE_TIMEOUT = 600; // 0.6 seconds without NEW frames = frozen, try reconnect
-        let lastFrameTimestamp = Date.now();
-
-        const resetFrameTimeout = () => {
-          if (frameTimeoutId) clearTimeout(frameTimeoutId);
-          
-          frameTimeoutId = setTimeout(() => {
-            console.error(`[MJPEGCanvas] No data received for ${FRAME_TIMEOUT/1000}s - connection appears dead, aborting`);
-            onStatusChange('offline');
-            abortControllerRef.current?.abort();
-          }, FRAME_TIMEOUT);
-        };
-
-        const checkForFrozenState = () => {
-          if (frozenCheckId) clearTimeout(frozenCheckId);
-          
-          frozenCheckId = setTimeout(() => {
-            const timeSinceLastFrame = Date.now() - lastFrameTimestamp;
-            const isStale = timeSinceLastFrame > FROZEN_STATE_TIMEOUT;
-            
-            console.log(`[MJPEGCanvas] Frozen check: elapsed=${timeSinceLastFrame}ms, threshold=${FROZEN_STATE_TIMEOUT}ms, stale=${isStale}`);
-            
-            if (isStale) {
-              console.error(`[MJPEGCanvas] ❌ FROZEN DETECTED: No frames for ${(timeSinceLastFrame/1000).toFixed(1)}s - aborting and reconnecting`);
-              onStatusChange('offline');
-              abortControllerRef.current?.abort();
-            } else {
-              // Continue checking every FROZEN_STATE_TIMEOUT
-              checkForFrozenState();
-            }
-          }, FROZEN_STATE_TIMEOUT);
-        };
-
-        // Race reader.read() against timeout to interrupt hanging reads
-        const readWithTimeout = async (reader) => {
-          const READ_TIMEOUT = 2000; // 2 seconds
-          
-          const timeoutPromise = new Promise((_, reject) => {
-            const timeoutId = setTimeout(() => {
-              reject(new Error('reader.read() timeout'));
-            }, READ_TIMEOUT);
-            
-            // Store timeout ID so we can clear it if read succeeds
-            readWithTimeout._timeoutId = timeoutId;
-          });
-          
-          try {
-            return await Promise.race([
-              reader.read(),
-              timeoutPromise
-            ]);
-          } finally {
-            // Clear timeout if read completed (success or error)
-            if (readWithTimeout._timeoutId) {
-              clearTimeout(readWithTimeout._timeoutId);
-              readWithTimeout._timeoutId = null;
-            }
-          }
-        };
-
-        resetFrameTimeout(); // Start timeout on initial connect
-        checkForFrozenState(); // Start frozen state detection
-        console.log(`[MJPEGCanvas] Initialized timeouts: FRAME_TIMEOUT=${FRAME_TIMEOUT}ms, FROZEN_STATE_TIMEOUT=${FROZEN_STATE_TIMEOUT}ms`);
-
-        while (true) {
-          try {
-            const { done, value } = await readWithTimeout(reader);
-            
-            if (done) {
-              console.log(`[MJPEGCanvas] Stream ended (reader.read returned done)`);
-              break;
-            }
-
-            // Reset timeouts on data received
-            resetFrameTimeout();
-            lastFrameTimestamp = Date.now();
-
-            // Send data to worker for parsing
-            if (workerRef.current) {
-              workerRef.current.postMessage({
-                type: 'append',
-                data: value
-              });
-            }
-          } catch (readerErr) {
-            if (readerErr.message === 'reader.read() timeout') {
-              console.error(`[MJPEGCanvas] ❌ TIMEOUT: reader.read() hung for 4.8s - stream is dead, reconnecting`);
-            } else {
-              console.error(`[MJPEGCanvas] Reader error:`, readerErr.message);
-            }
-            onStatusChange('reconnecting'); // Show overlay while trying to reconnect
-            abortControllerRef.current?.abort();
-            break;
-          }
-        }
-
-        if (frameTimeoutId) clearTimeout(frameTimeoutId);
-        if (frozenCheckId) clearTimeout(frozenCheckId);
-      } catch (err) {
-        if (err.name === 'AbortError') {
-          console.log(`[MJPEGCanvas] Stream aborted for camera ${camId}`);
-          // Attempt reconnect with exponential backoff
-          if (componentMounted && retryCount < MAX_RETRIES) {
-            const delayMs = BASE_RETRY_DELAY * Math.pow(2, retryCount);
-            console.log(`[MJPEGCanvas] Reconnecting in ${delayMs}ms (attempt ${retryCount + 1}/${MAX_RETRIES})`);
-            retryCount++;
-            onStatusChange('reconnecting'); // Show overlay during reconnect attempt
-            setTimeout(() => {
-              if (componentMounted) {
-                startStreaming();
-              }
-            }, delayMs);
-          } else if (retryCount >= MAX_RETRIES) {
-            console.error(`[MJPEGCanvas] Max retries (${MAX_RETRIES}) reached, giving up`);
-            onStatusChange('offline'); // Now show "Camera Offline"
-          }
-        } else {
-          console.error(`[MJPEGCanvas] Camera ${camId} streaming error:`, err);
-          onStatusChange('reconnecting'); // Show overlay during reconnect
-          // Retry on other errors too
-          if (componentMounted && retryCount < MAX_RETRIES) {
-            const delayMs = BASE_RETRY_DELAY * Math.pow(2, retryCount);
-            console.log(`[MJPEGCanvas] Reconnecting in ${delayMs}ms (attempt ${retryCount + 1}/${MAX_RETRIES})`);
-            retryCount++;
-            setTimeout(() => {
-              if (componentMounted) {
-                startStreaming();
-              }
-            }, delayMs);
-          }
-        }
-      }
-    };
-
-    startStreaming();
-
-    return () => {
-      componentMounted = false;
-      if (abortControllerRef.current) {
-        console.log(`[MJPEGCanvas] Cleaning up camera ${camId} stream`);
-        abortControllerRef.current.abort();
-      }
-      if (workerRef.current) {
-        workerRef.current.terminate();
-      }
-    };
-  }, [camId, onStatusChange]);
-
-  return (
-    <canvas
-      ref={canvasRef}
-      className="block max-w-full max-h-full"
-      style={{ display: 'block', backgroundColor: '#000', width: 'auto', height: 'auto', maxWidth: '100%', maxHeight: '100%' }}
-    />
-  );
-}
 
 function VideoFeed({
   camId,
@@ -363,134 +15,140 @@ function VideoFeed({
   streamUrl
 }) {
   const [currentDateTime, setCurrentDateTime] = useState(new Date());
-  const [cameraStatus, setCameraStatus] = useState('connecting'); // connecting, online, offline, error
   const [noDisplay, setNoDisplay] = useState(() => {
     try {
       return localStorage.getItem(`camera_${camId}_no_display`) === '1';
     } catch (e) { return false; }
   });
-  const subscriptionRef = useRef(null); // Track if subscribed to prevent duplicate subscribe calls
-  const videoRef = useRef(null);
-  const pcRef = useRef(null);
-  const [streamMode, setStreamMode] = useState(null); // 'webrtc' | 'hls' | 'mjpeg'
+  const wrapperRef = useRef(null);
 
+  // Dev/test mode toggle
+  const [devMode, setDevMode] = useState(() => {
+    try {
+      return localStorage.getItem('camera_dev_mode') === '1';
+    } catch (e) { return false; }
+  });
+  // Overlay toggle (can be separated if needed)
+  const [overlayEnabled, setOverlayEnabled] = useState(true);
+
+  // Persist dev mode toggle
+  useEffect(() => {
+    try {
+      localStorage.setItem('camera_dev_mode', devMode ? '1' : '0');
+    } catch (e) {}
+  }, [devMode]);
+
+  // Update date/time every second
   useEffect(() => {
     const timer = setInterval(() => setCurrentDateTime(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
 
-  // Choose stream preference: WebRTC (WHEP) > HLS (.m3u8) > MJPEG
-  useEffect(() => {
-    if (!streamUrl) {
-      setStreamMode('mjpeg');
-      return;
+  // Custom hooks for heavy lifting
+  // --- Updated: useCameraStream returns status ---
+  const { streamMode, videoRef, status: cameraStatus, setStatus: setCameraStatus } = useCameraStream(streamUrl, camId);
+
+  const { detections, confidenceThreshold, setConfidenceThreshold, lastDetectionAt } = useObjectDetection(
+    videoRef,
+    wrapperRef,
+    streamMode,
+    noDisplay,
+    camId
+  );
+
+  // Only set error via subscription if needed (optional, can be removed if all status is unified in hook)
+  useCameraSubscription(camId, (status) => {
+    if (status === 'error' && typeof setCameraStatus === 'function') {
+      setCameraStatus('error');
     }
-
-    try {
-      const url = String(streamUrl);
-      if (url.indexOf('/whep') !== -1 || url.toLowerCase().includes('webrtc')) {
-        setStreamMode('webrtc');
-      } else if (url.endsWith('.m3u8')) {
-        setStreamMode('hls');
-      } else {
-        setStreamMode('mjpeg');
-      }
-    } catch (e) {
-      setStreamMode('mjpeg');
-    }
-  }, [streamUrl]);
-
-  // Start/stop streams based on chosen mode
-  useEffect(() => {
-    let mounted = true;
-
-    const startWebRTC = async () => {
-      if (!videoRef.current) return;
-      try {
-        pcRef.current = await streamService.startWebRTCStream(camId, videoRef.current);
-      } catch (e) {
-        console.error('[VideoFeed] WebRTC start failed, falling back to MJPEG/HLS:', e);
-        if (mounted) setStreamMode('mjpeg');
-      }
-    };
-
-    const startHLS = async () => {
-      const v = videoRef.current;
-      if (!v) return;
-      v.crossOrigin = 'anonymous';
-      v.src = streamUrl;
-      v.play().catch(() => {});
-    };
-
-    if (streamMode === 'webrtc') {
-      startWebRTC();
-    } else if (streamMode === 'hls') {
-      startHLS();
-    }
-
-    return () => {
-      mounted = false;
-      // Cleanup WebRTC
-      if (pcRef.current) {
-        try { streamService.stopWebRTCStream(pcRef.current, videoRef.current); } catch (e) {}
-        pcRef.current = null;
-      }
-      // Stop HLS/video
-      if (videoRef.current) {
-        try { videoRef.current.pause(); videoRef.current.src = ''; } catch (e) {}
-      }
-    };
-  }, [streamMode, streamUrl, camId]);
-
-  // Subscribe to camera status updates (for connection status indicator)
-  useEffect(() => {
-    // Only subscribe if not already subscribed
-    if (subscriptionRef.current === camId) {
-      return; // Already subscribed to this camera
-    }
-
-    subscriptionRef.current = camId;
-    
-    // Track subscription for auto-resubscribe on reconnect
-    addSubscribedCamera(camId);
-    const authToken = localStorage.getItem('authToken');
-
-    try {
-      socket.emit('subscribe_camera', { camera_id: camId, token: authToken });
-    } catch (e) {
-      console.warn(`Failed to subscribe to camera ${camId}:`, e);
-      subscriptionRef.current = null;
-    }
-
-    // Listen for camera status events (only for critical errors, don't override local MJPEG status)
-    const handleCameraStatus = (data) => {
-      if (data.cam_id === String(camId)) {
-        // Only override if it's a critical error, otherwise trust MJPEG stream status
-        if (data.status === 'error') {
-          setCameraStatus('error');
-        }
-        // For 'offline' from backend, only set if MJPEG hasn't connected yet
-        // If MJPEG is streaming, that's more reliable than backend status
-      }
-    };
-
-    socket.on('camera_status', handleCameraStatus);
-
-    return () => {
-      // Unsubscribe when component unmounts
-      try {
-        socket.emit('unsubscribe_camera', { camera_id: camId, token: authToken });
-      } catch (e) {}
-      removeSubscribedCamera(camId);
-      socket.off('camera_status', handleCameraStatus);
-      subscriptionRef.current = null;
-    };
-  }, [camId]);
+  });
 
   let content;
   let statusMessage = 'Connecting...';
   let statusColor = 'text-yellow-400';
-  
+
+  // Save a flattened snapshot (video frame + overlay) as a single JPEG.
+  // Skip capturing when using MJPEG to avoid the expensive per-frame canvas reads.
+  const saveFlattenedSnapshot = async () => {
+    if (streamMode === 'mjpeg') {
+      // Skip MJPEG captures to avoid extra decode/copy overhead on client
+      return null;
+    }
+
+    const container = wrapperRef.current;
+    const videoEl = videoRef.current;
+    if (!container) return null;
+
+    // Pick the source element: prefer video for WebRTC/HLS
+    let sourceEl = null;
+    if (videoEl && (streamMode === 'webrtc' || streamMode === 'hls')) {
+      sourceEl = videoEl;
+    } else {
+      sourceEl = container.querySelector('canvas');
+    }
+    if (!sourceEl) return null;
+
+    const srcWidth = sourceEl.videoWidth || sourceEl.naturalWidth || sourceEl.width || sourceEl.offsetWidth;
+    const srcHeight = sourceEl.videoHeight || sourceEl.naturalHeight || sourceEl.height || sourceEl.offsetHeight;
+    if (!srcWidth || !srcHeight) return null;
+
+    const exportCanvas = document.createElement('canvas');
+    exportCanvas.width = srcWidth;
+    exportCanvas.height = srcHeight;
+    const ctx = exportCanvas.getContext('2d');
+
+    try {
+      ctx.drawImage(sourceEl, 0, 0, srcWidth, srcHeight);
+    } catch (e) {
+      console.error('drawImage failed', e);
+      return null;
+    }
+
+    // Draw detections (normalized coords expected)
+    if (overlayEnabled && Array.isArray(detections)) {
+      const fontSize = Math.max(12, Math.round(srcWidth / 100));
+      ctx.font = `${fontSize}px sans-serif`;
+      ctx.textBaseline = 'top';
+      detections.forEach(det => {
+        const [nx, ny, nw, nh] = det.box || [0,0,0,0];
+        const x = Math.round(nx * srcWidth);
+        const y = Math.round(ny * srcHeight);
+        const w = Math.round(nw * srcWidth);
+        const h = Math.round(nh * srcHeight);
+
+        ctx.strokeStyle = '#00ff00';
+        ctx.lineWidth = Math.max(2, Math.round(srcWidth / 400));
+        ctx.strokeRect(x, y, w, h);
+
+        const label = `${det.label} ${Math.round((det.confidence||0) * 100)}%`;
+        const padding = 4;
+        const textWidth = Math.ceil(ctx.measureText(label).width) + padding * 2;
+        const textHeight = fontSize + 4;
+        ctx.fillStyle = 'rgba(0,255,0,0.85)';
+        ctx.fillRect(x, Math.max(0, y - textHeight), textWidth, textHeight);
+        ctx.fillStyle = '#000';
+        ctx.fillText(label, x + padding, Math.max(0, y - textHeight + 2));
+      });
+    }
+
+    // Trigger download of merged JPEG
+    return new Promise((resolve) => {
+      exportCanvas.toBlob((blob) => {
+        if (!blob) return resolve(null);
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `snapshot_${camId || 'camera'}_${Date.now()}.jpg`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+        resolve(blob);
+      }, 'image/jpeg', 0.9);
+    });
+  };
+
+
   if (cameraStatus === 'reconnecting') {
     statusMessage = 'Reconnecting...';
     statusColor = 'text-yellow-400';
@@ -500,6 +158,9 @@ function VideoFeed({
   } else if (cameraStatus === 'error') {
     statusMessage = 'Camera Error';
     statusColor = 'text-red-400';
+  } else if (cameraStatus === 'online') {
+    statusMessage = 'Online';
+    statusColor = 'text-green-400';
   }
 
   if (noDisplay) {
@@ -532,23 +193,31 @@ function VideoFeed({
             onStatusChange={setCameraStatus}
           />
         )}
-        
-        {/* Loading/Error overlay (only visible when MJPEG is not connecting) */}
-        {cameraStatus !== 'online' && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/70">
-            <svg className="animate-spin h-12 w-12 mb-2 text-gray-500" fill="none" viewBox="0 0 24 24">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-            </svg>
-            <span className={statusColor}>{statusMessage}</span>
-          </div>
-        )}
+        {/* Detections overlay (normalized coords 0..1) */}
+        <div className="absolute inset-0 pointer-events-none">
+          {detections.filter(d => (d.confidence || 0) >= confidenceThreshold).map((det, idx) => {
+            const box = det.box || [0,0,0,0];
+            const left = `${(box[0] * 100).toFixed(4)}%`;
+            const top = `${(box[1] * 100).toFixed(4)}%`;
+            const width = `${(box[2] * 100).toFixed(4)}%`;
+            const height = `${(box[3] * 100).toFixed(4)}%`;
+            return (
+              <div key={idx} style={{ position: 'absolute', left, top, width, height }}>
+                <div style={{ position: 'absolute', inset: 0, border: '2px solid #00ff00', boxSizing: 'border-box' }} />
+                <div style={{ position: 'absolute', left: 0, top: 0, backgroundColor: 'rgba(0,255,0,0.85)', color: '#000', padding: '2px 6px', fontSize: '12px', fontFamily: 'sans-serif' }}>
+                  {det.label} {Math.round((det.confidence || 0) * 100)}%
+                </div>
+              </div>
+            );
+          })}
+        </div>
       </>
     );
   }
 
   return (
     <div
+      ref={wrapperRef}
       className={`group bg-black rounded-none shadow-md overflow-hidden border-2 border-gray-700 relative ${
         !isFocused ? 'cursor-pointer hover:border-teal-500 transition-all' : 'border-teal-600'
       }`}
@@ -560,14 +229,23 @@ function VideoFeed({
           <h4 className="font-semibold text-sm truncate">{cameraName}</h4>
           <p className="text-xs text-gray-400 truncate font-normal">{location}</p>
         </div>
-        {/* Status Indicator Dot */}
-        <span className={`w-2 h-2 rounded-full ${
-          cameraStatus === 'online' ? 'bg-green-500' :
-          cameraStatus === 'offline' ? 'bg-red-500' :
-          cameraStatus === 'error' ? 'bg-red-600' :
-          cameraStatus === 'reconnecting' ? 'bg-yellow-500 animate-pulse' :
-          'bg-yellow-500'
-        }`}></span>
+        {/* Save snapshot button + Status Indicator */}
+        <div className="flex items-center gap-2">
+          <button
+            onClick={(e) => { e.stopPropagation(); saveFlattenedSnapshot(); }}
+            className="p-1 bg-black/40 rounded text-white hover:bg-black/60"
+            title="Save snapshot"
+          >
+            <FaCamera />
+          </button>
+          <span className={`w-2 h-2 rounded-full ${
+            cameraStatus === 'online' ? 'bg-green-500' :
+            cameraStatus === 'offline' ? 'bg-red-500' :
+            cameraStatus === 'error' ? 'bg-red-600' :
+            cameraStatus === 'reconnecting' ? 'bg-yellow-500 animate-pulse' :
+            'bg-yellow-500'
+          }`}></span>
+        </div>
       </div>
 
       {/* Video Area */}
@@ -577,6 +255,13 @@ function VideoFeed({
         }`}
         style={isFocused ? { width: '100%', height: 'calc(100vh - 6rem)', maxHeight: 'calc(100vh - 6rem)' } : {}}
       >
+        {/* Loading overlay: only show if not online and not noDisplay */}
+        {(!noDisplay && cameraStatus !== 'online') && (
+          <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-black/70 text-white">
+            <div className="text-lg font-semibold mb-2">{statusMessage}</div>
+            <div className="w-8 h-8 border-4 border-t-transparent border-yellow-400 rounded-full animate-spin mb-2" />
+          </div>
+        )}
         {content}
 
         {/* CCTV Timestamp Overlay */}
