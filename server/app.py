@@ -27,8 +27,8 @@ from src.routes.contact_routes import router as contact_router
 from src.routes.video_routes import router as video_router
 from src.utils.auth import get_token_user_id_from_header
 
-# Import the background stream logic from the camera controller
-from src.controllers.camera_controller import ensure_mediamtx_running, start_camera_processing, analyze_camera_snapshot, YOLO_MODEL
+# Streaming controller imports removed per user request
+# from src.controllers.camera_controller import ensure_mediamtx_running, start_camera_processing, analyze_camera_snapshot, YOLO_MODEL
 import cv2
 import numpy as np
 
@@ -50,10 +50,7 @@ else:
 # --- 2. Socket.IO (ASGI) - centralized in socket_manager to prevent circular imports ---
 from src.services.socket_manager import socketio_server, connected_sids
 
-import redis.asyncio as aioredis
-
-# Async redis pool used for streaming frames without blocking the event loop
-redis_pool = aioredis.from_url("redis://localhost:6379", decode_responses=False)
+# Streaming-specific async redis pool removed
 
 # --- 3. FASTAPI app with lifespan ---
 from contextlib import asynccontextmanager
@@ -67,21 +64,7 @@ async def lifespan(app: FastAPI):
     print("[INFO] Connecting to Prisma DB...")
     await db.connect()
 
-    # Ensure local RTSP proxy (MediaMTX) is up before camera loops start.
-    try:
-        mtx_ok = await ensure_mediamtx_running()
-        if not mtx_ok:
-            print("[WARN] MediaMTX is not reachable on :8554; local RTSP proxy streams may fail.")
-    except Exception as e:
-        print(f"[WARN] MediaMTX startup check failed: {e}")
-
-    # Start the background camera stream loop (emits frames via Socket.IO)
-    # This is what powers the live stream view in the AGAPAI UI.
-    try:
-        asyncio.create_task(start_camera_processing())
-        print("[INFO] Started camera processing loop.")
-    except Exception as e:
-        print(f"[WARN] Failed to start camera processing loop: {e}")
+    # Streaming startup disabled per user request (starting from scratch)
 
     yield
     # --- Shutdown Logic ---
@@ -147,50 +130,7 @@ async def get_published_cameras():
         return JSONResponse(status_code=500, content={'error': str(e)})
 
 
-@app.get('/video_feed')
-async def video_feed(camera_id: str | None = None):
-    stream_key = f"latest_frame_{camera_id}" if camera_id else "latest_frame"
-
-    async def generate():
-        last_frame_data = None
-        stale_count = 0
-        
-        while True:
-            frame_bytes = await redis_pool.get(stream_key)
-
-            if not frame_bytes:
-                await asyncio.sleep(0.01)
-                continue
-
-            # Ensure frame_bytes is actually bytes, not a string
-            if isinstance(frame_bytes, str):
-                frame_bytes = frame_bytes.encode('latin-1')
-
-            # Freshness check: track consecutive identical frames
-            if frame_bytes == last_frame_data:
-                stale_count += 1
-            else:
-                stale_count = 0
-                last_frame_data = frame_bytes
-
-            # If frame hasn't changed for ~3 seconds (100 frames at 30fps), close connection
-            if stale_count > 100:
-                print(f"[STALE] Stream {stream_key} has no new frames for ~3 seconds. Closing connection.")
-                break
-
-            yield (
-                b'--frame\r\n'
-                b'Content-Type: image/jpeg\r\n'
-                b'Content-Length: ' + str(len(frame_bytes)).encode() + b'\r\n\r\n'
-                + frame_bytes + b'\r\n'
-            )
-
-            await asyncio.sleep(0.03)
-
-    return StreamingResponse(
-        generate(),
-        media_type='multipart/x-mixed-replace; boundary=frame'
-    )
+# Streaming MJPEG endpoint removed per user request
 
 # --- 7. Snapshot static folder (used for alert snapshots) ---
 SNAPSHOTS_DIR = os.path.join(os.path.dirname(__file__), 'static', 'snapshots')

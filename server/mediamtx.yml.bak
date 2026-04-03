@@ -3,7 +3,10 @@ apiAddress: :9997
 hls: true
 hlsAllowOrigin: '*'
 hlsAlwaysRemux: true
-paths: {}
+paths:
+  cam1:
+    source: rtsp://admin:pass@192.168.254.211:554/cam/realmonitor?channel=1&subtype=1
+    sourceOnDemand: true
 webrtc: true
 webrtcAddress: :8889
 webrtcAllowOrigin: '*'

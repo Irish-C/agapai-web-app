@@ -46,11 +46,11 @@ export default function CameraTable({ cameras, locations, editingCam, setEditing
                   }
 
                   if (editingCam?.id === cam.id) {
+                    // When editing, the inline action buttons are redundant because
+                    // the expanded edit form below already provides Save/Cancel.
+                    // Show a small editing indicator instead to avoid duplication.
                     return (
-                      <ActionButtons buttons={[
-                        { label: 'Save', onClick: onUpdate, className: 'bg-green-600 text-white text-xs py-1 px-2 rounded hover:bg-green-700 font-semibold' },
-                        { label: 'Cancel', onClick: () => setEditingCam(null), className: 'bg-gray-500 text-white text-xs py-1 px-2 rounded hover:bg-gray-600 font-semibold' },
-                      ]} />
+                      <div className="text-sm text-gray-600 font-medium">Editing...</div>
                     );
                   }
 

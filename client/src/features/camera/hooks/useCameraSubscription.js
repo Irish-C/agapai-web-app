@@ -31,15 +31,12 @@ export function useCameraSubscription(camId, onCameraError) {
       subscriptionRef.current = null;
     }
 
-    // Listen for camera status events (only for critical errors, don't override local MJPEG status)
+    // Listen for camera status events and relay critical errors
     const handleCameraStatus = (data) => {
       if (data.cam_id === String(camId)) {
-        // Only override if it's a critical error, otherwise trust MJPEG stream status
         if (data.status === 'error') {
           onCameraError?.('error');
         }
-        // For 'offline' from backend, only set if MJPEG hasn't connected yet
-        // If MJPEG is streaming, that's more reliable than backend status
       }
     };
 

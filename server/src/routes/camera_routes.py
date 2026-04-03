@@ -9,11 +9,9 @@ from src.controllers.camera_controller import (
     get_cameras_logic,
     create_camera_logic,
     get_camera_logic,
-    stream_camera_loop,
     update_camera_logic,
-    delete_camera_logic
+    delete_camera_logic,
 )
-from src.controllers.camera_controller import publish_camera_to_mediamtx, unpublish_camera_from_mediamtx
 from src.utils.auth import get_current_user_id, require_admin_user_id
 
 router = APIRouter()
@@ -36,14 +34,9 @@ async def create_camera(camera_data: dict, user_id: str = Depends(require_admin_
     result, code = await create_camera_logic(camera_data)
     
     # 2. If the database save was successful (201 Created)
+    # Streaming/background capture has been removed; do not start stream tasks here.
     if code == 201:
-        # Start the OpenCV background stream immediately for this new camera
-        # Note: result['camera_id'] comes from your controller as a string
-        cam_id = int(result['camera_id'])
-        rtsp_url = camera_data.get('stream_url')
-        
-        print(f"Manual Add: Starting background stream for Camera {cam_id}")
-        asyncio.create_task(stream_camera_loop(cam_id, rtsp_url))
+        pass
         
     return safe_json_response(status_code=code, content=result)
 
@@ -61,17 +54,13 @@ async def delete_camera(camera_id: int, user_id: str = Depends(require_admin_use
 
 
 @router.post('/cameras/{camera_id}/publish')
-async def publish_camera(camera_id: int, user_id: str = Depends(require_admin_user_id)):
-    """Create/update MediaMTX path for camera and restart MediaMTX."""
-    result, code = await publish_camera_to_mediamtx(camera_id)
-    return safe_json_response(status_code=code, content=result)
+async def publish_camera_disabled(camera_id: int, user_id: str = Depends(require_admin_user_id)):
+    return safe_json_response(status_code=410, content={'status': 'disabled', 'message': 'Publish endpoint removed'})
 
 
 @router.post('/cameras/{camera_id}/unpublish')
-async def unpublish_camera(camera_id: int, user_id: str = Depends(require_admin_user_id)):
-    """Remove camera path from MediaMTX and restart MediaMTX."""
-    result, code = await unpublish_camera_from_mediamtx(camera_id)
-    return safe_json_response(status_code=code, content=result)
+async def unpublish_camera_disabled(camera_id: int, user_id: str = Depends(require_admin_user_id)):
+    return safe_json_response(status_code=410, content={'status': 'disabled', 'message': 'Unpublish endpoint removed'})
 
 
 @router.post('/set_active_camera')

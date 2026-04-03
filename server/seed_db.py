@@ -2,11 +2,15 @@ import asyncio
 import os
 from datetime import UTC, datetime, timedelta
 from database import db
+from pathlib import Path
+from dotenv import load_dotenv
 from werkzeug.security import generate_password_hash
 
-from pathlib import Path
-import os
-from dotenv import load_dotenv
+env_path = Path(__file__).parent / '.env'
+load_dotenv(dotenv_path=env_path)
+
+print(f"DEBUG: Loading .env from {env_path}")
+print(f"DEBUG: Password found: {'Yes' if os.getenv('AGAPAI_SEED_PASSWORD') else 'No'}")
 
 async def seed_database():
     try:
@@ -113,19 +117,19 @@ async def seed_database():
         print(" ✓ Event types/classes processed.")
 
         # ===== 5. SEED CAMERAS =====
-        print("\nSeeding cameras...")
-        for loc_name, loc_id in created_locs.items():
-            cam_name = f"{loc_name} Camera"
-            existing_cam = await db.camera.find_first(where={'cam_name': cam_name})
-            if not existing_cam:
-                await db.camera.create(
-                    data={
-                        'cam_name': cam_name,
-                        'cam_status': True,
-                        'stream_url': f"rtsp://{loc_name.lower().replace(' ', '')}.local/stream",
-                        'loc_id': loc_id
-                    }
-                )
+        # print("\nSeeding cameras...")
+        # for loc_name, loc_id in created_locs.items():
+        #     cam_name = f"{loc_name} Camera"
+        #     existing_cam = await db.camera.find_first(where={'cam_name': cam_name})
+        #     if not existing_cam:
+        #         await db.camera.create(
+        #             data={
+        #                 'cam_name': cam_name,
+        #                 'cam_status': True,
+        #                 'stream_url': f"rtsp://{loc_name.lower().replace(' ', '')}.local/stream",
+        #                 'loc_id': loc_id
+        #             }
+        #         )
 
         # ===== 6. SEED EVENT LOGS FOR REPORTS =====
         print("\nSeeding report logs...")

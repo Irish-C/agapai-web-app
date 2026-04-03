@@ -37,18 +37,8 @@ export default function CameraGrid() {
 
     const focusedCamera = cameraList.find(c => c.id === focusedCameraId);
 
-    // Helper to generate a stream URL. Preference can be set via VITE_PREFERRED_STREAM
-    // Supported: 'hls' (returns MediaMTX HLS .m3u8) or 'webrtc' (returns a sentinel webrtc URL)
-    const getStreamUrl = (camId) => {
-        const preferred = import.meta.env.VITE_PREFERRED_STREAM || 'hls';
-        if (String(preferred).toLowerCase() === 'webrtc') {
-            // VideoFeed treats URLs containing 'webrtc' or '/whep' as a hint to use WHEP/WebRTC.
-            return `webrtc://camera/${camId}`;
-        }
-
-        const serverUrl = import.meta.env.VITE_MEDIAMTX_URL || 'http://127.0.0.1:8888';
-        return `${serverUrl.replace(/\/$/, '')}/${camId}/index.m3u8`;
-    };
+    // Streaming URL generation removed; pass null to render UI placeholders.
+    const getStreamUrl = (_camId) => null;
 
     const header = (
         <div className="flex items-center text-2xl font-extrabold text-gray-900 mb-4 border-b pb-2">
@@ -86,7 +76,7 @@ export default function CameraGrid() {
                         key={focusedCamera.id}
                         camId={focusedCamera.id}
                         location={focusedCamera.location_name || focusedCamera.location || focusedCamera.loc_name}
-                        streamUrl={getStreamUrl(focusedCamera.id)} // Use HLS stream URL
+                        streamUrl={null} // streaming removed; placeholder
                         frameData={cameraData[focusedCamera.id]}
                         isConnected={isConnected}
                         isFocused={true}
@@ -107,7 +97,7 @@ export default function CameraGrid() {
                                         <VideoFeed
                                             camId={camera.id}
                                             location={camera.location_name || camera.location || camera.loc_name}
-                                            streamUrl={getStreamUrl(camera.id)} // Use HLS stream URL
+                                            streamUrl={null} // streaming removed; placeholder
                                             frameData={cameraData[camera.id]}
                                             isConnected={isConnected}
                                             isFocused={false}

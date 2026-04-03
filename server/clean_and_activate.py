@@ -12,9 +12,9 @@ async def fix():
     all_cameras = await db.camera.find_many()
     print(f"\nFound {len(all_cameras)} cameras total\n")
     
-    # Delete all .local and localhost cameras
+    # Delete all .local cameras
     for cam in all_cameras:
-        if '.local' in cam.stream_url or 'localhost' in cam.stream_url.lower():
+        if '.local' in cam.stream_url.lower():
             print(f"DELETE: {cam.cam_name} (URL: {cam.stream_url})")
             await db.camera.delete(where={'id': cam.id})
     

@@ -4,10 +4,10 @@
 /* 2. Set default styles for entire app */
 @layer base {
   html, body, #root {
-    @apply h-full;
+    height: 100%;
   }
   body {
-    @apply bg-gray-100;
+    background-color: #f3f4f6;
     font-family: 'Inter', system-ui, sans-serif;
   }
 }
@@ -21,38 +21,100 @@
 /* 3. Reusable AGAPAI component classes */
 @layer components {
   .header-main {
-    @apply flex justify-between items-center px-4 h-16;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-left: 1rem;
+    padding-right: 1rem;
+    height: 4rem;
     background-color: #1E3A5F;
   }
 
   .navbar-main {
-    @apply flex justify-between items-center px-4 h-14;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-left: 1rem;
+    padding-right: 1rem;
+    height: 3.5rem;
     background-color: #3FA7A0;
   }
 
   .subnavbar-main {
-    @apply px-4 py-2;
+    padding-left: 1rem;
+    padding-right: 1rem;
+    padding-top: 0.5rem;
+    padding-bottom: 0.5rem;
     background-color: #E0E0E0;
   }
 
   .btn-subnav {
-    @apply px-3 py-1 bg-white rounded-md shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50;
+    padding-left: 0.75rem;
+    padding-right: 0.75rem;
+    padding-top: 0.25rem;
+    padding-bottom: 0.25rem;
+    background-color: #ffffff;
+    border-radius: 0.375rem;
+    box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+    font-weight: 500;
+    color: #374151;
   }
 
   .btn-nav-active {
-    @apply px-3 py-1 rounded-md text-sm font-medium shadow-inner bg-teal-700 text-white;
+    padding-left: 0.75rem;
+    padding-right: 0.75rem;
+    padding-top: 0.25rem;
+    padding-bottom: 0.25rem;
+    border-radius: 0.375rem;
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+    font-weight: 500;
+    box-shadow: inset 0 2px 4px 0 rgb(0 0 0 / 0.05);
+    background-color: #0f766e;
+    color: #ffffff;
   }
 
   .btn-nav-inactive {
-    @apply px-3 py-1 rounded-md text-sm font-medium text-white hover:bg-teal-600;
+    padding-left: 0.75rem;
+    padding-right: 0.75rem;
+    padding-top: 0.25rem;
+    padding-bottom: 0.25rem;
+    border-radius: 0.375rem;
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+    font-weight: 500;
+    color: #ffffff;
   }
 
   .btn-nav-admin {
-     @apply px-3 py-1 rounded-md text-sm font-medium transition-colors text-yellow-300 hover:bg-teal-600 hover:text-white;
+    padding-left: 0.75rem;
+    padding-right: 0.75rem;
+    padding-top: 0.25rem;
+    padding-bottom: 0.25rem;
+    border-radius: 0.375rem;
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+    font-weight: 500;
+    transition-property: color, background-color, border-color, text-decoration-color, fill, stroke;
+    transition-duration: 150ms;
+    color: #fcd34d;
   }
 
   .btn-logout {
-    @apply px-3 py-1 rounded-md text-sm font-medium transition-colors text-white bg-red-600 hover:bg-red-700;
+    padding-left: 0.75rem;
+    padding-right: 0.75rem;
+    padding-top: 0.25rem;
+    padding-bottom: 0.25rem;
+    border-radius: 0.375rem;
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+    font-weight: 500;
+    transition-property: color, background-color, border-color, text-decoration-color, fill, stroke;
+    transition-duration: 150ms;
+    color: #ffffff;
+    background-color: #dc2626;
   }
 }
 

@@ -15,7 +15,6 @@ For UI screenshots and product-level description, see [APP.md](APP.md).
 - [Prerequisites](#prerequisites)
 - [Quick Setup (dev)](#quick-setup-dev)
 - [Database: Prisma & Seeding](#database-prisma--seeding)
-- [MediaMTX (streaming)](#mediamtx-streaming)
 - [Troubleshooting](#troubleshooting)
 - [Project Structure](#project-structure)
 - [Contributing](#contributing)
@@ -122,22 +121,7 @@ python seed_db.py
 
 ---
 
-## MediaMTX (streaming)
-
-MediaMTX provides RTSP/HLS/WebRTC bridging for camera streams. Run the local binary:
-
-```powershell
-cd server
-# On Windows
-.\mediamtx.exe mediamtx.yml
-
-# On Linux/macOS
-./mediamtx mediamtx.yml
-```
-
-Edit `server/mediamtx.yml` to add RTSP camera sources. Default ports used by the project: 8554 (RTSP), 8888 (HLS), 8889 (WebRTC HTTP).
-
----
+<!-- MediaMTX streaming docs removed; the project no longer includes streaming runtime by default. -->
 
 ## Troubleshooting (common)
 

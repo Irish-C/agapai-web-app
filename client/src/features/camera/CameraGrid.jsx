@@ -102,14 +102,8 @@ export default function CameraGrid() {
     [publishedCameraList, focusedCameraId]
   );
 
-  const HLS_BASE_URL =
-    import.meta.env.VITE_MEDIAMTX_HLS_BASE_URL || 'http://127.0.0.1:8888';
-  const WEBRTC_BASE_URL =
-    import.meta.env.VITE_MEDIAMTX_WEBRTC_BASE_URL || 'http://127.0.0.1:8889';
-
+  // Streaming URL generation removed; frontend will render placeholders only.
   const getStreamPath = (camera) => camera.stream_path || camera.path || `cam${camera.id}`;
-  const getHlsUrl = (camera) => `${HLS_BASE_URL}/${getStreamPath(camera)}/index.m3u8`;
-  const getWebrtcUrl = (camera) => `${WEBRTC_BASE_URL}/${getStreamPath(camera)}/whep`;
 
   // Refresh cameras function
   const refreshCameras = useCallback(async () => {

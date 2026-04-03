@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev-client": "vite --host --config client/public/vite.config.js",
-    "dev-server": "cd server && REDIS_HOST=127.0.0.1 REDIS_PORT=6379 REDIS_DB=0 MEDIAMTX_URL=rtsp://127.0.0.1:8554 MEDAMTX_API=http://127.0.0.1:8080 MEDIAMTX_API=http://127.0.0.1:8080 ./venv/bin/python -m uvicorn app:asgi_app --reload --host 127.0.0.1 --port 5000 --log-level warning --no-access-log",
+    "dev-server": "cd server && ./venv/bin/python -m uvicorn app:asgi_app --reload --port 5000",
     "dev": "concurrently \"npm run dev-client\" \"npm run dev-server\"",
     "prisma:generate": "cd server && ./venv/bin/prisma py generate",
     "prisma:generate:node": "cd server && npx prisma generate --schema=./server/prisma/schema.prisma",

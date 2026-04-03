@@ -22,24 +22,23 @@ export default function VideoFeed({
 
   let content;
 
-  if (isConnected && hasStreamUrl && !hasFrameData) {
-    // Case 1: Connected, but the stream is not yet delivering frames (MJPEG stream placeholder).
-    // We display the URL as a debugging placeholder since the camera isn't running.
-    content = (
-      <div className="p-4 flex flex-col items-center justify-center h-full text-gray-400">
-        <FaLink className="text-4xl mb-2" />
-        <span className="font-semibold text-sm mb-1">Stream URL Confirmed:</span>
-        <a 
-          href={streamUrl} 
-          target="_blank" 
-          rel="noopener noreferrer"
-          className="text-xs break-all hover:underline text-teal-400"
-        >
-          {streamUrl}
-        </a>
-        <span className="mt-2 text-xs">Waiting for camera server to start streaming...</span>
-      </div>
-    );
+  if (isConnected && hasStreamUrl && !hasFrameData) {
+    // Stream URL present but no frames yet; show an informational placeholder
+    content = (
+      <div className="p-4 flex flex-col items-center justify-center h-full text-gray-400">
+        <FaLink className="text-4xl mb-2" />
+        <span className="font-semibold text-sm mb-1">Stream URL (inactive):</span>
+        <a
+          href={streamUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-xs break-all hover:underline text-teal-400"
+        >
+          {streamUrl}
+        </a>
+        <span className="mt-2 text-xs">No video frames available.</span>
+      </div>
+    );
   } else if (!isConnected) {
     // Case 2: WebSocket is globally disconnected
     content = (
@@ -66,11 +65,11 @@ export default function VideoFeed({
     );
 
   } else {
-    // Case 5: We have frame data from the socket stream (base64 rendering removed)
+    // Generic fallback when no frame data is present
     content = (
       <div className="flex flex-col items-center justify-center h-full text-yellow-500">
         <FaVideo className="text-4xl mb-2" />
-        <span>Direct MJPEG or binary streaming only. Base64 frames are not supported.</span>
+        <span>No video available.</span>
       </div>
     );
   }

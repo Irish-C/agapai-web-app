@@ -5,13 +5,11 @@ import { useState, useEffect, useRef } from 'react';
  * Handles YOLO inference requests, deduplication, and result state.
  * 
  * @param {React.RefObject} videoRef - Reference to video element
- * @param {React.RefObject} wrapperRef - Reference to wrapper element (for canvas access in MJPEG mode)
- * @param {string} streamMode - 'webrtc' | 'hls' | 'mjpeg'
  * @param {boolean} noDisplay - Whether to skip detection (disabled camera)
  * @param {string|number} camId - Camera ID for logging
  * @returns {Object} { detections, lastDetectionAt, confidenceThreshold, setConfidenceThreshold }
  */
-export function useObjectDetection(videoRef, wrapperRef, streamMode, noDisplay, camId) {
+export function useObjectDetection(videoRef, noDisplay, camId) {
   const [detections, setDetections] = useState([]);
   const [lastDetectionAt, setLastDetectionAt] = useState(0);
   const [confidenceThreshold, setConfidenceThreshold] = useState(0.5);
@@ -31,20 +29,12 @@ export function useObjectDetection(videoRef, wrapperRef, streamMode, noDisplay, 
       if (detectInflightRef.current) return; // only one inflight
       if (document.hidden) return; // don't run when tab hidden
       if (noDisplay) return; // skip when disabled
-      if (streamMode === 'mjpeg') return; // skip MJPEG to avoid overhead
 
       const videoEl = videoRef.current;
-      const container = wrapperRef.current;
-      let sourceEl = null;
-      if (videoEl && (streamMode === 'webrtc' || streamMode === 'hls')) {
-        sourceEl = videoEl;
-      } else if (container) {
-        sourceEl = container.querySelector('canvas');
-      }
-      if (!sourceEl) return;
+      if (!videoEl) return;
 
-      const srcWidth = sourceEl.videoWidth || sourceEl.naturalWidth || sourceEl.width || sourceEl.offsetWidth;
-      const srcHeight = sourceEl.videoHeight || sourceEl.naturalHeight || sourceEl.height || sourceEl.offsetHeight;
+      const srcWidth = videoEl.videoWidth || videoEl.naturalWidth || videoEl.width || videoEl.offsetWidth;
+      const srcHeight = videoEl.videoHeight || videoEl.naturalHeight || videoEl.height || videoEl.offsetHeight;
       if (!srcWidth || !srcHeight) return;
 
       // Compute scaled size keeping aspect ratio
@@ -63,7 +53,7 @@ export function useObjectDetection(videoRef, wrapperRef, streamMode, noDisplay, 
       captureCanvas.height = outH;
       const ctx = captureCanvas.getContext('2d');
       try {
-        ctx.drawImage(sourceEl, 0, 0, outW, outH);
+        ctx.drawImage(videoEl, 0, 0, outW, outH);
       } catch (e) {
         return;
       }
@@ -109,7 +99,7 @@ export function useObjectDetection(videoRef, wrapperRef, streamMode, noDisplay, 
 
     const id = setInterval(captureAndSend, INTERVAL);
     return () => { mounted = false; clearInterval(id); };
-  }, [streamMode, noDisplay, camId, videoRef, wrapperRef]);
+  }, [noDisplay, camId, videoRef]);
 
   // Clear detections if no new results arrive within STALE_TIMEOUT
   useEffect(() => {

@@ -44,24 +44,9 @@ Test checklist
 2) Enable Dev/Test mode
 - In the UI enable the dev toggle (or set `localStorage.setItem('camera_dev_mode','1')`) and refresh.
 
-3) Verify stream types
-- Confirm WebRTC stream shows when `streamUrl` contains `/whep` or mentions `webrtc`.
-- Confirm HLS (endswith `.m3u8`) and MJPEG fallbacks behave as expected.
-
-4) Overlay alignment (primary UX check)
-- While the camera is streaming (WebRTC/HLS preferred), check that detection boxes align with objects in the video.
-- Use moving, static, and close objects to validate bounding box location and size.
-- If misaligned, note whether the error is scale-only (consistent offset/scale) or dynamic (jittering).
-
-5) Confidence threshold and smoothing
+3) Overlay and snapshot checks
 - Toggle the confidence threshold (dev UI) and confirm low-confidence detections disappear.
-
-6) Snapshot (flattened) test
-- Click the snapshot button (camera icon).
-- Confirm a JPEG is downloaded that contains the video frame and the overlay boxes/labels baked into the image.
-
-7) MJPEG capture skip
-- Switch a camera to an MJPEG stream and confirm snapshot capture is skipped (to avoid expensive per-frame reads).
+- Click the snapshot button (camera icon) and confirm a JPEG is downloaded (placeholder snapshot if streaming not enabled).
 
 8) Single-inflight / throttling
 - In dev mode, verify the client doesn't issue overlapping `/detect` requests: open browser devtools → Network and ensure at most one outstanding `/detect` request.
