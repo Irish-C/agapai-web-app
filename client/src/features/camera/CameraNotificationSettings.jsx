@@ -17,7 +17,6 @@ const SETTINGS_DEFAULTS = {
     emit_inactivity: false,
     persist_inactivity: false,
     ai_enabled: true,
-    email_fallback: true,
 };
 
 // Notification sections configuration - easily extensible for new alert types
@@ -141,7 +140,6 @@ export default function CameraNotificationSettings() {
                     emit_inactivity: data.emit_inactivity === true,
                     persist_inactivity: data.persist_inactivity === true,
                     ai_enabled: data.ai_enabled === true,
-                    email_fallback: data.email_fallback === true,
                 });
                 setError(null);
             } catch (err) {
@@ -224,27 +222,6 @@ export default function CameraNotificationSettings() {
                         {error}
                     </div>
                 )}
-
-                <div className="space-y-4">
-                    {/* Email Fallback Toggle */}
-                    <SettingToggle
-                        label="Email Notification Fallback"
-                        description="Send email notifications if real-time WebSocket alerts fail"
-                        checked={globalSettings.email_fallback}
-                        onToggle={(v) => saveGlobalSettings({ email_fallback: v })}
-                        colorClass="peer-checked:bg-teal-600"
-                    />
-
-                    {/* Dynamic Notification Sections */}
-                    {NOTIFICATION_SECTIONS.map((section) => (
-                        <SettingsSection
-                            key={section.id}
-                            section={section}
-                            globalSettings={globalSettings}
-                            onToggle={saveGlobalSettings}
-                        />
-                    ))}
-                </div>
             </div>
 
             {/* AI DETECTION SECTION */}
