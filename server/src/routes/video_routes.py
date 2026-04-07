@@ -8,7 +8,6 @@ from fastapi.responses import StreamingResponse, JSONResponse
 import cv2
 import numpy as np
 import httpx
-import asyncio
 from urllib.parse import urlparse
 from pathlib import Path
 
@@ -16,8 +15,7 @@ from database import db
 from src.utils.input_sanitization import sanitize_input
 from src.utils.rate_limiter import enforce_ip_rate_limit
 from src.utils.drawing import draw_text_outline
-import redis.asyncio as aioredis
-from pathlib import Path
+from src.utils.redis_pool import RedisConnectionPool
 
 # Initialize YOLO model with GPU if available
 YOLO_MODEL = None
@@ -36,7 +34,7 @@ def _load_yolo_model():
             os.path.join(os.path.dirname(__file__), '..', '..', 'ml', 'best_openvino_model')
         )
         if not os.path.exists(model_path):
-            print(f"[video_routes] Model path not found: {model_path}")
+            print(f"[video_routes] [ERROR] Model path not found: {model_path}")
             return None
         
         # Check if it's an OpenVINO model
@@ -48,15 +46,16 @@ def _load_yolo_model():
         # OPENVINO_DEVICE env var controls actual device (CPU/GPU/HETERO:GPU,CPU)
         YOLO_MODEL = YOLO(model_path, task='detect')
         ov_device = os.environ.get('OPENVINO_DEVICE') or os.environ.get('DEVICE') or 'HETERO:GPU,CPU'
-        print(f"[video_routes] YOLO model loaded (OpenVINO={is_ov_model}, device={ov_device})")
+        try:
+            has_cuda = YOLO_MODEL.device.type != 'cpu' if hasattr(YOLO_MODEL, 'device') else False
+            actual_device = 'GPU' if has_cuda else 'CPU'
+        except:
+            actual_device = 'UNKNOWN'
+        print(f"[video_routes] [AI] ACTIVITY DETECTION MODEL LOADED - OpenVINO model ready (configured={ov_device}, actual={actual_device})")
         return YOLO_MODEL
     except Exception as e:
-        print(f"[video_routes] Failed to load YOLO model: {e}")
+        print(f"[video_routes] [ERROR] Failed to load activity detection model: {e}")
         return None
-
-# Async Redis pool to avoid blocking the event loop when waiting for frames
-REDIS_URL = os.getenv('REDIS_URL', 'redis://127.0.0.1:6379')
-redis_pool = aioredis.from_url(REDIS_URL, decode_responses=False)
 
 router = APIRouter()
 
@@ -146,6 +145,7 @@ async def detect_endpoint(request: Request):
             ai_enabled = True
 
         if not ai_enabled:
+            print(f"[detect] [OFF] ACTIVITY DETECTION DISABLED - Skipping inference")
             req_ts = request.headers.get('X-Request-Ts') or request.headers.get('X-Request-Timestamp')
             return JSONResponse(content={
                 'request_timestamp': int(req_ts) if req_ts and str(req_ts).isdigit() else int(time.time() * 1000),
@@ -193,17 +193,22 @@ async def detect_endpoint(request: Request):
             _load_yolo_model()
         
         if YOLO_MODEL is None:
-            return JSONResponse(status_code=503, content={'status': 'error', 'message': 'AI model not loaded'})
+            return JSONResponse(status_code=503, content={'status': 'error', 'message': 'Activity detection model not loaded'})
 
         # Run inference off the event loop
+        try:
+            ov_device = os.environ.get('OPENVINO_DEVICE') or os.environ.get('DEVICE') or 'HETERO:GPU,CPU'
+            print(f"[detect] [ON] ACTIVITY DETECTION ENABLED - Running inference (device={ov_device}, conf_threshold=0.3)")
+        except:
+            print(f"[detect] [ON] ACTIVITY DETECTION ENABLED - Running inference")
         try:
             t_infer_start = time.perf_counter()
             results = await asyncio.to_thread(lambda: YOLO_MODEL.predict(source=img, conf=0.3, imgsz=640, verbose=False))
             t_infer_end = time.perf_counter()
             infer_ms = (t_infer_end - t_infer_start) * 1000
-            print(f"[detect] Inference time: {infer_ms:.1f}ms")
+            print(f"[detect] [OK] Inference completed in {infer_ms:.1f}ms")
         except Exception as e:
-            print(f"[detect] YOLO inference error: {e}")
+            print(f"[detect] [ERROR] YOLO inference error: {e}")
             return JSONResponse(status_code=500, content={'status': 'error', 'message': 'Inference failed'})
 
         detections = []
@@ -230,7 +235,13 @@ async def detect_endpoint(request: Request):
                         except Exception:
                             continue
         except Exception as e:
-            print(f"[detect] Failed to parse results: {e}")
+            print(f"[detect] [ERROR] Failed to parse results: {e}")
+        
+        # Debug: Report detection count
+        if detections:
+            print(f"[detect] [DATA] Found {len(detections)} activity(ies): {[d['label'] for d in detections]}")
+        else:
+            print(f"[detect] [DATA] No activities detected in this frame")
 
         # Prepare response body
         response_body = {
@@ -303,7 +314,7 @@ async def detect_endpoint(request: Request):
             }
             if snapshot_url:
                 event['snapshot_url'] = snapshot_url
-            await redis_pool.publish(f"camera:{camera_id}:detections", json.dumps(event))
+            await RedisConnectionPool.publish_detection(camera_id, json.dumps(event))
         except Exception as e:
             print(f"[detect] Failed to publish detections to Redis: {e}")
 

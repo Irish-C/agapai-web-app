@@ -35,6 +35,7 @@ except Exception:
 # Import shared drawing utility
 try:
     from src.utils.drawing import draw_text_outline
+    from src.utils.redis_pool import RedisConnectionPool
 except Exception:
     # Fallback if import fails
     def draw_text_outline(img, text, pos, text_color=(0, 255, 0), bg_color=(0, 0, 0)):
@@ -45,6 +46,33 @@ except Exception:
         x, y = pos
         cv2.putText(img, text, (x, y), font, font_scale, bg_color, thickness + 2, cv2.LINE_AA)
         cv2.putText(img, text, (x, y), font, font_scale, text_color, thickness, cv2.LINE_AA)
+
+
+def get_activity_color(activity_label):
+    """Get RGB color based on activity type for visual distinction.
+    
+    Color scheme:
+    - Fall activities (HIGH PRIORITY): Red with cyan text
+    - Lying Down (ATTENTION): Brown with light blue text
+    - Sitting/Eating (NORMAL): Dark green with light green text
+    - Standing (NORMAL): Light green
+    - Walking (NORMAL): Cyan
+    - Default: White
+    """
+    fall_activities = ["Forward Fall", "Backward Fall", "Sideward Fall"]
+    
+    if activity_label in fall_activities:
+        return (0, 0, 255), (0, 255, 255)  # Red box, Cyan text - URGENT
+    elif activity_label == "Lying Down":
+        return (139, 69, 19), (100, 200, 255)  # Brown box, Light blue text - ATTENTION
+    elif activity_label in ["Sitting", "Eating"]:
+        return (0, 165, 0), (100, 255, 100)  # Darker green box, Light green text - SAFE
+    elif activity_label == "Standing":
+        return (0, 255, 0), (100, 200, 100)  # Green box, Green text - OK
+    elif activity_label == "Walking":
+        return (255, 0, 0), (100, 150, 255)  # Blue box, Light blue text - MOVING
+    else:
+        return (255, 255, 255), (200, 200, 200)  # White box, Gray text - DEFAULT
 
 
 def start_ffmpeg_push(width, height, fps, target):
@@ -79,12 +107,23 @@ def run_worker(src, target, camera_id, model_path=None):
             # OPENVINO_DEVICE env var controls actual device (CPU/GPU/HETERO:GPU,CPU)
             device = 'cpu' if is_ov_model else 'cpu'
             model = YOLO(model_path, task='detect')
-            print(f"processing_worker: YOLO model loaded (OpenVINO={is_ov_model})")
             ov_device = os.environ.get('OPENVINO_DEVICE') or os.environ.get('DEVICE') or 'HETERO:GPU,CPU'
-            print(f"processing_worker: OpenVINO device set to {ov_device}")
+            try:
+                has_cuda = model.device.type != 'cpu' if hasattr(model, 'device') else False
+                actual_device = 'GPU' if has_cuda else 'CPU'
+            except:
+                actual_device = 'UNKNOWN'
+            print(f"[processing_worker] [AI] Activity detection model loaded (OpenVINO={is_ov_model}, configured={ov_device}, actual={actual_device}) for camera {camera_id}")
+            print(f"[processing_worker] 🟢 ACTIVITY DETECTION ENABLED for camera {camera_id} using {actual_device}")
+            if hasattr(model, 'names'):
+                activities = list(model.names.values())
+                print(f"[processing_worker] [DEBUG] Detectable activities: {', '.join(activities)}")
+                print(f"[processing_worker] [DEBUG] ⚠️ Fall Detection: RED | Lying Down: BROWN | Sitting/Eating: GREEN | Standing: GREEN | Walking: BLUE")
         except Exception as e:
-            print(f"processing_worker: failed to load YOLO model: {e}")
+            print(f"[processing_worker] ❌ failed to load activity detection model: {e}")
             model = None
+    else:
+        print(f"[processing_worker] 🔴 ACTIVITY DETECTION DISABLED for camera {camera_id} (relay mode, pass-through)")
 
     running = True
 
@@ -95,23 +134,47 @@ def run_worker(src, target, camera_id, model_path=None):
     signal.signal(signal.SIGTERM, _sigterm)
     signal.signal(signal.SIGINT, _sigterm)
 
+    frame_counter = 0  # Counter for frame caching
+
     try:
         while running:
             ret, frame = cap.read()
             if not ret:
                 time.sleep(0.1)
                 continue
+            
+            frame_counter += 1
+            detection_count = 0
 
             if model is not None:
                 try:
                     # run inference on resized copy to keep speed
                     small = cv2.resize(frame, (640, int(640 * height / width)))
                     results = model.predict(source=small, conf=0.35, imgsz=640, verbose=False)
+                    
+                    # Debug: Log raw results
+                    if results and len(results) > 0:
+                        r = results[0]
+                        raw_boxes = getattr(r, 'boxes', None)
+                        if raw_boxes is not None:
+                            if len(raw_boxes) > 0:
+                                print(f"[processing_worker] [DEBUG] 🎯 Activity detection: {len(raw_boxes)} person activity(ies) detected")
+                                for i, box in enumerate(raw_boxes):
+                                    conf = float(box.conf[0]) if hasattr(box, 'conf') else 0.0
+                                    cls_id = int(box.cls[0]) if hasattr(box, 'cls') else 0
+                                    label = model.names.get(cls_id, f"Class {cls_id}") if hasattr(model, 'names') else f"Class {cls_id}"
+                                    icon = "🚨" if label in ["Forward Fall", "Backward Fall", "Sideward Fall"] else "👁️"
+                                    print(f"  {icon} Activity {i}: {label} (confidence={conf:.2%})")
+                    else:
+                        if frame_counter % 100 == 0:
+                            print(f"[processing_worker] [DEBUG] No activities detected in this frame")
+                    
                     if results and len(results) > 0:
                         r = results[0]
                         boxes = getattr(r, 'boxes', None)
                         if boxes is not None:
                             for box in boxes:
+                                detection_count += 1
                                 try:
                                     xy = box.xyxy[0]
                                     x1, y1, x2, y2 = [int(v) for v in xy]
@@ -124,38 +187,50 @@ def run_worker(src, target, camera_id, model_path=None):
                                     x1 = int(x1 * sx); x2 = int(x2 * sx)
                                     y1 = int(y1 * sy); y2 = int(y2 * sy)
                                     
-                                    # Get class label and determine color
+                                    # Get class label and activity-specific color
                                     label = model.names.get(cls_id, f"Class {cls_id}") if hasattr(model, 'names') else f"Class {cls_id}"
-                                    fall_classes = ["Forward Fall", "Backward Fall", "Sideward Fall"]
+                                    box_color, text_color = get_activity_color(label)
                                     
-                                    if label in fall_classes:
-                                        box_color = (0, 0, 255)  # Red for falls
-                                        text_color = (0, 255, 255)  # Cyan text
-                                    elif label in ["Lying Down"]:
-                                        box_color = (139, 69, 19)  # Brown for lying
-                                        text_color = (100, 200, 255)
-                                    elif label in ["Sitting", "Eating"]:
-                                        box_color = (72, 107, 18)  # Dark green for safe
-                                        text_color = (100, 255, 100)
-                                    else:
-                                        box_color = (0, 255, 0)  # Green default
-                                        text_color = (100, 255, 100)
+                                    # Draw bounding box with activity-specific color
+                                    cv2.rectangle(frame, (x1, y1), (x2, y2), box_color, 3)  # Thicker lines for visibility
                                     
-                                    # Draw bounding box
-                                    cv2.rectangle(frame, (x1, y1), (x2, y2), box_color, 2)
-                                    
-                                    # Draw label with confidence
-                                    label_text = f"{label} {conf:.2f}"
-                                    draw_text_outline(frame, label_text, (x1, y1 - 8), text_color, box_color)
-                                except Exception:
+                                    # Draw label with confidence and activity type
+                                    label_text = f"{label} {conf:.0%}"
+                                    draw_text_outline(frame, label_text, (x1, y1 - 10), text_color, box_color)
+                                except Exception as e:
+                                    print(f"[processing_worker] [ERROR] Failed to draw box: {e}")
                                     continue
-                except Exception:
-                    pass
+                except Exception as e:
+                    print(f"[processing_worker] [ERROR] YOLO inference error: {e}")
+                
+                # Debug: Report detection counts every 100 frames
+                if frame_counter % 100 == 0:
+                    if detection_count > 0:
+                        print(f"[processing_worker] [DATA] Camera {camera_id} Frame {frame_counter}: {detection_count} activity(ies) detected")
+                    else:
+                        print(f"[processing_worker] [DATA] Camera {camera_id} Frame {frame_counter}: No activities detected")
+            else:
+                # No model - relay mode (pass-through)
+                if frame_counter % 100 == 0:
+                    print(f"[processing_worker] [OFF] Camera {camera_id} Frame {frame_counter}: Relay mode (pass-through, no AI)")
 
+            # Send the drawn frame to ffmpeg for streaming
             try:
-                ff.stdin.write(frame.tobytes())
-            except Exception:
+                raw_data = frame.tobytes()
+                ff.stdin.write(raw_data)
+            except BrokenPipeError:
+                print(f"[processing_worker] [ERROR] ffmpeg pipe broken for camera {camera_id}")
                 break
+            except Exception as e:
+                print(f"[processing_worker] [ERROR] failed to write frame to ffmpeg: {e}")
+
+            # Cache the processed frame every 10 frames to Redis for quick retrieval
+            try:
+                if frame_counter % 10 == 0:
+                    _, frame_jpeg = cv2.imencode('.jpg', frame)
+                    RedisConnectionPool.cache_annotated_frame(camera_id, frame_jpeg.tobytes(), ttl=5)
+            except Exception as e:
+                print(f"processing_worker: failed to cache frame for camera {camera_id}: {e}")
 
         # clean shutdown
     finally:
