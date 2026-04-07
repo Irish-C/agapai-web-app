@@ -27,6 +27,19 @@ except Exception:
     YOLO = None
 
 
+def draw_text_outline(img, text, pos, text_color=(0, 255, 0), bg_color=(0, 0, 0)):
+    """Draw text with outline for better visibility."""
+    font = cv2.FONT_HERSHEY_DUPLEX
+    font_scale = 0.7
+    thickness = 1
+    x, y = pos
+    
+    # Draw background outline
+    cv2.putText(img, text, (x, y), font, font_scale, bg_color, thickness + 2, cv2.LINE_AA)
+    # Draw text
+    cv2.putText(img, text, (x, y), font, font_scale, text_color, thickness, cv2.LINE_AA)
+
+
 def start_ffmpeg_push(width, height, fps, target):
     cmd = (
         f"ffmpeg -f rawvideo -pixel_format bgr24 -video_size {width}x{height} -framerate {fps} -i - "
@@ -95,12 +108,38 @@ def run_worker(src, target, camera_id, model_path=None):
                                 try:
                                     xy = box.xyxy[0]
                                     x1, y1, x2, y2 = [int(v) for v in xy]
+                                    conf = float(box.conf[0]) if hasattr(box, 'conf') else 0.0
+                                    cls_id = int(box.cls[0]) if hasattr(box, 'cls') else 0
+                                    
                                     # scale coords back to original frame size
                                     sx = frame.shape[1] / small.shape[1]
                                     sy = frame.shape[0] / small.shape[0]
                                     x1 = int(x1 * sx); x2 = int(x2 * sx)
                                     y1 = int(y1 * sy); y2 = int(y2 * sy)
-                                    cv2.rectangle(frame, (x1, y1), (x2, y2), (0,255,0), 2)
+                                    
+                                    # Get class label and determine color
+                                    label = model.names.get(cls_id, f"Class {cls_id}") if hasattr(model, 'names') else f"Class {cls_id}"
+                                    fall_classes = ["Forward Fall", "Backward Fall", "Sideward Fall"]
+                                    
+                                    if label in fall_classes:
+                                        box_color = (0, 0, 255)  # Red for falls
+                                        text_color = (0, 255, 255)  # Cyan text
+                                    elif label in ["Lying Down"]:
+                                        box_color = (139, 69, 19)  # Brown for lying
+                                        text_color = (100, 200, 255)
+                                    elif label in ["Sitting", "Eating"]:
+                                        box_color = (72, 107, 18)  # Dark green for safe
+                                        text_color = (100, 255, 100)
+                                    else:
+                                        box_color = (0, 255, 0)  # Green default
+                                        text_color = (100, 255, 100)
+                                    
+                                    # Draw bounding box
+                                    cv2.rectangle(frame, (x1, y1), (x2, y2), box_color, 2)
+                                    
+                                    # Draw label with confidence
+                                    label_text = f"{label} {conf:.2f}"
+                                    draw_text_outline(frame, label_text, (x1, y1 - 8), text_color, box_color)
                                 except Exception:
                                     continue
                 except Exception:
