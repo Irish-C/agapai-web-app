@@ -37,18 +37,10 @@ async def get_global_notifications_logic():
         gs = await db.globalsetting.find_first()
         if not gs:
             return {
-                'emit_fall': True,
-                'persist_fall': True,
-                'emit_inactivity': False,
-                'persist_inactivity': False,
                 'ai_enabled': True,
             }, 200
 
         return {
-            'emit_fall': bool(getattr(gs, 'emit_fall', True)),
-            'persist_fall': bool(getattr(gs, 'persist_fall', True)),
-            'emit_inactivity': bool(getattr(gs, 'emit_inactivity', False)),
-            'persist_inactivity': bool(getattr(gs, 'persist_inactivity', False)),
             'ai_enabled': bool(getattr(gs, 'ai_enabled', True)),
         }, 200
 
@@ -60,14 +52,6 @@ async def get_global_notifications_logic():
 async def save_global_notifications_logic(data):
     try:
         payload = {}
-        if 'emit_fall' in data:
-            payload['emit_fall'] = bool(data.get('emit_fall'))
-        if 'persist_fall' in data:
-            payload['persist_fall'] = bool(data.get('persist_fall'))
-        if 'emit_inactivity' in data:
-            payload['emit_inactivity'] = bool(data.get('emit_inactivity'))
-        if 'persist_inactivity' in data:
-            payload['persist_inactivity'] = bool(data.get('persist_inactivity'))
         if 'ai_enabled' in data:
             payload['ai_enabled'] = bool(data.get('ai_enabled'))
         # If a row exists, update it; otherwise create one

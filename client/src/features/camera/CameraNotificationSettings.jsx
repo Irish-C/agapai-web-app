@@ -12,55 +12,11 @@ const API_ENDPOINT = '/api/settings/notifications/global';
 
 // Default values for all settings
 const SETTINGS_DEFAULTS = {
-    emit_fall: true,
-    persist_fall: true,
-    emit_inactivity: false,
-    persist_inactivity: false,
     ai_enabled: true,
 };
 
 // Notification sections configuration - easily extensible for new alert types
-const NOTIFICATION_SECTIONS = [
-    {
-        id: 'fall',
-        icon: '',
-        title: 'Fall Detection Alerts',
-        toggles: [
-            {
-                label: 'Real-time Alerts (WebSocket)',
-                description: 'Send immediate popup notifications when a fall is detected',
-                settingKey: 'emit_fall',
-                colorClass: 'peer-checked:bg-teal-600',
-            },
-            {
-                label: 'Save to History (Database)',
-                description: 'Record fall events with snapshots in Reports for later review',
-                settingKey: 'persist_fall',
-                colorClass: 'peer-checked:bg-teal-600',
-            },
-        ],
-    },
-    {
-        id: 'inactivity',
-        icon: '',
-        title: 'Inactivity Detection Alerts',
-        subtitle: 'Triggered when no person detected for 20+ seconds',
-        toggles: [
-            {
-                label: 'Real-time Alerts (WebSocket)',
-                description: 'Send immediate notification when inactivity is detected',
-                settingKey: 'emit_inactivity',
-                colorClass: 'peer-checked:bg-teal-600',
-            },
-            {
-                label: 'Save to History (Database)',
-                description: 'Record inactivity events in Reports for later review',
-                settingKey: 'persist_inactivity',
-                colorClass: 'peer-checked:bg-teal-600',
-            },
-        ],
-    },
-];
+const NOTIFICATION_SECTIONS = [];
 
 // ============================================================================
 // REUSABLE COMPONENTS
@@ -135,10 +91,6 @@ export default function CameraNotificationSettings() {
             try {
                 const data = await fetchApi('/settings/notifications/global', 'GET');
                 setGlobalSettings({
-                    emit_fall: data.emit_fall === true,
-                    persist_fall: data.persist_fall === true,
-                    emit_inactivity: data.emit_inactivity === true,
-                    persist_inactivity: data.persist_inactivity === true,
                     ai_enabled: data.ai_enabled === true,
                 });
                 setError(null);

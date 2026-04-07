@@ -78,6 +78,10 @@ async def lifespan(app: FastAPI):
     # --- Shutdown Logic ---
     print("[INFO] Closing Redis connection...")
     RedisConnectionPool.close()
+    try:
+        await RedisConnectionPool.close_async()
+    except Exception as e:
+        print(f"[WARN] Error closing async Redis client: {e}")
     print("[INFO] Disconnecting Prisma DB...")
     await db.disconnect()
     try:

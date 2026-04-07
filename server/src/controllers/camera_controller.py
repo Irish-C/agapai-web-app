@@ -147,14 +147,19 @@ async def publish_camera_to_mediamtx(camera_id):
 
         server_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '../..'))
         worker_py = os.path.join(server_root, 'src', 'workers', 'processing_worker.py')
+        model_path = os.path.join(server_root, 'ml', 'best_openvino_model')
+        venv_python = os.path.join(server_root, 'venv', 'bin', 'python')
 
         if ai_enabled:
             # spawn processing worker which handles inference + ffmpeg push
-            cmd = f"python3 {shlex.quote(worker_py)} --src {shlex.quote(original_rtsp)} --target {shlex.quote(full_target)} --camera_id {int(camera_id)}"
+            model_exists = os.path.exists(model_path)
+            print(f"[camera_controller] [ON] AI ENABLED for camera {camera_id} - spawning processing worker with YOLO inference (model: {model_path}, exists: {model_exists})")
+            cmd = f"{shlex.quote(venv_python)} {shlex.quote(worker_py)} --src {shlex.quote(original_rtsp)} --target {shlex.quote(full_target)} --camera_id {int(camera_id)} --model {shlex.quote(model_path)}"
             info = start_processed_push(cmd, camera_id)
             return {"status": "success", "mode": "processed", "worker": info}, 200
         else:
             # start a simple relay without AI
+            print(f"[camera_controller] [OFF] AI DISABLED for camera {camera_id} - using relay mode without processing")
             info = start_relay(original_rtsp, target_path, camera_id)
             return {"status": "success", "mode": "relay", "worker": info}, 200
     except Exception as e:

@@ -77,9 +77,12 @@ export default function CameraGrid() {
       try {
         const data = await fetchApi('/settings/notifications/global', 'GET');
         if (!mounted) return;
-        setAiEnabled(Boolean(data.ai_enabled));
+        const isEnabled = Boolean(data.ai_enabled);
+        setAiEnabled(isEnabled);
+        console.log(`[CameraGrid] [SETTING] AI is ${isEnabled ? '🟢 ENABLED' : '🔴 DISABLED'}`);
       } catch (e) {
         // keep default
+        console.warn('[CameraGrid] Failed to fetch AI settings:', e);
       }
     };
     getSettings();
@@ -220,8 +223,10 @@ export default function CameraGrid() {
           {(() => {
             // Dynamically build stream URL based on AI setting
             // Use relative proxy path /hls/ instead of hardcoded localhost:8888
-            const prefix = aiEnabled ? 'processed' : 'original';
-            const dynamicStreamUrl = `/hls/${prefix}/cam${focusedCamera.id}/index.m3u8`;
+            const prefix = aiEnabled ? 'processed' : 'cam'; // Use processed if AI enabled, otherwise use base cam stream
+            const streamPath = aiEnabled ? `${prefix}/cam${focusedCamera.id}` : `${prefix}${focusedCamera.id}`;
+            const dynamicStreamUrl = `/hls/${streamPath}/index.m3u8`;
+            console.log(`[CameraGrid] [STREAM] Focused camera ${focusedCamera.id}: using '${prefix}' stream (AI is ${aiEnabled ? '🟢 enabled' : '🔴 disabled'})`);
             return (
               <VideoFeed
                 key={focusedCamera.id}
@@ -244,8 +249,10 @@ export default function CameraGrid() {
                 {publishedCameraList.map((camera) => {
                   const location = camera.location_name || camera.location || camera.loc_name;
                   // Dynamically build stream URL based on AI setting
-                  const prefix = aiEnabled ? 'processed' : 'original';
-                  const dynamicStreamUrl = `/hls/${prefix}/cam${camera.id}/index.m3u8`;
+                  const prefix = aiEnabled ? 'processed' : 'cam'; // Use processed if AI enabled, otherwise use base cam stream
+                  const streamPath = aiEnabled ? `${prefix}/cam${camera.id}` : `${prefix}${camera.id}`;
+                  const dynamicStreamUrl = `/hls/${streamPath}/index.m3u8`;
+                  console.log(`[CameraGrid] [STREAM] Grid camera ${camera.id}: using '${prefix}' stream (AI is ${aiEnabled ? '🟢 enabled' : '🔴 disabled'})`);
                   return (
                     <div key={camera.id} className={publishedCameraList.length === 1 ? 'md:col-span-2' : ''}>
                       <VideoFeed

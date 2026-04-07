@@ -24,7 +24,6 @@ export default function CameraManager({ locations: initialLocations, onCameraUpd
   const [activeTab, setActiveTab] = useState('list');
   const [publishedCameras, setPublishedCameras] = useLocalStorageSet('publishedCameras');
   const [deleteModal, setDeleteModal] = useState({ open: false, type: '', id: null });
-  const [publishModal, setPublishModal] = useState({ open: false, id: null });
 
   const cam = useCameraManager(onCameraUpdated);
   const loc = useLocationManager();
@@ -78,29 +77,28 @@ export default function CameraManager({ locations: initialLocations, onCameraUpd
     await cam.updateCamera(cam.editingCam.id, { cam_name: cam.editingCam.cam_name, stream_url: ensureSubtype(cam.editingCam.stream_url), loc_id: parseInt(cam.editingCam.loc_id) || loc.locations[0]?.id });
   };
 
-  const handlePublish = async () => {
-    const isPublished = publishedCameras.has(publishModal.id);
+  const handlePublish = async (cameraId) => {
+    const isPublished = publishedCameras.has(cameraId);
     try {
       const fn = isPublished ? unpublishCamera : publishCamera;
-      const resp = await fn(publishModal.id);
+      const resp = await fn(cameraId);
       // If backend indicates mediamtx.yml was malformed, mark this camera as 'no display'
       if (resp && resp.no_display) {
         try {
-          localStorage.setItem(`camera_${publishModal.id}_no_display`, '1');
+          localStorage.setItem(`camera_${cameraId}_no_display`, '1');
         } catch (e) {}
       } else {
-        try { localStorage.removeItem(`camera_${publishModal.id}_no_display`); } catch (e) {}
+        try { localStorage.removeItem(`camera_${cameraId}_no_display`); } catch (e) {}
       }
       setPublishedCameras(p => {
         const u = new Set(p);
-        isPublished ? u.delete(publishModal.id) : u.add(publishModal.id);
+        isPublished ? u.delete(cameraId) : u.add(cameraId);
         return u;
       });
       cam.setMessage({ text: `${isPublished ? 'Unpublished' : 'Published'} successfully!`, type: 'success' });
     } catch (err) {
       cam.setMessage({ text: `Failed: ${err.message}`, type: 'error' });
     }
-    setPublishModal({ open: false, id: null });
   };
 
   const handleAddLocation = async (e) => {
@@ -131,7 +129,7 @@ export default function CameraManager({ locations: initialLocations, onCameraUpd
       {activeTab === 'list' && (
         cam.cameras.length === 0 
           ? <EmptyState Icon={FaCameraRetro} message="No cameras yet. Add a camera from the Add Camera tab." />
-          : <div className="max-h-screen overflow-y-auto pr-2"><CameraTable cameras={cam.cameras} locations={loc.locations} editingCam={cam.editingCam} setEditingCam={cam.setEditingCam} publishedCameras={publishedCameras} onEdit={(c) => cam.setEditingCam({ ...c, cam_name: c.name, stream_url: c.stream_url || '', loc_id: c.location_id || loc.locations[0]?.id })} onDelete={(id) => setDeleteModal({ open: true, type: 'camera', id })} onPublish={(id) => setPublishModal({ open: true, id })} onUpdate={handleUpdateCamera} readOnly={readOnly} /></div>
+          : <div className="max-h-screen overflow-y-auto pr-2"><CameraTable cameras={cam.cameras} locations={loc.locations} editingCam={cam.editingCam} setEditingCam={cam.setEditingCam} publishedCameras={publishedCameras} onEdit={(c) => cam.setEditingCam({ ...c, cam_name: c.name, stream_url: c.stream_url || '', loc_id: c.location_id || loc.locations[0]?.id })} onDelete={(id) => setDeleteModal({ open: true, type: 'camera', id })} onPublish={handlePublish} onUpdate={handleUpdateCamera} readOnly={readOnly} /></div>
       )}
 
       {!readOnly && activeTab === 'add' && (
@@ -165,7 +163,6 @@ export default function CameraManager({ locations: initialLocations, onCameraUpd
         </>
       )}
 
-      <Modal isOpen={publishModal.open} onClose={() => setPublishModal({ open: false, id: null })} title={`Confirm ${publishedCameras.has(publishModal.id) ? 'Unpublish' : 'Publish'}`} message={publishedCameras.has(publishModal.id) ? 'Unpublish from Dashboard?' : 'Publish to Dashboard?'} icon={FaCameraRetro} confirmText={publishedCameras.has(publishModal.id) ? 'Unpublish' : 'Publish'} onConfirm={handlePublish} isDangerous={false} />
       <Modal isOpen={deleteModal.open && deleteModal.type === 'camera'} onClose={() => setDeleteModal({ open: false, type: '', id: null })} title="Confirm Deletion" message={`Delete ${cam.cameras.find(c => c.id === deleteModal.id)?.name || 'camera'}?`} warning="This action cannot be undone." icon={FaTrash} confirmText="Delete" onConfirm={() => { cam.deleteCamera(deleteModal.id); setDeleteModal({ open: false, type: '', id: null }); }} isDangerous={true} />
       <Modal isOpen={deleteModal.open && deleteModal.type === 'location'} onClose={() => setDeleteModal({ open: false, type: '', id: null })} title="Confirm Deletion" message={`Delete ${loc.locations.find(l => l.id === deleteModal.id)?.name || 'location'}?`} warning="⚠️ Reassign/remove all cameras first." icon={FaTrash} confirmText="Delete" onConfirm={() => { loc.deleteLocation(deleteModal.id); setDeleteModal({ open: false, type: '', id: null }); }} isDangerous={true} />
     </div>

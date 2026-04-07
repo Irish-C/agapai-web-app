@@ -36,7 +36,13 @@ export default defineConfig({
       '/socket.io': { target: 'http://127.0.0.1:5000', ws: true, changeOrigin: true, secure: false },
       '/detect': { target: 'http://127.0.0.1:5000', changeOrigin: true, secure: false },
       // HLS streams from MediaMTX
-      '/hls': { target: 'http://127.0.0.1:8888', changeOrigin: true, secure: false }
+      // Browser requests: /hls/processed/cam1/index.m3u8
+      // Forward to: http://127.0.0.1:8888/processed/cam1/index.m3u8 (strip /hls/)
+      '/hls/': {
+        target: 'http://127.0.0.1:8888/',
+        changeOrigin: true,
+        secure: false
+      }
     }
   }
 });
