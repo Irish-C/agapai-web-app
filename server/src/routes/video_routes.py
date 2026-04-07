@@ -10,14 +10,47 @@ import numpy as np
 import httpx
 import asyncio
 from urllib.parse import urlparse
+from pathlib import Path
 
 from database import db
 from src.utils.input_sanitization import sanitize_input
 from src.utils.rate_limiter import enforce_ip_rate_limit
 import redis.asyncio as aioredis
-# Streaming and heavy inference helpers were removed. Keep a placeholder
-# so the detect endpoint can gracefully report model-unavailable.
+
+# Initialize YOLO model with GPU if available
 YOLO_MODEL = None
+_MODEL_LOAD_ATTEMPTED = False
+
+def _load_yolo_model():
+    """Lazily load YOLO model with GPU support via OpenVINO."""
+    global YOLO_MODEL, _MODEL_LOAD_ATTEMPTED
+    if _MODEL_LOAD_ATTEMPTED:
+        return YOLO_MODEL
+    
+    _MODEL_LOAD_ATTEMPTED = True
+    try:
+        from ultralytics import YOLO
+        model_path = os.path.abspath(
+            os.path.join(os.path.dirname(__file__), '..', '..', 'ml', 'best_openvino_model')
+        )
+        if not os.path.exists(model_path):
+            print(f"[video_routes] Model path not found: {model_path}")
+            return None
+        
+        # Check if it's an OpenVINO model
+        is_ov_model = os.path.isdir(model_path) and any(
+            p.endswith('.xml') or p.endswith('.bin') for p in os.listdir(model_path)
+        )
+        
+        # For OpenVINO models, pass device='cpu' to avoid CUDA errors
+        # OPENVINO_DEVICE env var controls actual device (CPU/GPU/HETERO:GPU,CPU)
+        YOLO_MODEL = YOLO(model_path, task='detect')
+        ov_device = os.environ.get('OPENVINO_DEVICE') or os.environ.get('DEVICE') or 'HETERO:GPU,CPU'
+        print(f"[video_routes] YOLO model loaded (OpenVINO={is_ov_model}, device={ov_device})")
+        return YOLO_MODEL
+    except Exception as e:
+        print(f"[video_routes] Failed to load YOLO model: {e}")
+        return None
 
 # Async Redis pool to avoid blocking the event loop when waiting for frames
 REDIS_URL = os.getenv('REDIS_URL', 'redis://127.0.0.1:6379')
@@ -153,6 +186,10 @@ async def detect_endpoint(request: Request):
         except Exception as e:
             return JSONResponse(status_code=400, content={'status': 'error', 'message': 'Invalid image data'})
 
+        if YOLO_MODEL is None:
+            # Try lazy loading on first request
+            _load_yolo_model()
+        
         if YOLO_MODEL is None:
             return JSONResponse(status_code=503, content={'status': 'error', 'message': 'AI model not loaded'})
 

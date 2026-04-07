@@ -14,15 +14,15 @@ if not os.path.exists(MODEL_PATH):
     print('[smoke_infer] Model path not found')
     sys.exit(3)
 
-ov_dev_env = os.environ.get('OPENVINO_DEVICE') or os.environ.get('DEVICE') or 'CPU'
+ov_dev_env = os.environ.get('OPENVINO_DEVICE') or os.environ.get('DEVICE') or 'HETERO:GPU,CPU'
 # If the model path looks like an OpenVINO export, tell ultralytics to use the
 # OpenVINO runtime (device='openvino') and rely on OPENVINO_DEVICE to select
-# the target device (CPU/GPU). Passing 'GPU' directly will be interpreted as
+# the target device (CPU/GPU/HETERO). Passing 'GPU' directly will be interpreted as
 # a CUDA device by ultralytics and will fail when torch has no CUDA available.
 is_ov_export = os.path.isdir(MODEL_PATH) and any(p.endswith('.xml') or p.endswith('.bin') for p in __import__('glob').glob(os.path.join(MODEL_PATH, '*')))
 # When using an OpenVINO-exported model, pass a CPU-like device to ultralytics
 # (for example 'cpu') and let the OpenVINO runtime pick the actual target via
-# the OPENVINO_DEVICE env var (e.g. 'GPU'). Passing 'GPU' directly is treated
+# the OPENVINO_DEVICE env var (e.g. 'HETERO:GPU,CPU'). Passing 'GPU' directly is treated
 # as a CUDA device by ultralytics and will error when CUDA isn't available.
 DEVICE = 'cpu' if is_ov_export else ov_dev_env
 print(f"[smoke_infer] Using predict device={DEVICE} (OPENVINO_DEVICE={ov_dev_env})")

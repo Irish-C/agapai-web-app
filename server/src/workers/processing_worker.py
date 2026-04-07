@@ -49,8 +49,19 @@ def run_worker(src, target, camera_id, model_path=None):
     model = None
     if YOLO and model_path:
         try:
-            model = YOLO(model_path)
-            print("processing_worker: YOLO model loaded")
+            # Detect if it's an OpenVINO model and use appropriate device
+            import os
+            is_ov_model = os.path.isdir(model_path) and any(
+                p.endswith('.xml') or p.endswith('.bin')
+                for p in os.listdir(model_path)
+            )
+            # For OpenVINO models, pass 'cpu' to avoid CUDA errors,
+            # OPENVINO_DEVICE env var controls actual device (CPU/GPU/HETERO:GPU,CPU)
+            device = 'cpu' if is_ov_model else 'cpu'
+            model = YOLO(model_path, task='detect')
+            print(f"processing_worker: YOLO model loaded (OpenVINO={is_ov_model})")
+            ov_device = os.environ.get('OPENVINO_DEVICE') or os.environ.get('DEVICE') or 'HETERO:GPU,CPU'
+            print(f"processing_worker: OpenVINO device set to {ov_device}")
         except Exception as e:
             print(f"processing_worker: failed to load YOLO model: {e}")
             model = None
