@@ -31,10 +31,6 @@ def test_toggle():
                 if gs:
                     print(f"✓ Global settings found:")
                     print(f"  - ai_enabled: {gs.ai_enabled}")
-                    print(f"  - emit_fall: {gs.emit_fall}")
-                    print(f"  - persist_fall: {gs.persist_fall}")
-                    print(f"  - emit_inactivity: {gs.emit_inactivity}")
-                    print(f"  - persist_inactivity: {gs.persist_inactivity}")
                     return gs
                 else:
                     print("✗ No global settings found!")
