@@ -75,12 +75,103 @@ def get_activity_color(activity_label):
         return (255, 255, 255), (200, 200, 200)  # White box, Gray text - DEFAULT
 
 
+def detect_encoder():
+    """Detect available video encoders and select best option for iGPU/CPU.
+    
+    Returns tuple: (encoder_name, encoder_opts, use_downsample)
+    - 'h264_qsv': Intel Quick Sync on iGPU (fastest, preferred)
+    - 'libx264': CPU fallback (requires resolution downsampling)
+    
+    Downsampling flag indicates if resolution should be reduced to maintain bitrate.
+    """
+    try:
+        # Check what encoders ffmpeg supports
+        result = subprocess.run(
+            ['ffmpeg', '-encoders', '-hide_banner'],
+            capture_output=True,
+            text=True,
+            timeout=5
+        )
+        encoders_output = result.stdout
+        
+        # Try Intel Quick Sync first (best for iGPU - h264_qsv)
+        if 'h264_qsv' in encoders_output:
+            print("[processing_worker] [ENCODER] ✓ Using Intel Quick Sync (h264_qsv) for iGPU encoding")
+            print("[processing_worker] [ENCODER]   - Encoding time: 5-10ms/frame")
+            print("[processing_worker] [ENCODER]   - Resolution: Full (1920×1080)")
+            encoder_opts = "-c:v h264_qsv -preset fast -load_plugin hevc_hw"
+            return 'h264_qsv', encoder_opts, False  # No downsampling needed
+        
+        # Fallback to CPU libx264 with ultrafast preset
+        elif 'libx264' in encoders_output:
+            print("[processing_worker] [ENCODER] ⚠ Using CPU libx264 (ultrafast preset)")
+            print("[processing_worker] [ENCODER]   - Encoding time: 15-20ms/frame")
+            print("[processing_worker] [ENCODER]   - Resolution: Downsampling to 1280×720")
+            print("[processing_worker] [ENCODER]   - Reason: Reduce bitrate for CPU encoding")
+            encoder_opts = "-c:v libx264 -preset ultrafast"
+            return 'libx264', encoder_opts, True  # Need downsampling for CPU
+        
+        else:
+            print("[processing_worker] [ENCODER] ⚠ No h264 encoder found, using default libx264")
+            return 'libx264', "-c:v libx264 -preset ultrafast", True
+            
+    except Exception as e:
+        print(f"[processing_worker] [ENCODER] ⚠ Encoder detection failed: {e}, using libx264")
+        return 'libx264', "-c:v libx264 -preset ultrafast", True
+
+
 def start_ffmpeg_push(width, height, fps, target):
+    """Start FFmpeg process with intelligent encoder selection.
+    
+    Detects available encoders (h264_qsv preferred for iGPU, libx264 fallback for CPU).
+    Automatically reduces resolution for CPU encoding to maintain manageable bitrate.
+    
+    Args:
+        width, height: Video dimensions (may be downsampled for CPU path)
+        fps: Frame rate (may be reduced for CPU path)
+        target: RTSP target URL for MediaMTX ingest
+        
+    Returns:
+        Process object with stdin pipe for raw BGR24 frames
+    """
+    encoder_name, encoder_opts, use_downsample = detect_encoder()
+    
+    # Store original dimensions for logging
+    orig_width, orig_height, orig_fps = width, height, fps
+    
+    # If CPU encoding, reduce resolution to manageable bitrate
+    # 1920×1080 @ 20fps = 14.4 MB/s raw data
+    # 1280×720 @ 15fps = 3.6 MB/s raw data (manageable on CPU)
+    if use_downsample and width > 1280:
+        scale_factor = 1280 / width
+        width = 1280
+        height = int(height * scale_factor)
+        fps = max(10, int(fps * scale_factor))  # Reduce fps slightly too
+        print(f"[processing_worker] [RESOLUTION] Reduced: {orig_width}×{orig_height}@{orig_fps}fps → {width}×{height}@{fps}fps")
+    
+    # Build FFmpeg command with detected encoder
     cmd = (
-        f"ffmpeg -f rawvideo -pixel_format bgr24 -video_size {width}x{height} -framerate {fps} -i - "
-        f"-c:v libx264 -preset veryfast -tune zerolatency -pix_fmt yuv420p -f rtsp {shlex.quote(target)}"
+        f"ffmpeg -f rawvideo -pixel_format bgr24 -video_size {width}x{height} "
+        f"-framerate {fps} -i - {encoder_opts} "
+        f"-pix_fmt yuv420p -bufsize 2M -f rtsp {shlex.quote(target)}"
     )
-    return subprocess.Popen(shlex.split(cmd), stdin=subprocess.PIPE)
+    
+    print(f"[processing_worker] [FFMPEG] Spawning encoder: {encoder_name}")
+    print(f"[processing_worker] [FFMPEG] Video params: {width}×{height}@{fps}fps")
+    print(f"[processing_worker] [FFMPEG] Target: {target}")
+    
+    try:
+        proc = subprocess.Popen(
+            shlex.split(cmd), 
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE
+        )
+        print(f"[processing_worker] [FFMPEG] Process started (PID: {proc.pid})")
+        return proc
+    except Exception as e:
+        print(f"[processing_worker] [ERROR] Failed to spawn FFmpeg: {e}")
+        raise
 
 
 def run_worker(src, target, camera_id, model_path=None):
@@ -218,8 +309,24 @@ def run_worker(src, target, camera_id, model_path=None):
             try:
                 raw_data = frame.tobytes()
                 ff.stdin.write(raw_data)
+                ff.stdin.flush()  # Critical: Force data to ffmpeg immediately (prevents buffer overflow)
+                
+                # Monitor ffmpeg process health every 100 frames
+                if frame_counter % 100 == 0:
+                    poll_result = ff.poll()
+                    if poll_result is not None:
+                        print(f"[processing_worker] [ERROR] FFmpeg process died unexpectedly (exit code: {poll_result})")
+                        # Try to read error output
+                        try:
+                            err_output = ff.stderr.read(500).decode('utf-8', errors='ignore')
+                            if err_output:
+                                print(f"[processing_worker] [ERROR] FFmpeg stderr: {err_output}")
+                        except:
+                            pass
+                        break
+                        
             except BrokenPipeError:
-                print(f"[processing_worker] [ERROR] ffmpeg pipe broken for camera {camera_id}")
+                print(f"[processing_worker] [ERROR] ffmpeg pipe broken for camera {camera_id} - stdin buffer exhausted")
                 break
             except Exception as e:
                 print(f"[processing_worker] [ERROR] failed to write frame to ffmpeg: {e}")

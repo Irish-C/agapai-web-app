@@ -223,8 +223,8 @@ export default function CameraGrid() {
           {(() => {
             // Dynamically build stream URL based on AI setting
             // Use relative proxy path /hls/ instead of hardcoded localhost:8888
-            const prefix = aiEnabled ? 'processed' : 'cam'; // Use processed if AI enabled, otherwise use base cam stream
-            const streamPath = aiEnabled ? `${prefix}/cam${focusedCamera.id}` : `${prefix}${focusedCamera.id}`;
+            const prefix = aiEnabled ? 'processed' : 'original'; // Use processed if AI enabled, otherwise use original
+            const streamPath = `${prefix}/cam${focusedCamera.id}`;
             const dynamicStreamUrl = `/hls/${streamPath}/index.m3u8`;
             console.log(`[CameraGrid] [STREAM] Focused camera ${focusedCamera.id}: using '${prefix}' stream (AI is ${aiEnabled ? '🟢 enabled' : '🔴 disabled'})`);
             return (
@@ -249,8 +249,8 @@ export default function CameraGrid() {
                 {publishedCameraList.map((camera) => {
                   const location = camera.location_name || camera.location || camera.loc_name;
                   // Dynamically build stream URL based on AI setting
-                  const prefix = aiEnabled ? 'processed' : 'cam'; // Use processed if AI enabled, otherwise use base cam stream
-                  const streamPath = aiEnabled ? `${prefix}/cam${camera.id}` : `${prefix}${camera.id}`;
+                  const prefix = aiEnabled ? 'processed' : 'original'; // Use processed if AI enabled, otherwise use original
+                  const streamPath = `${prefix}/cam${camera.id}`;
                   const dynamicStreamUrl = `/hls/${streamPath}/index.m3u8`;
                   console.log(`[CameraGrid] [STREAM] Grid camera ${camera.id}: using '${prefix}' stream (AI is ${aiEnabled ? '🟢 enabled' : '🔴 disabled'})`);
                   return (
