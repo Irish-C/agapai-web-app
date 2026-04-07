@@ -27,7 +27,13 @@ export default defineConfig({
     proxy: {
       '/api': { target: 'http://127.0.0.1:5000', changeOrigin: true, secure: false },
       '/detect': { target: 'http://127.0.0.1:5000', changeOrigin: true, secure: false },
-      '/socket.io': { target: 'http://127.0.0.1:5000', ws: true, changeOrigin: true, secure: false }
+      '/socket.io': { target: 'http://127.0.0.1:5000', ws: true, changeOrigin: true, secure: false },
+      '/hls': { 
+        target: 'http://127.0.0.1:8888', 
+        changeOrigin: true, 
+        secure: false,
+        rewrite: (path) => path.replace(/^\/hls/, '')
+      }
     }
   }
 });

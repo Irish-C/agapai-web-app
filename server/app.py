@@ -55,6 +55,7 @@ from src.services.socket_manager import socketio_server, connected_sids
 # --- 3. FASTAPI app with lifespan ---
 from contextlib import asynccontextmanager
 from src.utils.redis_pool import RedisConnectionPool
+from src.services.redis_detection_consumer import start_in_background as start_redis_detection_consumer, stop as stop_redis_detection_consumer
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -64,6 +65,13 @@ async def lifespan(app: FastAPI):
     print("[INFO] Connecting to Prisma DB...")
     await db.connect()
 
+    # Start Redis detection consumer to forward detections to Socket.IO
+    try:
+        start_redis_detection_consumer()
+        print('[INFO] Redis detection consumer started')
+    except Exception as e:
+        print(f'[WARN] Failed to start Redis detection consumer: {e}')
+
     # Streaming startup disabled per user request (starting from scratch)
 
     yield
@@ -72,6 +80,11 @@ async def lifespan(app: FastAPI):
     RedisConnectionPool.close()
     print("[INFO] Disconnecting Prisma DB...")
     await db.disconnect()
+    try:
+        await stop_redis_detection_consumer()
+        print('[INFO] Redis detection consumer stopped')
+    except Exception:
+        pass
 
 app = FastAPI(lifespan=lifespan, default_response_class=PrismaJSONResponse)
 

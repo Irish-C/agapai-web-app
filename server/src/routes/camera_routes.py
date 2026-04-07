@@ -11,6 +11,8 @@ from src.controllers.camera_controller import (
     get_camera_logic,
     update_camera_logic,
     delete_camera_logic,
+    publish_camera_to_mediamtx,
+    unpublish_camera_from_mediamtx,
 )
 from src.utils.auth import get_current_user_id, require_admin_user_id
 
@@ -55,12 +57,21 @@ async def delete_camera(camera_id: int, user_id: str = Depends(require_admin_use
 
 @router.post('/cameras/{camera_id}/publish')
 async def publish_camera_disabled(camera_id: int, user_id: str = Depends(require_admin_user_id)):
-    return safe_json_response(status_code=410, content={'status': 'disabled', 'message': 'Publish endpoint removed'})
+    # Start publish -> spawn relay or processing worker
+    try:
+        result, code = await publish_camera_to_mediamtx(camera_id)
+        return safe_json_response(status_code=code, content=result)
+    except Exception as e:
+        return safe_json_response(status_code=500, content={'error': str(e)})
 
 
 @router.post('/cameras/{camera_id}/unpublish')
 async def unpublish_camera_disabled(camera_id: int, user_id: str = Depends(require_admin_user_id)):
-    return safe_json_response(status_code=410, content={'status': 'disabled', 'message': 'Unpublish endpoint removed'})
+    try:
+        result, code = await unpublish_camera_from_mediamtx(camera_id)
+        return safe_json_response(status_code=code, content=result)
+    except Exception as e:
+        return safe_json_response(status_code=500, content={'error': str(e)})
 
 
 @router.post('/set_active_camera')

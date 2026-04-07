@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { FaUsers, FaSpinner, FaArchive, FaShieldAlt } from 'react-icons/fa';
 import { useUserManager } from '../../hooks/useUserManager.js';
-import UserTable from '../../components/features/manager/UserTable.jsx';
+import UserTable from '../../components/UserTable.jsx';
 import UserEditModal from '../modal/UserEditModal.jsx';
 import { displayRole, normalizeRole } from '../../utils/roleUtils.js';
 import { ALL_PERMISSIONS, hasPermission } from '../../utils/rolePermissions.js';

@@ -1,14 +1,26 @@
 api: true
-apiAddress: :9997
+apiAddress: 0.0.0.0:9997
+rtspAddress: 0.0.0.0:8554
 hls: true
-hlsAllowOrigins:
-- '*'
 hlsAlwaysRemux: true
-paths:
-  cam1:
-    source: rtsp://admin:pass@192.168.254.211:554/cam/realmonitor?channel=1&subtype=1
-    sourceOnDemand: true
+hlsVariant: fmp4
 webrtc: true
-webrtcAddress: :8889
-webrtcAllowOrigins:
-- '*'
+webrtcAddress: 0.0.0.0:8889
+paths:
+  # Camera 1 - source configuration
+  cam1:
+    source: rtsp://admin:agapai143@192.168.254.211/cam/realmonitor?channel=1&subtype=1
+  # Relay cam1 to original/cam1 for frontend (non-AI streams)
+  "original/cam1":
+    source: rtsp://localhost:8554/cam1
+  # Relay cam1 to processed/cam1 for frontend (AI-enabled streams)
+  # AI scripts can push their processed video here
+  "processed/cam1":
+    source: rtsp://localhost:8554/cam1
+  # Accept any camera path with original/ prefix
+  "~original/.*": {}
+  # Accept any camera path with processed/ prefix (for AI-enabled streams - allows external publishers)
+  "~processed/.*": {}
+  # Direct camera access
+  "~cam.*": {}
+

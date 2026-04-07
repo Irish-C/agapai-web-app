@@ -13,17 +13,34 @@ os.makedirs(SNAPSHOT_DIR, exist_ok=True)
 async def get_cameras_logic():
     cameras = await db.camera.find_many(include={"location": True})
     result = []
+    from src.services.mediamtx_controller import MEDIAMTX_INGEST, MEDIAMTX_API
     for cam in cameras:
         # Hide archived cameras from management lists.
         if (cam.cam_name or '').startswith('[DELETED] '):
             continue
 
         cam_id = str(cam.id)
+        # Construct playback URLs for MediaMTX: HLS and WebRTC (WHEP)
+        try:
+            # Use original stream by default (raw feed without AI processing)
+            # When AI script is running, it will push processed video to processed/cam{id}
+            playback_path = f"original/cam{cam_id}"
+            # HLS endpoint (working and reliable)
+            hls_url = f"http://127.0.0.1:8888/{playback_path}/index.m3u8"
+            from src.services.mediamtx_controller import MEDIAMTX_WHEP
+            # WHEP URL - note: no trailing slash as MediaMTX WHEP expects it without
+            playback_webrtc = f"{MEDIAMTX_WHEP.rstrip('/')}/whep/play/{playback_path}"
+        except Exception:
+            hls_url = None
+            playback_webrtc = None
+
         result.append({
             "id": cam_id,
             "name": cam.cam_name,
             "status": cam.cam_status,
             "stream_url": cam.stream_url,
+            "playback_url": hls_url,
+            "playback_webrtc": playback_webrtc,
             "location_name": cam.location.loc_name if cam.location else None,
         })
     return result, 200
@@ -104,7 +121,52 @@ async def delete_camera_logic(camera_id):
 
 # Stubs for MediaMTX actions (disabled)
 async def publish_camera_to_mediamtx(camera_id):
-    return {"status": "disabled", "message": "publish_camera_to_mediamtx removed"}, 410
+    from src.services.mediamtx_controller import start_relay, start_processed_push
+    import os, shlex
+
+    try:
+        camera = await db.camera.find_unique(where={"id": int(camera_id)})
+        if not camera:
+            return {"error": "Camera not found"}, 404
+        original_rtsp = camera.stream_url
+        if not original_rtsp:
+            return {"error": "Camera has no stream_url"}, 400
+
+        # Decide mode based on global AI flag
+        try:
+            gs = await db.globalsetting.find_first()
+            ai_enabled = True if not gs else bool(getattr(gs, 'ai_enabled', True))
+        except Exception:
+            ai_enabled = True
+
+        target_path = f"processed/cam{camera_id}" if ai_enabled else f"original/cam{camera_id}"
+
+        # Build full target URL for MediaMTX ingest
+        from src.services.mediamtx_controller import MEDIAMTX_INGEST
+        full_target = f"{MEDIAMTX_INGEST.rstrip('/')}/{target_path.lstrip('/')}"
+
+        server_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '../..'))
+        worker_py = os.path.join(server_root, 'src', 'workers', 'processing_worker.py')
+
+        if ai_enabled:
+            # spawn processing worker which handles inference + ffmpeg push
+            cmd = f"python3 {shlex.quote(worker_py)} --src {shlex.quote(original_rtsp)} --target {shlex.quote(full_target)} --camera_id {int(camera_id)}"
+            info = start_processed_push(cmd, camera_id)
+            return {"status": "success", "mode": "processed", "worker": info}, 200
+        else:
+            # start a simple relay without AI
+            info = start_relay(original_rtsp, target_path, camera_id)
+            return {"status": "success", "mode": "relay", "worker": info}, 200
+    except Exception as e:
+        return {"error": str(e)}, 500
 
 async def unpublish_camera_from_mediamtx(camera_id):
-    return {"status": "disabled", "message": "unpublish_camera_from_mediamtx removed"}, 410
+    from src.services.mediamtx_controller import stop_worker
+    try:
+        ok = stop_worker(camera_id)
+        if ok:
+            return {"status": "success", "message": "Unpublished and worker stopped"}, 200
+        else:
+            return {"status": "success", "message": "No worker found; cleaned state"}, 200
+    except Exception as e:
+        return {"error": str(e)}, 500

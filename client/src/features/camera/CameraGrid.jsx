@@ -1,8 +1,9 @@
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import VideoFeed from './VideoFeed.jsx';
+import { fetchApi } from '../../services/apiService.js';
 import TodayReport from '../dashboard/TodayReport.jsx';
 import { useCameraSocket } from '../../hooks/useCamera.js';
-import { FaPlug, FaSpinner, FaVideo, FaSync } from 'react-icons/fa';
+import { FaSpinner, FaVideo, FaSync } from 'react-icons/fa';
 import { fetchCameraList } from '../../services/apiService.js';
 
 export default function CameraGrid() {
@@ -20,6 +21,25 @@ export default function CameraGrid() {
       return new Set();
     }
   });
+  const [aiEnabled, setAiEnabled] = useState(true);
+  const [mediamtxHealth, setMediamtxHealth] = useState(null);
+
+  useEffect(() => {
+    let mounted = true;
+    const check = async () => {
+      try {
+        const resp = await fetch('/mediamtx_health');
+        if (!resp.ok) return;
+        const j = await resp.json();
+        if (!mounted) return;
+        setMediamtxHealth(j);
+      } catch (e) {
+        // ignore
+      }
+    };
+    check();
+    return () => { mounted = false; };
+  }, []);
 
   useEffect(() => {
     let mounted = true;
@@ -48,6 +68,22 @@ export default function CameraGrid() {
     return () => {
       mounted = false;
     };
+  }, []);
+
+  // Fetch global AI setting (ai_enabled)
+  useEffect(() => {
+    let mounted = true;
+    const getSettings = async () => {
+      try {
+        const data = await fetchApi('/settings/notifications/global', 'GET');
+        if (!mounted) return;
+        setAiEnabled(Boolean(data.ai_enabled));
+      } catch (e) {
+        // keep default
+      }
+    };
+    getSettings();
+    return () => { mounted = false; };
   }, []);
 
   useEffect(() => {
@@ -145,6 +181,14 @@ export default function CameraGrid() {
     </div>
   );
 
+  const mediamtxBanner = mediamtxHealth && !mediamtxHealth.ok ? (
+    <div className="p-3 mb-4 rounded bg-yellow-100 border border-yellow-300 text-yellow-800">
+      <div className="font-semibold">MediaMTX connectivity issues</div>
+      <ul className="text-sm">
+        {mediamtxHealth.messages && mediamtxHealth.messages.map((m, i) => <li key={i}>- {m}</li>)}
+      </ul>
+    </div>
+  ) : null;
 
   if (isLoading && cameraList.length === 0) {
     return (
@@ -173,14 +217,23 @@ export default function CameraGrid() {
       {focusedCameraId && focusedCamera ? (
         <div className="flex-grow w-full">
           {header}
-          <VideoFeed
-            key={focusedCamera.id}
-            camId={focusedCamera.id}
-            cameraName={focusedCamera.name}
-            location={focusedCamera.location_name || focusedCamera.location || focusedCamera.loc_name}
-            isFocused={true}
-            onFocusChange={setFocusedCameraId}
-          />
+          {(() => {
+            // Dynamically build stream URL based on AI setting
+            // Use relative proxy path /hls/ instead of hardcoded localhost:8888
+            const prefix = aiEnabled ? 'processed' : 'original';
+            const dynamicStreamUrl = `/hls/${prefix}/cam${focusedCamera.id}/index.m3u8`;
+            return (
+              <VideoFeed
+                key={focusedCamera.id}
+                camId={focusedCamera.id}
+                cameraName={focusedCamera.name}
+                streamUrl={dynamicStreamUrl}
+                location={focusedCamera.location_name || focusedCamera.location || focusedCamera.loc_name}
+                isFocused={true}
+                onFocusChange={setFocusedCameraId}
+              />
+            );
+          })()}
         </div>
       ) : (
         <>
@@ -190,11 +243,15 @@ export default function CameraGrid() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-0">
                 {publishedCameraList.map((camera) => {
                   const location = camera.location_name || camera.location || camera.loc_name;
+                  // Dynamically build stream URL based on AI setting
+                  const prefix = aiEnabled ? 'processed' : 'original';
+                  const dynamicStreamUrl = `/hls/${prefix}/cam${camera.id}/index.m3u8`;
                   return (
                     <div key={camera.id} className={publishedCameraList.length === 1 ? 'md:col-span-2' : ''}>
                       <VideoFeed
                         camId={camera.id}
                         cameraName={camera.name}
+                        streamUrl={dynamicStreamUrl}
                         location={location}
                         isFocused={false}
                         onFocusChange={setFocusedCameraId}

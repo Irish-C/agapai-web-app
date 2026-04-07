@@ -6,7 +6,8 @@
   "scripts": {
     "dev-client": "vite --host --config client/public/vite.config.js",
     "dev-server": "cd server && ./venv/bin/python -m uvicorn app:asgi_app --reload --port 5000",
-    "dev": "concurrently \"npm run dev-client\" \"npm run dev-server\"",
+    "dev-mediamtx": "cd server && ./mediamtx mediamtx.yml",
+    "dev": "concurrently \"npm run dev-client\" \"npm run dev-server\" \"npm run dev-mediamtx\"",
     "prisma:generate": "cd server && ./venv/bin/prisma py generate",
     "prisma:generate:node": "cd server && npx prisma generate --schema=./server/prisma/schema.prisma",
     "build": "vite build --config client/public/vite.config.js",
@@ -16,6 +17,7 @@
     "@prisma/client": "5.17.0",
     "axios": "^1.13.2",
     "dotenv": "^17.3.1",
+    "hls.js": "^1.6.15",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "react-icons": "^5.5.0",
