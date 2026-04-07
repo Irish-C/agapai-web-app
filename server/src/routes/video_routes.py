@@ -15,7 +15,9 @@ from pathlib import Path
 from database import db
 from src.utils.input_sanitization import sanitize_input
 from src.utils.rate_limiter import enforce_ip_rate_limit
+from src.utils.drawing import draw_text_outline
 import redis.asyncio as aioredis
+from pathlib import Path
 
 # Initialize YOLO model with GPU if available
 YOLO_MODEL = None
@@ -263,7 +265,7 @@ async def detect_endpoint(request: Request):
                         
                         cv2.rectangle(img_overlay, (x1, y1), (x2, y2), color, 2)
                         text = f"{label} {conf:.2f}"
-                        cv2.putText(img_overlay, text, (x1, max(0, y1 - 6)), cv2.FONT_HERSHEY_DUPLEX, 0.6, color, 1, cv2.LINE_AA)
+                        draw_text_outline(img_overlay, text, (x1, max(0, y1 - 6)), color, (255, 255, 255))
                     except Exception:
                         continue
 

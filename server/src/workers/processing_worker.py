@@ -10,6 +10,12 @@ import shlex
 import sys
 import time
 import signal
+from pathlib import Path
+
+# Ensure server/ is on sys.path for imports
+server_root = Path(__file__).parent.parent.parent.resolve()
+if str(server_root) not in sys.path:
+    sys.path.insert(0, str(server_root))
 
 try:
     import cv2
@@ -26,18 +32,19 @@ try:
 except Exception:
     YOLO = None
 
-
-def draw_text_outline(img, text, pos, text_color=(0, 255, 0), bg_color=(0, 0, 0)):
-    """Draw text with outline for better visibility."""
-    font = cv2.FONT_HERSHEY_DUPLEX
-    font_scale = 0.7
-    thickness = 1
-    x, y = pos
-    
-    # Draw background outline
-    cv2.putText(img, text, (x, y), font, font_scale, bg_color, thickness + 2, cv2.LINE_AA)
-    # Draw text
-    cv2.putText(img, text, (x, y), font, font_scale, text_color, thickness, cv2.LINE_AA)
+# Import shared drawing utility
+try:
+    from src.utils.drawing import draw_text_outline
+except Exception:
+    # Fallback if import fails
+    def draw_text_outline(img, text, pos, text_color=(0, 255, 0), bg_color=(0, 0, 0)):
+        """Fallback text drawing function."""
+        font = cv2.FONT_HERSHEY_DUPLEX
+        font_scale = 0.6
+        thickness = 1
+        x, y = pos
+        cv2.putText(img, text, (x, y), font, font_scale, bg_color, thickness + 2, cv2.LINE_AA)
+        cv2.putText(img, text, (x, y), font, font_scale, text_color, thickness, cv2.LINE_AA)
 
 
 def start_ffmpeg_push(width, height, fps, target):
