@@ -211,4 +211,4 @@ DEVICE=GPU                       # Preferred device
 
 ## More Information
 
-See [TOGGLE_ANALYSIS.md](TOGGLE_ANALYSIS.md) for details on how the AI toggle works in the system.
+For more technical details, see the [Activity Detection Implementation](ACTIVITY_DETECTION_IMPLEMENTATION.md) guide.

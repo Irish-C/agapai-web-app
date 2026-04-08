@@ -245,7 +245,7 @@ The system automatically:
 
 - **[ACTIVITY_DETECTION_GUIDE.md](ACTIVITY_DETECTION_GUIDE.md)** - Complete activity detection guide
 - **[AI_DEBUG_FEATURES.md](AI_DEBUG_FEATURES.md)** - Debug output and monitoring guide
-- **[TOGGLE_ANALYSIS.md](TOGGLE_ANALYSIS.md)** - How the AI toggle works
+- **[Alert System](ALERT_SYSTEM.md)** - Fall detection and inactivity alerts
 
 ---
 

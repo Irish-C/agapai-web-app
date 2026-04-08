@@ -14,8 +14,8 @@
 
 | Color | Activity | Urgency | Action |
 |-------|----------|---------|--------|
-| 🔴 RED | Falling | ⚠️ HIGH | Check immediately |
-| 🟤 BROWN | Lying Down | ⚠️ MEDIUM | Investigate |
+| � RED | Falling | ⚠️ HIGH | Check immediately |
+|  BROWN | Lying Down | ⚠️ MEDIUM | Investigate |
 | 🟢 GREEN | Standing/Sitting/Eating | ✅ LOW | Normal |
 | 🔵 BLUE | Walking | ✅ LOW | Normal |
 

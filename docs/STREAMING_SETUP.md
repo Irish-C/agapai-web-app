@@ -2,25 +2,26 @@
 
 ## Architecture Overview
 
-The AGAPAI system uses a two-stage streaming pipeline:
+The AGAPAI system uses a MediaMTX relay streaming architecture:
 
 ```
-Camera RTSP Stream → FFmpeg Worker → MediaMTX Ingest → WebRTC WHEP → Browser
-                                      (RTSP Ingest)
+Camera RTSP Stream → MediaMTX Relay → HLS Playback → Browser
+  (IP Camera)        (original/cam1)    (port 8888)
 ```
 
 ### Components
 
-1. **Camera**: Original RTSP stream source (e.g., IP camera)
-2. **FFmpeg Worker**: Captures camera stream and pushes to MediaMTX
-   - If AI enabled: Runs object detection (ultralytics) and pushes processed frames
-   - If AI disabled: Relays original stream with no processing
-3. **MediaMTX**: Central streaming hub supporting multiple protocols
-   - RTSP Ingest: Receives streams from workers (port 8554)
-   - HTTP API: Management API (port 9997)
-   - WebRTC/WHEP: Broadcasting to browsers (port 8889)
-   - HLS: Alternative playback format (port 8888)
-4. **Browser**: Displays stream via WebRTC protocol
+1. **Camera**: Original RTSP stream source (e.g., IP camera at 192.168.254.211:554)
+2. **MediaMTX**: Central streaming hub configured as relay server
+   - **Relay Paths**: Pulls from camera sources and rebroadcasts
+     - `cam1`: Direct pull from camera RTSP source
+     - `original/cam1`: Relay of cam1 for non-AI streams (default)
+     - `processed/cam1`: For future AI-processed streams (accepts RTSP PUSH)
+   - **RTSP Ingest**: Accepts RTSP PUSH from AI workers (port 8554)
+   - **HTTP API**: Management API (port 9997)
+   - **HLS**: HTTP Live Streaming playback (port 8888) ←  **Primary playback**
+   - **WebRTC**: WebRTC/WHEP signaling (port 8889)
+3. **Browser**: Displays stream via HLS protocol
 
 ## Configuration
 
@@ -39,10 +40,16 @@ MEDIAMTX_WHEP=http://127.0.0.1:8889
 
 ### MediaMTX Configuration (mediamtx.yml)
 
-- **rtspAddress**: RTSP protocol listener (8554) - workers push to this
+Key settings:
+- **rtspAddress**: RTSP listener (8554) - for PUSH ingest from AI workers
+- **hlsAddress**: HLS listener (8888) - for HTTP playback ← **Primary**
 - **hlsAlwaysRemux**: Ensures HLS format compatibility
-- **webrtcAddress**: WebRTC/WHEP listener (8889) - browsers connect here
-- **Dynamic paths**: `~original/.*` and `~processed/.*` accept any camera ID
+- **webrtcAddress**: WebRTC listener (8889)
+- **paths** define relay and dynamic paths:
+  - `cam1`: Source - pulls from camera RTSP
+  - `original/cam1`: Relay from cam1 (non-AI stream, always available)
+  - `processed/cam1`: Receives AI-processed stream (accepts RTSP PUSH)
+  - `~original/.*` and `~processed/.*`: Accept any camera ID patterns
 
 ## User Workflow
 
@@ -55,37 +62,19 @@ Settings → Device and Location → Add Camera
 - RTSP Stream URL: Source stream (e.g., `rtsp://admin:pass@192.168.x.x:554/stream`)
 - Location: Select or create location
 
-**Result:** Camera saved to database but streaming NOT started yet
+**Result:** Camera saved to database, streaming available immediately via MediaMTX relay
 
-### Step 2: Publish Camera to Start Streaming
+### Step 2: View Live Stream
 
-1. In Camera Management table, locate your camera
-2. Click the **"Publish"** button (yellow button next to camera actions)
-3. Status changes to **"Unpublish"** (gray button) = streaming is live
+Navigate to Dashboard → Camera Grid
 
-**What happens on Publish:**
-- Backend starts FFmpeg worker process
-- Worker connects to camera RTSP stream
-- Worker pushes stream to MediaMTX
-- MediaMTX makes it available via WebRTC/WHEP
-- Browser can now display live video
+- All cameras with valid RTSP sources display live feed
+- Stream pulls from `original/cam{id}` relay path automatically
+- AI detection toggle controls which stream path is used (original vs processed)
 
-### Step 3: View Live Stream
-
-Navigate to Dashboard → Live View
-
-- Only published cameras appear in grid
-- Click camera to expand and watch full-screen
-- AI detection overlay (if enabled)
-
-### Step 4: Unpublish to Stop Streaming
-
-Click **"Unpublish"** button next to camera
-
-- FFmpeg worker is stopped
-- MediaMTX removes stream
-- No more video available
-- Camera remains in database for future use
+**Stream Status Indicator:**
+- 🟢 Green dot = Stream connected and playing
+- 🔴 Red dot = RTSP source unreachable or invalid
 
 ## Troubleshooting
 

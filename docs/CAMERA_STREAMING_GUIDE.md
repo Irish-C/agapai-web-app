@@ -1,48 +1,43 @@
-# Camera Streaming - What Was Fixed and How to Use It
+# Camera Streaming - Current Architecture
 
-## 🔧 Issues Fixed
+## 📋 How Streaming Works (Current)
 
-### 1. **✓ WHEP 404 Error** 
-- **Problem**: Frontend was passing `null` stream URLs to VideoFeed component
-- **Fixed**: Updated `CameraGrid.jsx` to use `playback_webrtc` URLs from backend
-- **Result**: Correct WHEP endpoints (`/whep/play/cam1/`) now requested
+```
+1. User adds camera in Settings with valid RTSP URL
+   ↓
+2. MediaMTX automatically relays the RTSP stream
+   ↓
+3. MediaMTX exposes relay paths:
+   - cam{id}: Direct source
+   - original/cam{id}: Stable relay (default for UI)
+   - processed/cam{id}: For future AI-processed streams
+   ↓
+4. Frontend requests HLS stream via /hls/original/cam{id}/index.m3u8
+   ↓
+5. MediaMTX serves HLS stream on port 8888
+   ↓
+6. Browser plays video via HLS.js
+   ↓
+7. AI toggle switches between original/cam{id} and processed/cam{id}
+```
 
-### 2. **✓ MediaMTX Configuration**
-- **Problem**: `mediamtx.yml` had empty regex paths, couldn't accept dynamic streams
-- **Fixed**: Updated with proper path templates for `original/*` and `processed/*` paths
-- **Result**: MediaMTX now accepts FFmpeg push ingest from background workers
-
-### 3. **✓ Environment Variables**
-- **Problem**: `MEDIAMTX_API` was set to wrong port (8888 instead of 9997)
-- **Fixed**: Updated `.env` to `MEDIAMTX_API=http://127.0.0.1:9997`
-- **Result**: Backend can properly call MediaMTX HTTP API for stream management
-
-### 4. **✓ Directory Structure**
-- **Problem**: Duplicate CameraGrid in old `components/features/` path
-- **Fixed**: Removed old directory, all imports centralized to `features/`
-- **Result**: Clean code structure, single source of truth
+### Key Features
+✅ **Automatic Relay** - No need to "publish" cameras, streams work immediately  
+✅ **Reliable** - MediaMTX relay is more stable than FFmpeg workers  
+✅ **HLS Playback** - Browser-compatible, no special codec needed  
+✅ **Scalable** - Easy to add processing workers later for AI streams  
 
 ---
 
-## 📋 How Streaming Works Now
+## 🔧 Previous Issues (Now Fixed)
 
-```
-1. User adds camera in Settings with RTSP URL
-   ↓
-2. User clicks "Publish" button
-   ↓
-3. Backend calls /cameras/{id}/publish
-   ↓
-4. FFmpeg worker spawns and connects to camera RTSP stream
-   ↓
-5. Worker pushes stream to MediaMTX via RTSP ingest (port 8554)
-   ↓
-6. MediaMTX broadcasts stream via WebRTC/WHEP (port 8889)
-   ↓
-7. Browser connects and displays live video
-   ↓
-8. User can unpublish to stop streaming and free resources
-```
+### ✓ MediaMTX Configuration
+- `mediamtx.yml` now includes proper relay paths for `original/*` and `processed/*`
+- Both are configured to accept camera streams
+
+### ✓ Environment Variables
+- `MEDIAMTX_HLS=http://127.0.0.1:8888` - Primary playback endpoint
+- `MEDIAMTX_API=http://127.0.0.1:9997` - Management API
 
 ---
 

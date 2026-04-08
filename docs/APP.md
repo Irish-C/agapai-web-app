@@ -36,9 +36,8 @@ streamlined device control, and secure user access.
 
 Detailed technical documentation for reconnect, sync, and QA scenarios:
 
-- [AUTO_RECONNECT_AND_SYNC.md](AUTO_RECONNECT_AND_SYNC.md)
-- [RECONNECT_VERIFICATION.md](RECONNECT_VERIFICATION.md)
-- [SOCKET_IO_TESTING.md](SOCKET_IO_TESTING.md)
+- [Auto Reconnect Architecture](AUTO_RECONNECT_AND_SYNC.md)
+- [Socket.IO Testing Guide](SOCKET_IO_TESTING.md)
 
 ## Security & Access
 
