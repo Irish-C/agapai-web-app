@@ -21,7 +21,7 @@ export default function CameraGrid() {
       return new Set();
     }
   });
-  const [aiEnabled, setAiEnabled] = useState(true);
+  const [aiEnabled, setAiEnabled] = useState(false); // Disabled by default - use original streams instead which are more stable
   const [mediamtxHealth, setMediamtxHealth] = useState(null);
 
   useEffect(() => {
