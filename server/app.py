@@ -27,7 +27,7 @@ from src.routes.contact_routes import router as contact_router
 from src.routes.video_routes import router as video_router
 from src.utils.auth import get_token_user_id_from_header
 
-# Streaming controller imports removed per user request
+# Streaming controller imports
 # from src.controllers.camera_controller import ensure_mediamtx_running, start_camera_processing, analyze_camera_snapshot, YOLO_MODEL
 import cv2
 import numpy as np
