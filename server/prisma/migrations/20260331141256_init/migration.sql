@@ -55,10 +55,6 @@ CREATE TABLE "camera" (
     "cam_name" VARCHAR(100) NOT NULL,
     "cam_status" BOOLEAN NOT NULL DEFAULT true,
     "stream_url" VARCHAR(255) NOT NULL,
-    "emit_fall" BOOLEAN NOT NULL DEFAULT true,
-    "persist_fall" BOOLEAN NOT NULL DEFAULT true,
-    "emit_inactivity" BOOLEAN NOT NULL DEFAULT false,
-    "persist_inactivity" BOOLEAN NOT NULL DEFAULT false,
     "loc_id" BIGINT,
 
     CONSTRAINT "camera_pkey" PRIMARY KEY ("id")
@@ -67,10 +63,6 @@ CREATE TABLE "camera" (
 -- CreateTable
 CREATE TABLE "global_settings" (
     "id" BIGSERIAL NOT NULL,
-    "emit_fall" BOOLEAN NOT NULL DEFAULT true,
-    "persist_fall" BOOLEAN NOT NULL DEFAULT true,
-    "emit_inactivity" BOOLEAN NOT NULL DEFAULT false,
-    "persist_inactivity" BOOLEAN NOT NULL DEFAULT false,
     "ai_enabled" BOOLEAN NOT NULL DEFAULT true,
     "email_fallback" BOOLEAN NOT NULL DEFAULT true,
 

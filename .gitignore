@@ -45,6 +45,10 @@ server/.prisma/
 static/snapshots/
 server/static/snapshots/
 
+# OpenVINO and runtime caches
+server/ov_cache/
+server/logs/
+
 # OS-specific files
 .DS_Store
 Thumbs.db

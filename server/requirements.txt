@@ -9,7 +9,7 @@ charset-normalizer==3.4.1
 click==8.1.8
 colorama==0.4.6
 cryptography==46.0.5
-fastapi==0.135.2
+fastapi==0.104.1
 filelock==3.20.0
 Flask-JWT-Extended==4.7.1
 greenlet==3.2.4
@@ -21,7 +21,8 @@ openvino==2024.1.0
 openvino-telemetry==2025.2.0
 opencv-python-headless==4.11.0.86
 packaging==24.2
-prisma==0.15.0
+pydantic==1.10.26
+prisma==0.13.1
 protobuf==6.33.1
 pyparsing==3.2.3
 python-dotenv==1.2.1

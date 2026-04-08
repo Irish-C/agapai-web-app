@@ -12,7 +12,8 @@ paths:
   cam1:
     source: rtsp://admin:agapai143@192.168.254.211/cam/realmonitor?channel=1&subtype=1
   # Relay cam1 to original/cam1 for frontend (non-AI streams)
-  "original/cam1": {}
+  "original/cam1":
+    source: rtsp://localhost:8554/cam1
   # Accept processed/cam1 path for AI worker pushes 
   "processed/cam1": {}
   # Accept any camera path with original/ prefix (for relaying non-AI streams)

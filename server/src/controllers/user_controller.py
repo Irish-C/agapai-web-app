@@ -93,8 +93,7 @@ async def update_user_logic(user_id, data):
 
         # 3. Handle password if provided
         if data.get('password'):
-            from src.utils.auth import hash_password
-            update_data['password'] = hash_password(data['password'])
+            update_data['password'] = generate_password_hash(data['password'])
 
         # 4. Execute the update
         await db.user.update(
@@ -143,8 +142,6 @@ async def change_password_logic(user_id, old_password, new_password):
     return {"status": "success", "message": "Password updated"}, 200
 
 async def create_user_logic(data):
-
-    from src.utils.auth import hash_password
     try:
         # 1. Map the role string (e.g., 'guard') to the Database ID
         role_record = await db.role.find_unique(
@@ -154,8 +151,8 @@ async def create_user_logic(data):
         if not role_record:
             return {"status": "error", "message": f"Role '{data['role']}' not found."}, 400
 
-        # 2. Use the imported hash_password function
-        hashed_pw = hash_password(data['password'])
+        # 2. Use werkzeug's generate_password_hash function
+        hashed_pw = generate_password_hash(data['password'])
 
         # 3. Create the user in the database
         new_user = await db.user.create(

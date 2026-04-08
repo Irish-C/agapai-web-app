@@ -136,3 +136,70 @@ async def handle_ping(sid, data):
         # print(f"SocketIO health check: ping from {sid}, pong sent")
     except Exception as e:
         print(f"SocketIO health check error: {e}")
+
+
+@socketio_server.on('ack_alert')
+async def handle_ack_alert(sid, data):
+    """Handle alert acknowledgement from frontend.
+    
+    Client sends this when user clicks 'ACKNOWLEDGE' button.
+    Updates database and turns off hardware alarm.
+    """
+    try:
+        from database import db
+        from src.services.hardware import hardware_alert
+        from datetime import datetime, timezone
+        
+        alert_id = data.get('alert_id') if isinstance(data, dict) else None
+        user_id = data.get('user_id') if isinstance(data, dict) else None
+        
+        if not alert_id:
+            await socketio_server.emit('error', {'message': 'No alert_id provided'}, to=sid)
+            return
+        
+        # Convert alert_id to int if it's numeric, otherwise keep as string
+        try:
+            alert_id = int(alert_id)
+        except ValueError:
+            pass
+        
+        print(f"[Socket.IO] Alert {alert_id} acknowledged by user {user_id}")
+        
+        # Update database
+        try:
+            await db.eventlog.update(
+                where={"id": alert_id},
+                data={
+                    "event_status": "acknowledged",
+                    "ack_by_user_id": int(user_id) if user_id else None
+                }
+            )
+            print(f"[Socket.IO] ✅ Updated alert {alert_id} status to acknowledged")
+        except Exception as e:
+            print(f"[Socket.IO] ⚠️ Failed to update database: {e}")
+        
+        # Turn off hardware alarm
+        try:
+            hardware_alert.stop_alarm()
+            print(f"[Socket.IO] 🔴 Hardware alarm stopped")
+        except Exception as e:
+            print(f"[Socket.IO] ⚠️ Warning: Could not stop hardware alarm: {e}")
+        
+        # Broadcast acknowledgement to all clients
+        try:
+            await socketio_server.emit('alert_acknowledged', {
+                'alert_id': alert_id,
+                'acknowledged_by': user_id,
+                'timestamp': datetime.now(timezone.utc).isoformat()
+            }, broadcast=True)
+            print(f"[Socket.IO] ✅ Broadcasted alert_acknowledged")
+        except Exception as e:
+            print(f"[Socket.IO] ⚠️ Failed to broadcast acknowledgement: {e}")
+        
+    except Exception as e:
+        print(f"[Socket.IO] ❌ Error handling alert ack: {e}")
+        try:
+            await socketio_server.emit('error', {'message': str(e)}, to=sid)
+        except:
+            pass
+

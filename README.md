@@ -2,13 +2,24 @@
 
 AGAPAI is a real-time monitoring and alerting web app for elderly care environments. It combines live camera streaming, Socket.IO event delivery, and AI-generated alerts (fall/inactivity) with role-based access control.
 
-For UI screenshots and product-level description, see [APP.md](APP.md).
+**Key Features:**
+- **Live Streaming** - HLS video feeds from IP cameras via MediaMTX relay
+- 🚨**Fall Detection** - Real-time fall alerts with instant notification to caregivers
+- ⏱ **Inactivity Tracking** - 3-tier alerts (low: 5m, medium: 15m, high: 30m inactivity)
+- **Role-Based Access** - Admin, supervisor, guard, caregiver roles with JWT auth
+- **Event Logging** - All alerts stored in PostgreSQL with acknowledgement tracking
+- **Socket.IO Sync** - Real-time event delivery with auto-reconnect + message buffering
+- **Dashboard** - Multi-camera grid view with alert modals, camera management, user admin
 
-## Quick Links
+For UI screenshots and product-level description, see [APP.md](docs/APP.md).
 
-- Changelog: use git history / see `server/prisma/migrations/`
-- Architecture: [AUTO_RECONNECT_AND_SYNC.md](AUTO_RECONNECT_AND_SYNC.md)
-- QA/Testing: [SOCKET_IO_TESTING.md](SOCKET_IO_TESTING.md)
+## Quick Links - Documentation
+
+📍 **[View Full Documentation Hub →](docs/GUIDES.md)** (organized by category)
+
+Or jump directly to:
+- **[Streaming Setup](docs/STREAMING_SETUP.md)** | **[Alert System](docs/ALERT_SYSTEM.md)** | **[Activity Detection](docs/ACTIVITY_DETECTION_GUIDE.md)**
+- **[Auto Reconnect](docs/AUTO_RECONNECT_AND_SYNC.md)** | **[GPU Setup](docs/OPENVINO.md)**
 
 ## Table of Contents
 
@@ -130,7 +141,7 @@ python seed_db.py
 - Prisma errors: re-run `npx prisma generate` then `npx prisma migrate deploy`.
 - Backend won't start: check that all required services (PostgreSQL, Redis) are running and accessible.
 
-For more detailed troubleshooting see the docs: `AUTO_RECONNECT_AND_SYNC.md`, `RECONNECT_VERIFICATION.md`, `SOCKET_IO_TESTING.md`.
+For more detailed troubleshooting see the docs: [Auto Reconnect](docs/AUTO_RECONNECT_AND_SYNC.md), [Reconnect Verification](docs/RECONNECT_VERIFICATION.md), [Socket.IO Testing](docs/SOCKET_IO_TESTING.md).
 
 ---
 
@@ -138,18 +149,80 @@ For more detailed troubleshooting see the docs: `AUTO_RECONNECT_AND_SYNC.md`, `R
 
 ```text
 agapai-web-app/
-├── client/                  # React + Vite frontend
-│   ├── src/components/
-│   ├── src/features/
-│   ├── src/hooks/
-│   └── src/services/
-├── server/                  # FastAPI + Socket.IO backend
-│   ├── app.py
-│   ├── prisma/
+├── 📄 README.md
+├── 📄 package.json & package-lock.json (workspace)
+├── 📄 postcss.config.js, tailwind.config.js
+│
+├── 📁 docs/                           # Documentation (15 guides)
+│   ├── GUIDES.md (navigation hub)
+│   ├── ACTIVITY_DETECTION_GUIDE.md
+│   ├── ALERT_SYSTEM.md
+│   ├── AUTO_RECONNECT_AND_SYNC.md
+│   └── ... (12 more comprehensive guides)
+│
+├── 📁 client/                         # React 19 + Vite frontend
+│   ├── index.html
+│   ├── vite.config.js
+│   ├── package.json
 │   ├── src/
-│   └── ml/
-└── README.md
+│   │   ├── components/                # Reusable UI components
+│   │   ├── features/                  # Feature modules (camera, manager, auth)
+│   │   ├── hooks/                     # Custom React hooks
+│   │   ├── pages/                     # Page components (Landing, Login, Dashboard)
+│   │   ├── services/                  # API clients (axios, Socket.IO)
+│   │   ├── utils/                     # Utilities (role helpers, validation)
+│   │   └── App.jsx, main.jsx
+│   └── public/
+│
+├── 📁 server/                         # FastAPI + Socket.IO backend
+│   ├── app.py                         # FastAPI app entry, lifespan, routers
+│   ├── models.py                      # Database models (User, Camera, Location, etc.)
+│   ├── requirements.txt               # Python dependencies
+│   ├── seed_db.py                     # Database seeder
+│   ├── init_db.py
+│   ├── mediamtx.yml                   # MediaMTX relay config
+│   ├── venv/                          # Python virtual environment
+│   ├── database/                      # Database setup utilities
+│   ├── prisma/                        # Prisma schema & migrations
+│   ├── ml/
+│   │   └── best_openvino_model/       # YOLO v10 model for activity detection
+│   ├── src/
+│   │   ├── controllers/               # Business logic (user, camera, event)
+│   │   ├── middleware/                # FastAPI middleware (sanitization, rate limiting)
+│   │   ├── routes/                    # API endpoints (camera, event, auth, video)
+│   │   ├── services/                  # Support services (Socket.IO, MediaMTX, Redis)
+│   │   ├── utils/                     # Utilities (auth, drawing, serialization, rate limiting)
+│   │   ├── workers/                   # Subprocesses (YOLO inference + streaming)
+│   │   └── generated/                 # Prisma generated client
+│   ├── scripts/                       # Development utilities (GPU verify, cleanup)
+│   └── static/snapshots/              # Runtime frame cache
+│
+├── 📁 database/                       # Database schema (SQL file)
+│   └── agapai_db.sql
+│
+├── 📁 deploy/                         # Deployment configs
+│   └── rtsp_ffmpeg.service
+│
+├── 📁 test-scripts/                   # Testing utilities
+│   ├── async_monitor.py               # Real-time monitoring with async inference
+│   └── rtsp_capture_post.py           # RTSP frame capture for API testing
+│
+├── 📄 start_services.sh               # Startup script (MediaMTX, backend, Redis)
+├── 📄 restart_all_services.sh         # Restart all services
+├── 📄 nodemon.json
+├── 📄 .gitignore
+├── 📄 LICENSE
+└── 📁 .git/
 ```
+
+### Key Directories Explained
+
+- **docs/** - 15 comprehensive markdown guides (flattened, no subfolders)
+- **client/src/features/** - Major UI features (camera grid, user management, auth)
+- **server/src/controllers/** - Business logic for each domain (users, cameras, events)
+- **server/src/services/** - Long-running background services (Socket.IO, MediaMTX, Redis consumer)
+- **server/src/workers/** - Subprocesses for compute-intensive work (YOLO inference, streaming)
+- **server/ml/best_openvino_model/** - Deployable YOLO v10 model (XML/BIN format)
 
 ---
 

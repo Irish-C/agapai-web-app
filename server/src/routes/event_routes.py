@@ -83,3 +83,56 @@ async def get_missed_alerts(timestamp_ms: int, user_id: str = Depends(get_curren
     result, code = await get_missed_alerts_logic(timestamp_ms)
     return safe_json_response(status_code=code, content=result)
 
+
+@router.post("/alerts/{alert_id}/acknowledge")
+async def acknowledge_alert(alert_id: int, user_id: str = Depends(get_current_user_id)):
+    """
+    REST endpoint for acknowledging alerts (backup to Socket.IO).
+    
+    Usage: POST /api/alerts/12345/acknowledge
+    
+    Updates alert status and stops hardware alarm.
+    """
+    try:
+        from database import db
+        from src.services.hardware import hardware_alert
+        from datetime import datetime, timezone
+        
+        # Update database
+        updated_log = await db.eventlog.update(
+            where={"id": alert_id},
+            data={
+                "event_status": "acknowledged",
+                "ack_by_user_id": int(user_id)
+            }
+        )
+        
+        print(f"[Event Routes] Alert {alert_id} acknowledged by user {user_id}")
+        
+        # Try to stop hardware alarm
+        try:
+            hardware_alert.stop_alarm()
+            print(f"[Event Routes] Hardware alarm stopped")
+        except Exception as e:
+            print(f"[Event Routes] ⚠️ Could not stop hardware alarm: {e}")
+        
+        return safe_json_response(
+            status_code=200,
+            content={
+                "status": "success",
+                "message": "Alert acknowledged",
+                "alert": {
+                    "id": updated_log.id,
+                    "status": updated_log.event_status
+                }
+            }
+        )
+        
+    except Exception as e:
+        print(f"[Event Routes] Error acknowledging alert: {e}")
+        return safe_json_response(
+            status_code=400,
+            content={"status": "error", "message": str(e)}
+        )
+
+
