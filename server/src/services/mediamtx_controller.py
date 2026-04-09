@@ -4,10 +4,9 @@ import shlex
 import time
 from src.utils.redis_pool import RedisConnectionPool
 
-# Read MediaMTX ingest and API host from env. MediaMTX RTSP is on port 8554, API on 9997, WHEP on 8889
+# Read MediaMTX ingest and API host from env. MediaMTX RTSP is on port 8554, API on 9997
 MEDIAMTX_INGEST = os.getenv('MEDIAMTX_URL', 'rtsp://127.0.0.1:8554')
 MEDIAMTX_API = os.getenv('MEDIAMTX_API', 'http://127.0.0.1:9997')
-MEDIAMTX_WHEP = os.getenv('MEDIAMTX_WHEP', 'http://127.0.0.1:8889')
 
 def _redis_key(camera_id):
     return f"mediamtx:worker:{camera_id}"

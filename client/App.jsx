@@ -26,7 +26,8 @@ import Settings from './src/pages/SettingsPage.jsx';
 
 // --- Global Alert Component ---
 const GlobalAlertModal = ({ alert, onClose }) => {
-    if (!alert) return null;
+     if (!alert) return null;
+    // alert ={ priority: "CRITICAL", type: "Fall_Detected", location: "Living Room", timestamp: new Date().toISOString(), snapshot_url: "https://via.placeholder.com/400x300.png?text=Alert+Snapshot" };
 
     // Determine styling based on priority and class type
     const getPriorityStyles = (priority, type) => {

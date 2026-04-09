@@ -10,29 +10,28 @@ from database import db
 SNAPSHOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../static/snapshots'))
 os.makedirs(SNAPSHOT_DIR, exist_ok=True)
 
-async def get_cameras_logic():
+async def get_cameras_logic(include_archived=False):
     cameras = await db.camera.find_many(include={"location": True})
     result = []
     from src.services.mediamtx_controller import MEDIAMTX_INGEST, MEDIAMTX_API
     for cam in cameras:
-        # Hide archived cameras from management lists.
-        if (cam.cam_name or '').startswith('[DELETED] '):
+        # Optionally hide archived cameras from management lists.
+        is_archived = (cam.cam_name or '').startswith('[DELETED] ')
+        if is_archived and not include_archived:
             continue
+        if not is_archived and include_archived:
+            continue  # If showing archived, skip active cameras
 
         cam_id = str(cam.id)
-        # Construct playback URLs for MediaMTX: HLS and WebRTC (WHEP)
+        # Construct playback URLs for MediaMTX: HLS
         try:
             # Use original stream by default (raw feed without AI processing)
             # When AI script is running, it will push processed video to processed/cam{id}
             playback_path = f"original/cam{cam_id}"
             # HLS endpoint (working and reliable)
             hls_url = f"http://127.0.0.1:8888/{playback_path}/index.m3u8"
-            from src.services.mediamtx_controller import MEDIAMTX_WHEP
-            # WHEP URL - note: no trailing slash as MediaMTX WHEP expects it without
-            playback_webrtc = f"{MEDIAMTX_WHEP.rstrip('/')}/whep/play/{playback_path}"
         except Exception:
             hls_url = None
-            playback_webrtc = None
 
         result.append({
             "id": cam_id,
@@ -40,7 +39,6 @@ async def get_cameras_logic():
             "status": cam.cam_status,
             "stream_url": cam.stream_url,
             "playback_url": hls_url,
-            "playback_webrtc": playback_webrtc,
             "location_name": cam.location.loc_name if cam.location else None,
         })
     return result, 200
@@ -173,5 +171,76 @@ async def unpublish_camera_from_mediamtx(camera_id):
             return {"status": "success", "message": "Unpublished and worker stopped"}, 200
         else:
             return {"status": "success", "message": "No worker found; cleaned state"}, 200
+    except Exception as e:
+        return {"error": str(e)}, 500
+
+async def permanently_delete_camera_logic(camera_id):
+    """Permanently delete an archived camera (hard delete from database)."""
+    try:
+        camera = await db.camera.find_unique(where={"id": int(camera_id)})
+        if not camera:
+            return {"error": "Camera not found"}, 404
+        
+        # Stop any running workers before deletion
+        from src.services.mediamtx_controller import stop_worker
+        try:
+            stop_worker(camera_id)
+        except Exception as e:
+            print(f"[camera_controller] Warning: Failed to stop worker: {e}")
+        
+        # Hard delete from database
+        await db.camera.delete(where={"id": int(camera_id)})
+        return {"status": "success", "message": f"Camera permanently deleted"}, 200
+    except Exception as e:
+        return {"error": str(e)}, 500
+
+async def get_archived_cameras_logic():
+    """Retrieve all archived (deleted) cameras for admin review."""
+    cameras = await db.camera.find_many(include={"location": True})
+    result = []
+    for cam in cameras:
+        if not (cam.cam_name or '').startswith('[DELETED] '):
+            continue  # Only show archived cameras
+        
+        cam_id = str(cam.id)
+        # Extract original name by removing [DELETED] prefix
+        original_name = cam.cam_name.replace('[DELETED] ', '') if cam.cam_name else 'Unknown'
+        result.append({
+            "id": cam_id,
+            "name": cam.cam_name,
+            "original_name": original_name,
+            "location_name": cam.location.loc_name if cam.location else None,
+            "stream_url": cam.stream_url,
+        })
+    return result, 200
+
+async def restore_camera_logic(camera_id):
+    """Restore an archived camera back to active status."""
+    try:
+        camera = await db.camera.find_unique(where={"id": int(camera_id)})
+        if not camera:
+            return {"error": "Camera not found"}, 404
+        
+        # Check if it's actually archived
+        if not (camera.cam_name or '').startswith('[DELETED] '):
+            return {"error": "Camera is not archived"}, 400
+        
+        # Remove [DELETED] prefix and restore the camera
+        restored_name = camera.cam_name.replace('[DELETED] ', '')
+        # Restore stream URL (try to recover original RTSP URL pattern)
+        restored_stream_url = camera.stream_url
+        if restored_stream_url.startswith('deleted://'):
+            # If we have original RTSP, great; otherwise user will need to update it
+            restored_stream_url = 'rtsp://example-camera-url'  # Default placeholder
+        
+        await db.camera.update(
+            where={"id": int(camera_id)},
+            data={
+                "cam_name": restored_name,
+                "cam_status": True,
+                "stream_url": restored_stream_url
+            }
+        )
+        return {"status": "success", "message": f"Camera '{restored_name}' restored and auto-published"}, 200
     except Exception as e:
         return {"error": str(e)}, 500

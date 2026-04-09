@@ -1,16 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { FaPlus, FaCameraRetro, FaMapMarkerAlt, FaTrash } from 'react-icons/fa';
-import { useLocalStorageSet } from '../../hooks/useLocalStorageSet';
+import { FaPlus, FaCameraRetro, FaMapMarkerAlt, FaTrash, FaUndo } from 'react-icons/fa';
 import { useCameraManager } from '../../hooks/useCameraManager';
 import { useLocationManager } from '../../hooks/useLocationManager';
-import { publishCamera, unpublishCamera } from '../../services/apiService.js';
 import Modal from '../../components/Modal';
 import CameraTable from '../../components/CameraTable';
 import LocationTable from '../../components/LocationTable';
 import { TableInput, EmptyState } from '../../components/FormComponents';
 import { messageClass, tabButtonClass } from '../../utils/uiConstants';
 
-// Helper: Ensure RTSP URL has subtype=1 for optimal performance
 const ensureSubtype = (url) => {
   if (!url) return url;
   if (!url.includes('subtype=')) {
@@ -22,8 +19,9 @@ const ensureSubtype = (url) => {
 
 export default function CameraManager({ locations: initialLocations, onCameraUpdated, readOnly = false }) {
   const [activeTab, setActiveTab] = useState('list');
-  const [publishedCameras, setPublishedCameras] = useLocalStorageSet('publishedCameras');
   const [deleteModal, setDeleteModal] = useState({ open: false, type: '', id: null });
+  const [permanentDeleteModal, setPermanentDeleteModal] = useState({ open: false, id: null, name: '' });
+  const [archivedCameras, setArchivedCameras] = useState([]);
 
   const cam = useCameraManager(onCameraUpdated);
   const loc = useLocationManager();
@@ -61,6 +59,59 @@ export default function CameraManager({ locations: initialLocations, onCameraUpd
     loc.fetchLocations();
   }, []);
 
+  const fetchArchivedCameras = async () => {
+    try {
+      const response = await fetch('/api/cameras/archived', {
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('authToken')}` }
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setArchivedCameras(data.archived_cameras || []);
+      }
+    } catch (err) {
+      console.error('Failed to fetch archived cameras:', err);
+      cam.setMessage({ text: 'Failed to load archived cameras', type: 'error' });
+    }
+  };
+
+  const handleRestoreCamera = async (cameraId) => {
+    try {
+      const response = await fetch(`/api/cameras/${cameraId}/restore`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('authToken')}` }
+      });
+      if (response.ok) {
+        cam.setMessage({ text: 'Camera restored and auto-published successfully!', type: 'success' });
+        await fetchArchivedCameras();
+        await cam.fetchCameras();
+      } else {
+        const err = await response.json();
+        cam.setMessage({ text: `Restore failed: ${err.error || 'Unknown error'}`, type: 'error' });
+      }
+    } catch (err) {
+      cam.setMessage({ text: `Restore error: ${err.message}`, type: 'error' });
+    }
+  };
+
+  const handlePermanentDelete = async (cameraId) => {
+    try {
+      const response = await fetch(`/api/cameras/${cameraId}/permanent`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('authToken')}` }
+      });
+      if (response.ok) {
+        cam.setMessage({ text: 'Camera permanently deleted!', type: 'success' });
+        setPermanentDeleteModal({ open: false, id: null, name: '' });
+        await fetchArchivedCameras();
+      } else {
+        const err = await response.json();
+        cam.setMessage({ text: `Delete failed: ${err.error || 'Unknown error'}`, type: 'error' });
+      }
+    } catch (err) {
+      cam.setMessage({ text: `Delete error: ${err.message}`, type: 'error' });
+    }
+  };
+
   useEffect(() => {
     if (loc.locations.length > 0 && !cam.newCam.locId) cam.setNewCam(p => ({ ...p, locId: loc.locations[0].id }));
     if (cam.editingCam && !cam.editingCam.loc_id && loc.locations.length > 0) cam.setEditingCam(p => ({ ...p, loc_id: loc.locations[0].id }));
@@ -75,30 +126,6 @@ export default function CameraManager({ locations: initialLocations, onCameraUpd
     e.preventDefault();
     if (!cam.editingCam.cam_name.trim()) { cam.setMessage({ text: 'Camera name cannot be empty.', type: 'error' }); return; }
     await cam.updateCamera(cam.editingCam.id, { cam_name: cam.editingCam.cam_name, stream_url: ensureSubtype(cam.editingCam.stream_url), loc_id: parseInt(cam.editingCam.loc_id) || loc.locations[0]?.id });
-  };
-
-  const handlePublish = async (cameraId) => {
-    const isPublished = publishedCameras.has(cameraId);
-    try {
-      const fn = isPublished ? unpublishCamera : publishCamera;
-      const resp = await fn(cameraId);
-      // If backend indicates mediamtx.yml was malformed, mark this camera as 'no display'
-      if (resp && resp.no_display) {
-        try {
-          localStorage.setItem(`camera_${cameraId}_no_display`, '1');
-        } catch (e) {}
-      } else {
-        try { localStorage.removeItem(`camera_${cameraId}_no_display`); } catch (e) {}
-      }
-      setPublishedCameras(p => {
-        const u = new Set(p);
-        isPublished ? u.delete(cameraId) : u.add(cameraId);
-        return u;
-      });
-      cam.setMessage({ text: `${isPublished ? 'Unpublished' : 'Published'} successfully!`, type: 'success' });
-    } catch (err) {
-      cam.setMessage({ text: `Failed: ${err.message}`, type: 'error' });
-    }
   };
 
   const handleAddLocation = async (e) => {
@@ -123,13 +150,14 @@ export default function CameraManager({ locations: initialLocations, onCameraUpd
       <div className="flex gap-2 mb-12">
         <button onClick={() => setActiveTab('list')} className={tabButtonClass(activeTab === 'list')}>Camera List ({cam.cameras.length})</button>
         {!readOnly && <button onClick={() => setActiveTab('add')} className={tabButtonClass(activeTab === 'add')}>Add Camera</button>}
-        <button onClick={() => setActiveTab('locations')} className={tabButtonClass(activeTab === 'locations')}>Locations ({loc.locations.length})</button>
+        <button onClick={() => { setActiveTab('locations'); }} className={tabButtonClass(activeTab === 'locations')}>Locations ({loc.locations.length})</button>
+        {!readOnly && <button onClick={() => { setActiveTab('archived'); fetchArchivedCameras(); }} className={tabButtonClass(activeTab === 'archived')}>Archived Cameras</button>}
       </div>
 
       {activeTab === 'list' && (
         cam.cameras.length === 0 
           ? <EmptyState Icon={FaCameraRetro} message="No cameras yet. Add a camera from the Add Camera tab." />
-          : <div className="max-h-screen overflow-y-auto pr-2"><CameraTable cameras={cam.cameras} locations={loc.locations} editingCam={cam.editingCam} setEditingCam={cam.setEditingCam} publishedCameras={publishedCameras} onEdit={(c) => cam.setEditingCam({ ...c, cam_name: c.name, stream_url: c.stream_url || '', loc_id: c.location_id || loc.locations[0]?.id })} onDelete={(id) => setDeleteModal({ open: true, type: 'camera', id })} onPublish={handlePublish} onUpdate={handleUpdateCamera} readOnly={readOnly} /></div>
+          : <div className="max-h-screen overflow-y-auto pr-2"><CameraTable cameras={cam.cameras} locations={loc.locations} editingCam={cam.editingCam} setEditingCam={cam.setEditingCam} onEdit={(c) => cam.setEditingCam({ ...c, cam_name: c.name, stream_url: c.stream_url || '', loc_id: c.location_id || loc.locations[0]?.id })} onDelete={(id) => setDeleteModal({ open: true, type: 'camera', id })} onUpdate={handleUpdateCamera} readOnly={readOnly} /></div>
       )}
 
       {!readOnly && activeTab === 'add' && (
@@ -163,7 +191,59 @@ export default function CameraManager({ locations: initialLocations, onCameraUpd
         </>
       )}
 
-      <Modal isOpen={deleteModal.open && deleteModal.type === 'camera'} onClose={() => setDeleteModal({ open: false, type: '', id: null })} title="Confirm Deletion" message={`Delete ${cam.cameras.find(c => c.id === deleteModal.id)?.name || 'camera'}?`} warning="This action cannot be undone." icon={FaTrash} confirmText="Delete" onConfirm={() => { cam.deleteCamera(deleteModal.id); setDeleteModal({ open: false, type: '', id: null }); }} isDangerous={true} />
+      {activeTab === 'archived' && (
+        <div className="space-y-4">
+          <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 p-4 rounded-lg text-sm">
+            <strong> ℹ  Archived Cameras:</strong> Deleted cameras are archived to preserve event history and camera linkages. You can restore them to active status below.
+          </div>
+          {archivedCameras.length === 0 
+            ? <EmptyState Icon={FaCameraRetro} message="No archived cameras. All cameras are active." />
+            : (
+              <div className="overflow-x-auto">
+                <table className="w-full border-collapse">
+                  <thead>
+                    <tr className="bg-gray-200">
+                      <th className="px-4 py-3 text-left font-semibold text-gray-900">Original Name</th>
+                      <th className="px-4 py-3 text-left font-semibold text-gray-900">Current Status</th>
+                      <th className="px-4 py-3 text-left font-semibold text-gray-900">Location</th>
+                      <th className="px-4 py-3 text-left font-semibold text-gray-900">Stream URL</th>
+                      <th className="px-4 py-3 text-center font-semibold text-gray-900">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {archivedCameras.map((cam, idx) => (
+                      <tr key={cam.id} className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-100'}>
+                        <td className="px-4 py-3 text-gray-900 font-semibold">{cam.original_name}</td>
+                        <td className="px-4 py-3 text-gray-700">Archived</td>
+                        <td className="px-4 py-3 text-gray-700">{cam.location_name || 'Unknown'}</td>
+                        <td className="px-4 py-3 text-gray-600 text-sm truncate">{cam.stream_url}</td>
+                        <td className="px-4 py-3 text-center">
+                          <button 
+                            onClick={() => handleRestoreCamera(cam.id)} 
+                            className="bg-green-600 text-white text-xs py-1 px-3 rounded hover:bg-green-700 font-semibold"
+                          >
+                            Restore
+                          </button>
+                          <button 
+                            onClick={() => setPermanentDeleteModal({ open: true, id: cam.id, name: cam.original_name })} 
+                            className="bg-red-600 text-white text-xs py-1 px-3 rounded hover:bg-red-700 font-semibold ml-2"
+                          >
+                            Delete Permanently
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )
+          }
+        </div>
+      )}
+
+      <Modal isOpen={deleteModal.open && deleteModal.type === 'camera'} onClose={() => setDeleteModal({ open: false, type: '', id: null })} title="Archive Camera?" message={`Archive ${cam.cameras.find(c => c.id === deleteModal.id)?.name || 'camera'}?`} warning="The camera will be moved to Archived and can be restored later." icon={FaTrash} confirmText="Archive" onConfirm={() => { cam.deleteCamera(deleteModal.id); setDeleteModal({ open: false, type: '', id: null }); }} isDangerous={false} />
+      <Modal isOpen={deleteModal.open && deleteModal.type === 'location'} onClose={() => setDeleteModal({ open: false, type: '', id: null })} title="Confirm Deletion" message={`Delete ${loc.locations.find(l => l.id === deleteModal.id)?.name || 'location'}?`} warning="⚠️ Reassign/remove all cameras first." icon={FaTrash} confirmText="Delete" onConfirm={() => { loc.deleteLocation(deleteModal.id); setDeleteModal({ open: false, type: '', id: null }); }} isDangerous={true} />
+      <Modal isOpen={permanentDeleteModal.open} onClose={() => setPermanentDeleteModal({ open: false, id: null, name: '' })} title="Permanently Delete Camera?" message={`Permanently delete "${permanentDeleteModal.name}"? This cannot be undone.`} warning="⚠️ This will delete all camera data from the database. Events linked to this camera will lose the camera reference." icon={FaTrash} confirmText="Delete Permanently" onConfirm={() => { handlePermanentDelete(permanentDeleteModal.id); }} isDangerous={true} />
       <Modal isOpen={deleteModal.open && deleteModal.type === 'location'} onClose={() => setDeleteModal({ open: false, type: '', id: null })} title="Confirm Deletion" message={`Delete ${loc.locations.find(l => l.id === deleteModal.id)?.name || 'location'}?`} warning="⚠️ Reassign/remove all cameras first." icon={FaTrash} confirmText="Delete" onConfirm={() => { loc.deleteLocation(deleteModal.id); setDeleteModal({ open: false, type: '', id: null }); }} isDangerous={true} />
     </div>
   );

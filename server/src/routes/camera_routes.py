@@ -13,6 +13,9 @@ from src.controllers.camera_controller import (
     delete_camera_logic,
     publish_camera_to_mediamtx,
     unpublish_camera_from_mediamtx,
+    get_archived_cameras_logic,
+    restore_camera_logic,
+    permanently_delete_camera_logic,
 )
 from src.utils.auth import get_current_user_id, require_admin_user_id
 
@@ -23,22 +26,33 @@ async def get_all_cameras(user_id: str = Depends(get_current_user_id)):
     data, code = await get_cameras_logic()
     return safe_json_response(status_code=code, content={'status': 'success', 'cameras': data})
 
+@router.get('/cameras/archived')
+async def get_archived_cameras(user_id: str = Depends(require_admin_user_id)):
+    """Get list of archived (deleted) cameras for restoration."""
+    data, code = await get_archived_cameras_logic()
+    return safe_json_response(status_code=code, content={'status': 'success', 'archived_cameras': data})
+
 @router.get('/cameras/{camera_id}')
 async def get_single_camera(camera_id: int, user_id: str = Depends(get_current_user_id)):
     result, code = await get_camera_logic(camera_id)
     return safe_json_response(status_code=code, content=result)
 
-# NEW: Logic for manually adding a camera via the Management UI
+# Logic for manually adding a camera via the Management UI
 @router.post('/cameras')
 async def create_camera(camera_data: dict, user_id: str = Depends(require_admin_user_id)):
     camera_data = sanitize_input(camera_data)
     # 1. Save the camera details (Name, RTSP Link, Location) to the database
     result, code = await create_camera_logic(camera_data)
     
-    # 2. If the database save was successful (201 Created)
-    # Streaming/background capture has been removed; do not start stream tasks here.
+    # 2. If the database save was successful (201 Created), auto-spawn processing worker
     if code == 201:
-        pass
+        try:
+            camera_id = result.get('camera_id')
+            if camera_id:
+                publish_result, publish_code = await publish_camera_to_mediamtx(int(camera_id))
+                print(f"[camera_routes] Auto-spawned worker for new camera {camera_id}: {publish_result.get('status', 'started') if isinstance(publish_result, dict) else 'started'}")
+        except Exception as e:
+            print(f"[camera_routes] Warning: Failed to auto-spawn worker for new camera: {e}")
         
     return safe_json_response(status_code=code, content=result)
 
@@ -104,3 +118,30 @@ async def sync_published_cameras(request: Request):
     except Exception as e:
         print(f"[sync_published_cameras] Error: {e}")
         return JSONResponse(status_code=500, content={'error': str(e)})
+
+
+@router.post('/cameras/{camera_id}/restore')
+async def restore_camera(camera_id: int, user_id: str = Depends(require_admin_user_id)):
+    """Restore an archived camera back to active status."""
+    try:
+        result, code = await restore_camera_logic(camera_id)
+        # Auto-start the worker after restoration
+        if code == 200:
+            try:
+                publish_result, publish_code = await publish_camera_to_mediamtx(camera_id)
+                print(f"[restore_camera] Auto-spawned worker for restored camera {camera_id}")
+            except Exception as e:
+                print(f"[restore_camera] Warning: Failed to auto-spawn worker: {e}")
+        return safe_json_response(status_code=code, content=result)
+    except Exception as e:
+        return safe_json_response(status_code=500, content={'error': str(e)})
+
+
+@router.delete('/cameras/{camera_id}/permanent')
+async def permanently_delete_camera(camera_id: int, user_id: str = Depends(require_admin_user_id)):
+    """Permanently delete an archived camera from the database (hard delete)."""
+    try:
+        result, code = await permanently_delete_camera_logic(camera_id)
+        return safe_json_response(status_code=code, content=result)
+    except Exception as e:
+        return safe_json_response(status_code=500, content={'error': str(e)})

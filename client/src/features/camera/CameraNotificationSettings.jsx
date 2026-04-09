@@ -183,7 +183,7 @@ export default function CameraNotificationSettings() {
                     AI Detection & Camera Activation
                 </h2>
                 <p className="text-sm text-gray-500 mb-4">
-                    Control AI inference and detection models for all cameras.
+                    Control AI inference and detection models for all cameras. Cameras are automatically published and streaming when created.
                 </p>
 
                 <div className="space-y-3">
@@ -192,17 +192,17 @@ export default function CameraNotificationSettings() {
                         label="Enable AI Detection (YOLO)"
                         description={
                             globalSettings.ai_enabled
-                                ? 'Inference is enabled using YOLO model'
-                                : 'Raw streaming data is used'
+                                ? 'Inference is enabled using YOLO model for all cameras'
+                                : 'Raw streaming data is used (no AI detection)'
                         }
                         checked={globalSettings.ai_enabled}
                         onToggle={(v) => saveGlobalSettings({ ai_enabled: v })}
                         colorClass="peer-checked:bg-teal-600"
                     />
 
-                    {/* Placeholder for Per-Camera Settings */}
-                    <div className="p-4 bg-blue-50 border border-blue-300 text-blue-800 rounded-lg text-sm mt-4">
-                        Per-camera model activation controls will be implemented here.
+                    {/* Auto-Start Note */}
+                    <div className="p-4 bg-green-50 border border-green-300 text-green-800 rounded-lg text-sm mt-4">
+                        <strong>✓ Auto-Start Enabled:</strong> All cameras automatically start streaming when created or when the server starts up. No manual publishing required.
                     </div>
                 </div>
             </div>

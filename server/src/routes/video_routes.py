@@ -42,7 +42,6 @@ def _load_yolo_model():
             p.endswith('.xml') or p.endswith('.bin') for p in os.listdir(model_path)
         )
         
-        # For OpenVINO models, pass device='cpu' to avoid CUDA errors
         # OPENVINO_DEVICE env var controls actual device (CPU/GPU/HETERO:GPU,CPU)
         YOLO_MODEL = YOLO(model_path, task='detect')
         ov_device = os.environ.get('OPENVINO_DEVICE') or os.environ.get('DEVICE') or 'HETERO:GPU,CPU'
@@ -326,17 +325,15 @@ async def detect_endpoint(request: Request):
 
 @router.get('/mediamtx_health')
 async def mediamtx_health():
-    """Check MediaMTX HTTP (API), WHEP (WebRTC signaling) and RTSP ingest reachability.
+    """Check MediaMTX HTTP (API) and RTSP ingest reachability.
 
     Returns a JSON summary with actionable messages for the UI.
     """
     MEDIAMTX_API = os.getenv('MEDIAMTX_API', 'http://127.0.0.1:8888')
-    MEDIAMTX_WHEP = os.getenv('MEDIAMTX_WHEP', 'http://127.0.0.1:8889')
     MEDIAMTX_URL = os.getenv('MEDIAMTX_URL', 'rtsp://127.0.0.1:8888')
 
     result = {
         'api': {'url': MEDIAMTX_API, 'ok': False, 'status_code': None, 'error': None},
-        'whep': {'url': MEDIAMTX_WHEP, 'ok': False, 'status_code': None, 'error': None},
         'rtsp': {'url': MEDIAMTX_URL, 'ok': False, 'error': None},
         'ok': False,
     }
@@ -368,18 +365,15 @@ async def mediamtx_health():
 
     await asyncio.gather(
         _check_http(MEDIAMTX_API, 'api'),
-        _check_http(MEDIAMTX_WHEP, 'whep'),
         _check_rtsp(MEDIAMTX_URL),
     )
 
-    result['ok'] = result['api']['ok'] and result['whep']['ok'] and result['rtsp']['ok']
+    result['ok'] = result['api']['ok'] and result['rtsp']['ok']
 
     # Add friendly messages
     messages = []
     if not result['api']['ok']:
         messages.append('MediaMTX HTTP API unreachable. Check MEDIAMTX_API and that MediaMTX is running.')
-    if not result['whep']['ok']:
-        messages.append('MediaMTX WebRTC/WHEP unreachable. WebRTC playback will fail; check MEDIAMTX_WHEP and firewall/ports.')
     if not result['rtsp']['ok']:
         messages.append('MediaMTX RTSP ingest unreachable. Backend cannot push RTSP streams to MediaMTX.')
 

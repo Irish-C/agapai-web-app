@@ -639,6 +639,16 @@ def run_worker(src, target, camera_id, model_path=None, camera_name="Unknown"):
             pass
         try:
             ff.terminate()
+            # Wait for process to exit (max 5 seconds)
+            ff.wait(timeout=5)
+            print(f"[processing_worker] [CLEANUP] FFmpeg process terminated gracefully")
+        except subprocess.TimeoutExpired:
+            print(f"[processing_worker] [CLEANUP] FFmpeg did not exit in time, forcing kill")
+            try:
+                ff.kill()
+                ff.wait(timeout=2)  # Wait for kill to be processed
+            except Exception as e:
+                print(f"[processing_worker] [CLEANUP] Error force-killing FFmpeg: {e}")
         except Exception:
             pass
         cap.release()

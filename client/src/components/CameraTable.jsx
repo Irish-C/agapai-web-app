@@ -2,7 +2,7 @@ import React from 'react';
 import { FaSave } from 'react-icons/fa';
 import { TableInput, ActionButtons } from './FormComponents';
 
-export default function CameraTable({ cameras, locations, editingCam, setEditingCam, publishedCameras, onEdit, onDelete, onPublish, onUpdate, readOnly = false }) {
+export default function CameraTable({ cameras, locations, editingCam, setEditingCam, onEdit, onDelete, onUpdate, readOnly = false }) {
   const sanitizeCameraName = (value) => {
     if (typeof value !== 'string') return '';
     return value
@@ -57,8 +57,7 @@ export default function CameraTable({ cameras, locations, editingCam, setEditing
                   return (
                     <ActionButtons buttons={[
                       { label: 'Edit', onClick: () => onEdit(cam), className: 'bg-blue-600 text-white text-xs py-1 px-2 rounded hover:bg-blue-700 font-semibold disabled:opacity-50', disabled: locations.length === 0 },
-                      { label: 'Delete', onClick: () => onDelete(cam.id), className: 'bg-red-600 text-white text-xs py-1 px-2 rounded hover:bg-red-700 font-semibold' },
-                      { label: publishedCameras.has(cam.id) ? 'Unpublish' : 'Publish', onClick: () => onPublish(cam.id), className: publishedCameras.has(cam.id) ? 'bg-gray-600 text-white text-xs py-1 px-2 rounded hover:bg-gray-700 font-semibold' : 'bg-yellow-600 text-white text-xs py-1 px-2 rounded hover:bg-yellow-700 font-semibold' },
+                      { label: 'Archive', onClick: () => onDelete(cam.id), className: 'bg-yellow-600 text-white text-xs py-1 px-2 rounded hover:bg-yellow-700 font-semibold' },
                     ]} />
                   );
                 })()}

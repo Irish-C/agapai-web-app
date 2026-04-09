@@ -56,17 +56,22 @@ function VideoFeed({ camId, cameraName, location, isFocused, onFocusChange, stre
     );
   } else if (streamUrl) {
     // Use HLS video stream (supports both .m3u8 and regular video URLs)
-    if (streamUrl.includes('.m3u8') || streamUrl.includes('/hls/')) {
-      // HLS stream managed by HLS.js
-      content = (
-        <video ref={videoRef} className="w-full h-full object-cover" muted playsInline controls />
-      );
-    } else {
+    // if (streamUrl.includes('.m3u8') || streamUrl.includes('/hls/')) {
+    //   // HLS stream managed by HLS.js
+    //   content = (
+    //     <video ref={videoRef} className="w-full h-full object-cover" muted playsInline controls />
+    //   );
+    // } else {
       // Regular video stream
+      // content = (
+      //   <video src={streamUrl} className="w-full h-full object-cover" autoPlay muted playsInline controls />
+      // );s
       content = (
-        <video src={streamUrl} className="w-full h-full object-cover" autoPlay muted playsInline controls />
+        <div>
+          <img src={"http://192.168.2.72:3000/video_feed?ip=192.168.2.211&pass=agapai143&t=1775720354654"} className="w-full h-full object-cover" autoPlay muted playsInline controls />
+        </div>
       );
-    }
+    // }
   } else {
     // No stream available
     content = (
@@ -83,7 +88,7 @@ function VideoFeed({ camId, cameraName, location, isFocused, onFocusChange, stre
     <div ref={wrapperRef} className={`group bg-black rounded-none shadow-md overflow-hidden border-2 border-gray-700 relative ${!isFocused ? 'cursor-pointer hover:border-teal-500 transition-all' : 'border-teal-600'}`} onClick={() => !isFocused && onFocusChange?.(camId)}>
       <div className="absolute top-0 left-0 w-full text-white p-2 flex items-center justify-between z-10">
         <div className="flex items-center gap-2 overflow-hidden min-w-0">
-          <h4 className="font-semibold text-sm truncate">{cameraName}</h4>
+          <h4 className="font-semibold text-sm truncate">{cameraName}11234567890-80798675</h4>
           <p className="text-xs text-gray-400 truncate font-normal">{location}</p>
         </div>
         <div className="flex items-center gap-2">

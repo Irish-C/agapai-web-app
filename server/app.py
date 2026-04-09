@@ -44,8 +44,8 @@ if local_env.exists():
 else:
     load_dotenv(dotenv_path=server_env)
 
-## print(f"DEBUG: Looking for .env at: {env_path}")
-## print(f"DEBUG: DATABASE_URL is: {os.getenv('DATABASE_URL')}")
+# print(f"DEBUG: Looking for .env at: {env_path}")
+# print(f"DEBUG: DATABASE_URL is: {os.getenv('DATABASE_URL')}")
 
 # --- 2. Socket.IO (ASGI) - centralized in socket_manager to prevent circular imports ---
 from src.services.socket_manager import socketio_server, connected_sids
@@ -72,7 +72,22 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         print(f'[WARN] Failed to start Redis detection consumer: {e}')
 
-    # Streaming startup disabled per user request (starting from scratch)
+    # Auto-start processing workers for all active cameras
+    try:
+        from src.controllers.camera_controller import publish_camera_to_mediamtx
+        active_cameras = await db.camera.find_many(where={"cam_status": True})
+        print(f"[INFO] Found {len(active_cameras)} active camera(s) to resume")
+        for cam in active_cameras:
+            # Skip deleted cameras
+            if (cam.cam_name or '').startswith('[DELETED] '):
+                continue
+            try:
+                result, code = await publish_camera_to_mediamtx(cam.id)
+                print(f"[INFO] Auto-started camera {cam.id} ({cam.cam_name}): {result.get('status', 'started') if isinstance(result, dict) else 'started'}")
+            except Exception as e:
+                print(f"[WARN] Failed to auto-start camera {cam.id}: {e}")
+    except Exception as e:
+        print(f"[WARN] Error during camera startup: {e}")
 
     yield
     # --- Shutdown Logic ---
