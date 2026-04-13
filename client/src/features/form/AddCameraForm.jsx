@@ -67,10 +67,10 @@ function AddCameraForm({ onCameraAdded }) {
     const newCamera = {
       cam_name: sanitizedName,
       stream_url: sanitizedStreamUrl,
-      loc_id: parseInt(sanitizedLocationId, 10) // Make sure ID is a number
+      loc_id: parseInt(sanitizedLocationId, 10)
     };
 
-    // 2. Send the POST request to your API
+    // 2. Send the POST request to API
     fetch('/api/cameras', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
