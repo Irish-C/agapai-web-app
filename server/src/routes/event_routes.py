@@ -21,6 +21,26 @@ async def create_event(request: Request, user_id: str = Depends(get_current_user
     result, code = await create_event_logic(data)
     return safe_json_response(status_code=code, content=result)
 
+@router.post('/alerts')
+async def create_alert_from_flask(request: Request):
+    """Receive alerts from Flask AI service and broadcast via Socket.IO"""
+    try:
+        data = await get_sanitized_json(request)
+        # Flask sends: camera_id, alert_message, event_class_id, snapshot_url, timestamp
+        # Convert to event_logic format
+        event_data = {
+            'camera_id': data.get('camera_id'),
+            'event_class_id': data.get('event_class_id', 1),
+            'message': data.get('alert_message', ''),
+            'snapshot_url': data.get('snapshot_url', ''),
+            'timestamp': data.get('timestamp')
+        }
+        result, code = await create_event_logic(event_data)
+        return safe_json_response(status_code=code, content=result)
+    except Exception as e:
+        print(f"[ALERT ROUTE ERROR] {e}")
+        return safe_json_response(status_code=500, content={'error': str(e)})
+
 # server/src/routes/event_routes.py
 
 @router.get('/event_logs') # Ensure this is exactly '/event_logs'

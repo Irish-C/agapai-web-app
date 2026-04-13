@@ -2,7 +2,8 @@ import cv2
 import os
 import time
 import threading
-import serial 
+import serial
+import requests
 from flask import Flask, Response, request, render_template_string, jsonify
 from ultralytics import YOLO
 
@@ -46,6 +47,35 @@ def trigger_hardware(state):
             esp32.write(b'1' if state == "ON" else b'0')
         except:
             pass
+
+def publish_alert_to_backend(camera_id, alert_message, event_type="Detection"):
+    """Publish alert to backend for database logging and Socket.IO broadcasting"""
+    try:
+        # Map alert message to event class ID
+        event_class_id = 1  # Default: General Detection
+        if "Floor" in alert_message or "Fall" in alert_message:
+            event_class_id = 2  # Fall/Floor
+        elif "Inactivity" in alert_message:
+            event_class_id = 3  # Inactivity
+        
+        payload = {
+            'camera_id': camera_id,
+            'event_class_id': event_class_id,
+            'alert_message': alert_message,
+            'snapshot_url': '',
+            'timestamp': time.time()
+        }
+        response = requests.post(
+            'http://localhost:5000/api/alerts',
+            json=payload,
+            timeout=2
+        )
+        if response.status_code in [200, 201]:
+            print(f"[ALERT SENT] Camera {camera_id}: {alert_message}")
+        else:
+            print(f"[ALERT ERROR] Backend returned {response.status_code}")
+    except Exception as e:
+        print(f"[ALERT ERROR] Could not send to backend: {e}")
 
 # ==========================================
 # --- AI & TRACKING STATE INITIALIZATION ---
@@ -466,6 +496,11 @@ def generate_frames(rtsp_url):
             # --- UPDATED 10-SECOND HARDWARE TIMER LOGIC ---
             with state_lock:
                 active_alerts = current_frame_alerts
+                
+                # Publish new alerts to backend for logging and Socket.IO
+                if len(current_frame_alerts) > 0:
+                    for alert in current_frame_alerts:
+                        publish_alert_to_backend(current_camera_id, alert)
                 
                 # If there is a new alert and we haven't muted it, push the timer 10 seconds into the future
                 if len(active_alerts) > 0 and not hardware_muted:

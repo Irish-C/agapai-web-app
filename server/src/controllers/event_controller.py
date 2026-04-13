@@ -101,9 +101,18 @@ async def get_event_logs_logic(filters=None):
             include={'camera': {'include': {'location': True}}, 'event_class': True, 'acknowledged_by': True}
         )
         
+        # Sort by unacknowledged first, then acknowledged, with most recent timestamps first within each group
+        sorted_logs = sorted(
+            logs,
+            key=lambda log: (
+                0 if log.event_status == 'unacknowledged' else 1,  # unacknowledged (0) comes before acknowledged (1)
+                -log.timestamp.timestamp()  # Most recent first (negative timestamp for descending)
+            )
+        )
+        
         # Convert BigInt and DateTime to strings for JSON
         formatted_data = []
-        for log in logs:
+        for log in sorted_logs:
             formatted_data.append({
                 "id": str(log.id),
                 "type": log.event_class.class_name if log.event_class else "Unknown",
@@ -132,9 +141,18 @@ async def get_viewed_event_logs_logic(filters=None):
             include={'camera': {'include': {'location': True}}, 'event_class': True}
         )
         
+        # Sort by unacknowledged first, then acknowledged, with most recent timestamps first within each group
+        sorted_logs = sorted(
+            logs,
+            key=lambda log: (
+                0 if log.event_status == 'unacknowledged' else 1,  # unacknowledged (0) comes before acknowledged (1)
+                -log.timestamp.timestamp()  # Most recent first (negative timestamp for descending)
+            )
+        )
+        
         # Convert BigInt and DateTime to strings for JSON
         formatted_data = []
-        for log in logs:
+        for log in sorted_logs:
             formatted_data.append({
                 "id": str(log.id),
                 "type": log.event_class.class_name if log.event_class else "Unknown",

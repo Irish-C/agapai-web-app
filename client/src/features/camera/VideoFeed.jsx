@@ -113,12 +113,12 @@ function VideoFeed({ camId, cameraName, location, isFocused, onFocusChange, stre
 
         {isFocused ? (
           <div className="absolute top-2 right-2 flex gap-2 z-20">
-            <button onClick={(e) => { e.stopPropagation(); fetch(`/api/cameras/${camId}/publish`, { method: 'POST' }).then(() => window.open('http://localhost:3000', '_blank')).catch(err => console.error('Failed to start AI:', err)); }} className="p-2 bg-blue-600/80 rounded-full text-white hover:bg-blue-700 transition-colors" title="View AI Detection"><FaBrain /></button>
+            <button onClick={(e) => { e.stopPropagation(); fetch(`/api/cameras/${camId}/publish`, { method: 'POST' }).then(() => window.open('http://localhost:3000', '_blank')).catch(err => console.error('Failed to start AI:', err)); }} className="p-2 bg-green-600/80 rounded-full text-white hover:bg-green-700 transition-colors" title="View AI Detection"><FaBrain /></button>
             <button onClick={(e) => { e.stopPropagation(); onFocusChange?.(null); }} className="p-2 bg-black/60 rounded-full text-white hover:bg-red-600 transition-colors" title="Return to Grid"><FaTimes /></button>
           </div>
         ) : (
           <div className="absolute top-2 right-2 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity z-20">
-            <button onClick={(e) => { e.stopPropagation(); fetch(`/api/cameras/${camId}/publish`, { method: 'POST' }).then(() => window.open('http://localhost:3000', '_blank')).catch(err => console.error('Failed to start AI:', err)); }} className="p-2 bg-blue-600/80 rounded-full text-white hover:bg-blue-700 transition-colors" title="View AI Detection"><FaBrain /></button>
+            <button onClick={(e) => { e.stopPropagation(); fetch(`/api/cameras/${camId}/publish`, { method: 'POST' }).then(() => window.open('http://localhost:3000', '_blank')).catch(err => console.error('Failed to start AI:', err)); }} className="p-2 bg-blue-600/80 rounded-full text-white hover:bg-gray-700 transition-colors" title="View AI Detection"><FaBrain /></button>
             <div className="p-2 bg-black/60 rounded-full text-white" title="Focus"><FaExpand /></div>
           </div>
         )}
