@@ -35,6 +35,13 @@ export default defineConfig({
       '/api': { target: 'http://127.0.0.1:5000', changeOrigin: true, secure: false },
       '/socket.io': { target: 'http://127.0.0.1:5000', ws: true, changeOrigin: true, secure: false },
       '/detect': { target: 'http://127.0.0.1:5000', changeOrigin: true, secure: false },
+      // Snapshots from AI Service (port 3000)
+      '/snapshots/': {
+        target: 'http://127.0.0.1:3000/api/snapshots',
+        changeOrigin: true,
+        secure: false,
+        rewrite: (path) => path.replace(/^\/snapshots\//, ''),
+      },
       // MJPEG streams from AI Service (port 3000)
       // Browser requests: /mjpeg/?camera_id=1
       // Forward to: http://127.0.0.1:3000/api/video_feed?camera_id=1

@@ -77,21 +77,29 @@ async def create_event_logic(data):
         else:
             print(f"  [LOOKUP] No class_name provided, using event_class_id={event_class_id}")
         
-        # Check for recent matching incident (within 5 seconds)
-        time_window = datetime.now(timezone.utc) - timedelta(seconds=5)
+        # Check for recent matching incident (within 60 seconds for accumulation)
+        time_window = datetime.now(timezone.utc) - timedelta(seconds=60)
+        
+        print(f"  [DEDUP] Checking for recent events:")
+        print(f"    - Camera ID: {camera_id}")
+        print(f"    - Event Class ID: {event_class_id}")
+        print(f"    - Time window: {time_window} to now")
         
         recent_event = await db.eventlog.find_first(
             where={
                 'cam_id': camera_id,
                 'event_class_id': event_class_id,
                 'timestamp': {'gte': time_window},
-                'event_status': 'unacknowledged'
             },
             order={'timestamp': 'desc'}
         )
         
         if recent_event:
-            print(f"  [DEDUP] Found recent matching incident (ID={recent_event.id})")
+            print(f"  [DEDUP] ✓ Found recent event (ID={recent_event.id}, status={recent_event.event_status})")
+            print(f"         Last event timestamp: {recent_event.timestamp}")
+            print(f"         Current timestamp: {datetime.now(timezone.utc)}")
+            print(f"         Time diff: {(datetime.now(timezone.utc) - recent_event.timestamp).total_seconds()}s")
+            
             # Accumulate snapshots
             existing_data = _parse_snapshot_data(recent_event.file_path)
             

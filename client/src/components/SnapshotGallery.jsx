@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { FaTimes, FaChevronLeft, FaChevronRight } from 'react-icons/fa';
 
 export default function SnapshotGallery({ isOpen, onClose, snapshots = [], title = "Incident Snapshots" }) {
@@ -17,9 +18,9 @@ export default function SnapshotGallery({ isOpen, onClose, snapshots = [], title
     setCurrentIndex((prev) => (prev + 1) % totalSnapshots);
   };
 
-  return (
-    <div className="fixed inset-0 bg-black bg-opacity-75 z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl">
+  const modalContent = (
+    <div className="fixed inset-0 bg-black bg-opacity-75 z-[9999] flex items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl" onClick={(e) => e.stopPropagation()}>
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-200">
           <div>
@@ -41,7 +42,7 @@ export default function SnapshotGallery({ isOpen, onClose, snapshots = [], title
         <div className="bg-gray-900 flex items-center justify-center relative" style={{ minHeight: '400px' }}>
           {currentSnapshot ? (
             <img
-              src={currentSnapshot}
+              src={currentSnapshot.startsWith('http') ? currentSnapshot : currentSnapshot}
               alt={`Snapshot ${currentIndex + 1}`}
               className="max-h-96 max-w-full object-contain"
               onError={(e) => {
@@ -89,7 +90,7 @@ export default function SnapshotGallery({ isOpen, onClose, snapshots = [], title
                 }`}
               >
                 <img
-                  src={snapshot}
+                  src={snapshot.startsWith('http') ? snapshot : snapshot}
                   alt={`Thumbnail ${index + 1}`}
                   className="w-full h-full object-cover"
                   onError={(e) => {
@@ -103,4 +104,6 @@ export default function SnapshotGallery({ isOpen, onClose, snapshots = [], title
       </div>
     </div>
   );
+
+  return createPortal(modalContent, document.body);
 }
