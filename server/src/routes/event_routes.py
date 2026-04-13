@@ -26,11 +26,12 @@ async def create_alert_from_flask(request: Request):
     """Receive alerts from Flask AI service and broadcast via Socket.IO"""
     try:
         data = await get_sanitized_json(request)
-        # Flask sends: camera_id, alert_message, event_class_id, snapshot_url, timestamp
+        # Flask sends: camera_id, alert_message, event_class_id, class_name, snapshot_url, timestamp
         # Convert to event_logic format
         event_data = {
             'camera_id': data.get('camera_id'),
             'event_class_id': data.get('event_class_id', 1),
+            'class_name': data.get('class_name'),  # ADD THIS - critical for classification lookup!
             'message': data.get('alert_message', ''),
             'snapshot_url': data.get('snapshot_url', ''),
             'timestamp': data.get('timestamp')

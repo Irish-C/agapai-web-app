@@ -17,11 +17,23 @@ async def create_event_logic(data):
         event_class_id = int(data.get('event_class_id', 1))
         class_name = data.get('class_name')
         
+        print(f"\n[EVENT_CREATE] START")
+        print(f"  Incoming data: {data}")
+        print(f"  class_name from data: '{class_name}' (type: {type(class_name).__name__})")
+        print(f"  event_class_id from data: {data.get('event_class_id')}")
+        
         if class_name:
+            print(f"  [LOOKUP] Searching for class_name='{class_name}'...")
             # Look up the EventClass by name to get the correct ID
             event_class = await db.eventclass.find_first(where={'class_name': class_name})
             if event_class:
+                old_id = event_class_id
                 event_class_id = event_class.id
+                print(f"  [LOOKUP] ✓ FOUND: event_class_id {old_id} → {event_class_id}")
+            else:
+                print(f"  [LOOKUP] ✗ NOT FOUND in database! Using default event_class_id={event_class_id}")
+        else:
+            print(f"  [LOOKUP] No class_name provided, using event_class_id={event_class_id}")
         
         # Create the event log entry
         new_event = await db.eventlog.create(
@@ -47,6 +59,9 @@ async def create_event_logic(data):
             'snapshot_url': new_event.file_path,
             'status': 'unacknowledged'
         }
+        print(f"  [STORED] EventLog ID={new_event.id}, event_class_id={new_event.event_class_id}, type='{payload['type']}'")
+        print(f"[EVENT_CREATE] END\n")
+        
         # Emit alert to frontend
         await socketio_server.emit('new_alert', payload)
 
