@@ -4,7 +4,7 @@ import uuid
 import asyncio
 import json
 from fastapi import APIRouter, Request
-from fastapi.responses import StreamingResponse, JSONResponse
+from fastapi.responses import StreamingResponse, JSONResponse, HTMLResponse
 import cv2
 import numpy as np
 import httpx
@@ -379,3 +379,248 @@ async def mediamtx_health():
 
     result['messages'] = messages
     return JSONResponse(content=result)
+
+
+# --- Stream Viewer UI ---
+@router.get('/stream/{camera_id}')
+async def stream_viewer_ui(camera_id: int):
+    """Render an HTML page to view a camera's YOLO-enhanced video stream.
+    
+    Provides an interactive UI with controls to toggle AI inference, adjust
+    quality, and configure frame skipping for performance tuning.
+    """
+    try:
+        # Verify camera exists
+        camera = await db.camera.find_unique(where={"id": camera_id})
+        if not camera:
+            return JSONResponse(status_code=404, content={'error': f'Camera {camera_id} not found'})
+        
+        camera_name = getattr(camera, 'cam_name', f'Camera {camera_id}')
+        
+        html_page = f"""<!DOCTYPE html>
+<html>
+<head>
+    <title>{camera_name} - YOLO Stream</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .stream-container {{
+            aspect-ratio: 16/9;
+            background: #1a1a1a;
+            border: 2px solid #333;
+            position: relative;
+            overflow: hidden;
+        }}
+        .stream-container img {{
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }}
+        .status-badge {{
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            padding: 6px 12px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: bold;
+            z-index: 10;
+        }}
+        .status-badge.loading {{
+            background-color: #fbbf24;
+            color: #111;
+        }}
+        .status-badge.streaming {{
+            background-color: #10b981;
+            color: white;
+        }}
+        .status-badge.error {{
+            background-color: #ef4444;
+            color: white;
+        }}
+        .control-group {{
+            background: #1f2937;
+            padding: 16px;
+            border-radius: 8px;
+            margin-bottom: 16px;
+        }}
+        .control-label {{
+            display: block;
+            font-size: 12px;
+            color: #9ca3af;
+            margin-bottom: 6px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }}
+        .control-input {{
+            width: 100%;
+            padding: 8px;
+            background: #111827;
+            border: 1px solid #374151;
+            border-radius: 4px;
+            color: #e5e7eb;
+            font-size: 14px;
+        }}
+        .control-input:focus {{
+            outline: none;
+            border-color: #3b82f6;
+        }}
+        .slider-container {{
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }}
+        .slider-container input[type="range"] {{
+            flex: 1;
+        }}
+        .slider-value {{
+            width: 50px;
+            text-align: right;
+            color: #e5e7eb;
+            font-weight: bold;
+        }}
+    </style>
+</head>
+<body class="bg-slate-950 text-white p-6 font-sans">
+    <div class="max-w-6xl mx-auto">
+        <!-- Header -->
+        <div class="mb-6">
+            <h1 class="text-3xl font-bold text-blue-400">{camera_name}</h1>
+            <p class="text-slate-400 text-sm">Camera ID: {camera_id}</p>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
+            <!-- Controls Panel -->
+            <div class="lg:col-span-1 space-y-4">
+                <!-- AI Toggle -->
+                <div class="control-group">
+                    <label class="control-label">AI Inference</label>
+                    <div class="flex items-center gap-3">
+                        <input type="checkbox" id="useAI" checked class="w-5 h-5 accent-blue-500">
+                        <span id="aiStatus" class="text-sm text-slate-300">Enabled</span>
+                    </div>
+                </div>
+
+                <!-- Confidence Threshold -->
+                <div class="control-group">
+                    <label class="control-label">Confidence Threshold</label>
+                    <div class="slider-container">
+                        <input type="range" id="confidence" min="0.1" max="1.0" step="0.05" value="0.5" class="control-input">
+                        <span class="slider-value" id="confValue">0.50</span>
+                    </div>
+                </div>
+
+                <!-- Frame Skip -->
+                <div class="control-group">
+                    <label class="control-label">Frame Skip (Performance)</label>
+                    <div class="slider-container">
+                        <input type="range" id="frameSkip" min="1" max="10" step="1" value="3" class="control-input">
+                        <span class="slider-value" id="skipValue">3</span>
+                    </div>
+                    <p class="text-xs text-slate-500 mt-2">Process 1 of every N frames</p>
+                </div>
+
+                <!-- JPEG Quality -->
+                <div class="control-group">
+                    <label class="control-label">Video Quality</label>
+                    <div class="slider-container">
+                        <input type="range" id="quality" min="30" max="100" step="5" value="70" class="control-input">
+                        <span class="slider-value" id="qualValue">70</span>
+                    </div>
+                </div>
+
+                <!-- Action Buttons -->
+                <button onclick="reconnectStream()" class="w-full bg-blue-600 hover:bg-blue-500 py-2 rounded-lg font-bold transition-all">
+                    Reconnect
+                </button>
+                <button onclick="copyStreamUrl()" class="w-full bg-slate-700 hover:bg-slate-600 py-2 rounded-lg text-sm font-bold transition-all">
+                    Copy Stream URL
+                </button>
+            </div>
+
+            <!-- Video Stream -->
+            <div class="lg:col-span-3">
+                <div class="stream-container">
+                    <div id="status-badge" class="status-badge loading">⏳ Loading...</div>
+                    <img id="stream" alt="Camera Stream" src="" onload="onStreamLoaded()" onerror="onStreamError()">
+                </div>
+                <div class="mt-4 text-xs text-slate-500 space-y-1">
+                    <p><strong>Stream URL:</strong> <code id="streamUrl" class="bg-slate-900 px-2 py-1 rounded">{{ placeholder }}</code></p>
+                    <p><strong>Format:</strong> MJPEG (Motion JPEG)</p>
+                    <p><strong>Codec:</strong> YOLO v11 Activity Detection with OpenVINO</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const cameraId = {camera_id};
+        
+        function updateStreamUrl() {{
+            const useAI = document.getElementById('useAI').checked ? '1' : '0';
+            const conf = parseFloat(document.getElementById('confidence').value).toFixed(2);
+            const frameSkip = document.getElementById('frameSkip').value;
+            const quality = document.getElementById('quality').value;
+            
+            const url = `/video_feed?camera_id=${{cameraId}}&use_ai=${{useAI}}&conf=${{conf}}&frame_skip=${{frameSkip}}&quality=${{quality}}`;
+            document.getElementById('stream').src = url + `&t=${{Date.now()}}`;
+            document.getElementById('streamUrl').textContent = url;
+        }}
+
+        function reconnectStream() {{
+            document.getElementById('status-badge').textContent = '⏳ Loading...';
+            document.getElementById('status-badge').className = 'status-badge loading';
+            updateStreamUrl();
+        }}
+
+        function copyStreamUrl() {{
+            const url = document.getElementById('streamUrl').textContent;
+            navigator.clipboard.writeText(window.location.origin + url).then(() => {{
+                alert('Stream URL copied!');
+            }});
+        }}
+
+        function onStreamLoaded() {{
+            document.getElementById('status-badge').textContent = '✓ Streaming';
+            document.getElementById('status-badge').className = 'status-badge streaming';
+        }}
+
+        function onStreamError() {{
+            document.getElementById('status-badge').textContent = '✗ Connection Error';
+            document.getElementById('status-badge').className = 'status-badge error';
+            setTimeout(reconnectStream, 3000);
+        }}
+
+        // Event listeners for controls
+        document.getElementById('useAI').addEventListener('change', () => {{
+            const status = document.getElementById('useAI').checked ? 'Enabled' : 'Disabled';
+            document.getElementById('aiStatus').textContent = status;
+            reconnectStream();
+        }});
+
+        document.getElementById('confidence').addEventListener('input', (e) => {{
+            document.getElementById('confValue').textContent = parseFloat(e.target.value).toFixed(2);
+            reconnectStream();
+        }});
+
+        document.getElementById('frameSkip').addEventListener('input', (e) => {{
+            document.getElementById('skipValue').textContent = e.target.value;
+            reconnectStream();
+        }});
+
+        document.getElementById('quality').addEventListener('input', (e) => {{
+            document.getElementById('qualValue').textContent = e.target.value;
+            reconnectStream();
+        }});
+
+        // Initialize stream on load
+        updateStreamUrl();
+    </script>
+</body>
+</html>"""
+        
+        return HTMLResponse(content=html_page)
+        
+    except Exception as e:
+        print(f"[stream_viewer_ui] [ERROR] {e}")
+        return JSONResponse(status_code=500, content={'error': str(e)})
+

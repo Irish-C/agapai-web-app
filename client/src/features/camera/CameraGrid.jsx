@@ -21,7 +21,6 @@ export default function CameraGrid() {
       return new Set();
     }
   });
-  const [aiEnabled, setAiEnabled] = useState(false); // Disabled by default - use original streams instead which are more stable
   const [mediamtxHealth, setMediamtxHealth] = useState(null);
 
   useEffect(() => {
@@ -70,25 +69,6 @@ export default function CameraGrid() {
     };
   }, []);
 
-  // Fetch global AI setting (ai_enabled)
-  useEffect(() => {
-    let mounted = true;
-    const getSettings = async () => {
-      try {
-        const data = await fetchApi('/settings/notifications/global', 'GET');
-        if (!mounted) return;
-        const isEnabled = Boolean(data.ai_enabled);
-        setAiEnabled(isEnabled);
-        console.log(`[CameraGrid] [SETTING] AI is ${isEnabled ? '🟢 ENABLED' : '🔴 DISABLED'}`);
-      } catch (e) {
-        // keep default
-        console.warn('[CameraGrid] Failed to fetch AI settings:', e);
-      }
-    };
-    getSettings();
-    return () => { mounted = false; };
-  }, []);
-
   useEffect(() => {
     const handleStorageChange = () => {
       try {
@@ -131,7 +111,9 @@ export default function CameraGrid() {
 
   // Memoize publishedCameraList to prevent unnecessary VideoFeed remounts
   const publishedCameraList = useMemo(
-    () => cameraList.filter(cam => publishedCameras.has(cam.id)),
+    () => {
+      return cameraList.filter(cam => publishedCameras.has(cam.id));
+    },
     [cameraList, publishedCameras]
   );
   
@@ -168,19 +150,21 @@ export default function CameraGrid() {
         <FaVideo className="mr-3 text-gray-900" />
         Live View
       </div>
-      <button
-        onClick={refreshCameras}
-        disabled={isLoading}
-        className={`flex items-center gap-2 px-4 py-2 rounded-lg font-semibold transition-colors ${
-          isLoading
-            ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-            : 'bg-cyan-800 text-white hover:bg-gray-500'
-        }`}
-        title="Refresh all cameras"
-      >
-        <FaSync className={isLoading ? 'animate-spin' : ''} />
-        {isLoading ? 'Refreshing...' : 'Refresh'}
-      </button>
+      <div className="flex items-center gap-2">
+        <button
+          onClick={refreshCameras}
+          disabled={isLoading}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg font-semibold transition-colors ${
+            isLoading
+              ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+              : 'bg-cyan-800 text-white hover:bg-gray-500'
+          }`}
+          title="Refresh all cameras"
+        >
+          <FaSync className={isLoading ? 'animate-spin' : ''} />
+          {isLoading ? 'Refreshing...' : 'Refresh'}
+        </button>
+      </div>
     </div>
   );
 
@@ -221,18 +205,17 @@ export default function CameraGrid() {
         <div className="flex-grow w-full">
           {header}
           {(() => {
-            // Dynamically build stream URL based on AI setting
-            // Use relative proxy path /hls/ instead of hardcoded localhost:8888
-            const prefix = aiEnabled ? 'processed' : 'original'; // Use processed if AI enabled, otherwise use original
-            const streamPath = `${prefix}/cam${focusedCamera.id}`;
-            const dynamicStreamUrl = `/hls/${streamPath}/index.m3u8`;
-            console.log(`[CameraGrid] [STREAM] Focused camera ${focusedCamera.id}: using '${prefix}' stream (AI is ${aiEnabled ? '🟢 enabled' : '🔴 disabled'})`);
+            // Handle focused camera streaming (MJPEG from AI service)
+            const dynamicStreamUrl = `/mjpeg/?camera_id=${focusedCamera.id}`;
+            
+            console.log(`[CameraGrid] [STREAM] Focused camera ${focusedCamera.id}: ${dynamicStreamUrl}`);
             return (
               <VideoFeed
                 key={focusedCamera.id}
                 camId={focusedCamera.id}
                 cameraName={focusedCamera.name}
                 streamUrl={dynamicStreamUrl}
+                rtspUrl={focusedCamera.stream_url}
                 location={focusedCamera.location_name || focusedCamera.location || focusedCamera.loc_name}
                 isFocused={true}
                 onFocusChange={setFocusedCameraId}
@@ -248,17 +231,18 @@ export default function CameraGrid() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-0">
                 {publishedCameraList.map((camera) => {
                   const location = camera.location_name || camera.location || camera.loc_name;
-                  // Dynamically build stream URL based on AI setting
-                  const prefix = aiEnabled ? 'processed' : 'original'; // Use processed if AI enabled, otherwise use original
-                  const streamPath = `${prefix}/cam${camera.id}`;
-                  const dynamicStreamUrl = `/hls/${streamPath}/index.m3u8`;
-                  console.log(`[CameraGrid] [STREAM] Grid camera ${camera.id}: using '${prefix}' stream (AI is ${aiEnabled ? '🟢 enabled' : '🔴 disabled'})`);
+                  
+                  // Determine stream URL for MJPEG stream from AI service
+                  const dynamicStreamUrl = `/mjpeg/?camera_id=${camera.id}`;
+                  
+                  console.log(`[CameraGrid] [STREAM] Grid camera ${camera.id}: ${dynamicStreamUrl}`);
                   return (
                     <div key={camera.id} className={publishedCameraList.length === 1 ? 'md:col-span-2' : ''}>
                       <VideoFeed
                         camId={camera.id}
                         cameraName={camera.name}
                         streamUrl={dynamicStreamUrl}
+                        rtspUrl={camera.stream_url}
                         location={location}
                         isFocused={false}
                         onFocusChange={setFocusedCameraId}

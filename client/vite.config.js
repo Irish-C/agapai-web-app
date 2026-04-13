@@ -35,13 +35,14 @@ export default defineConfig({
       '/api': { target: 'http://127.0.0.1:5000', changeOrigin: true, secure: false },
       '/socket.io': { target: 'http://127.0.0.1:5000', ws: true, changeOrigin: true, secure: false },
       '/detect': { target: 'http://127.0.0.1:5000', changeOrigin: true, secure: false },
-      // HLS streams from MediaMTX
-      // Browser requests: /hls/processed/cam1/index.m3u8
-      // Forward to: http://127.0.0.1:8888/processed/cam1/index.m3u8 (strip /hls/)
-      '/hls/': {
-        target: 'http://127.0.0.1:8888/',
+      // MJPEG streams from AI Service (port 3000)
+      // Browser requests: /mjpeg/?camera_id=1
+      // Forward to: http://127.0.0.1:3000/api/video_feed?camera_id=1
+      '/mjpeg/': {
+        target: 'http://127.0.0.1:3000/api/video_feed',
         changeOrigin: true,
-        secure: false
+        secure: false,
+        rewrite: (path) => path.replace(/^\/mjpeg\//, ''),
       }
     }
   }

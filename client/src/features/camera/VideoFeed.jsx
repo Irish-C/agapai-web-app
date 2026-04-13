@@ -1,47 +1,55 @@
 import React, { useState, useEffect, useRef, memo } from 'react';
-import { FaExpand, FaTimes } from 'react-icons/fa';
-import HLS from 'hls.js';
+import { FaExpand, FaTimes, FaBrain } from 'react-icons/fa';
 
-function VideoFeed({ camId, cameraName, location, isFocused, onFocusChange, streamUrl }) {
+function VideoFeed({ camId, cameraName, location, isFocused, onFocusChange, streamUrl, rtspUrl }) {
   const [currentDateTime, setCurrentDateTime] = useState(new Date());
   const [noDisplay, setNoDisplay] = useState(() => {
     try { return localStorage.getItem(`camera_${camId}_no_display`) === '1'; } catch (e) { return false; }
   });
+  const [streamError, setStreamError] = useState(false);
 
   const wrapperRef = useRef(null);
-  const videoRef = useRef(null);
+  const imgRef = useRef(null);
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentDateTime(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
 
-  // Set up HLS.js for HLS streams
+  // Set up MJPEG stream from AI service
   useEffect(() => {
-    if (!streamUrl || !videoRef.current || !streamUrl.includes('.m3u8')) return;
+    if (!streamUrl || !imgRef.current) return;
 
-    if (HLS.isSupported()) {
-      const hls = new HLS({
-        debug: false,
-        enableWorker: true,
-      });
-      hls.loadSource(streamUrl);
-      hls.attachMedia(videoRef.current);
-      hls.on(HLS.Events.MANIFEST_PARSED, () => {
-        videoRef.current?.play().catch(err => console.log('Autoplay failed:', err));
-      });
+    const updateMjpegStream = () => {
+      if (imgRef.current) {
+        // Force stream refresh by adding cache-busting parameter
+        imgRef.current.src = `${streamUrl}&t=${Date.now()}`;
+      }
+    };
 
-      return () => {
-        hls.destroy();
-      };
-    } else if (videoRef.current?.canPlayType('application/vnd.apple.mpegurl')) {
-      // Fallback for native HLS support (Safari)
-      videoRef.current.src = streamUrl;
-      videoRef.current.play().catch(err => console.log('Autoplay failed:', err));
-    }
+    // Initial load
+    updateMjpegStream();
+
+    // Set error handler
+    const handleError = () => {
+      setStreamError(true);
+      // Retry every 5 seconds
+      const timer = setTimeout(updateMjpegStream, 5000);
+      return () => clearTimeout(timer);
+    };
+
+    imgRef.current.addEventListener('error', handleError);
+    imgRef.current.addEventListener('load', () => setStreamError(false));
+
+    return () => {
+      if (imgRef.current) {
+        imgRef.current.removeEventListener('error', handleError);
+        imgRef.current.removeEventListener('load', () => setStreamError(false));
+      }
+    };
   }, [streamUrl]);
 
-  const cameraStatus = streamUrl ? 'online' : 'offline';
+  const cameraStatus = streamUrl && !streamError ? 'online' : 'offline';
 
   let content = null;
 
@@ -54,31 +62,22 @@ function VideoFeed({ camId, cameraName, location, isFocused, onFocusChange, stre
         </div>
       </div>
     );
-  } else if (streamUrl) {
-    // Use HLS video stream (supports both .m3u8 and regular video URLs)
-    // if (streamUrl.includes('.m3u8') || streamUrl.includes('/hls/')) {
-    //   // HLS stream managed by HLS.js
-    //   content = (
-    //     <video ref={videoRef} className="w-full h-full object-cover" muted playsInline controls />
-    //   );
-    // } else {
-      // Regular video stream
-      // content = (
-      //   <video src={streamUrl} className="w-full h-full object-cover" autoPlay muted playsInline controls />
-      // );s
-      content = (
-        <div>
-          <img src={"http://192.168.2.72:3000/video_feed?ip=192.168.2.211&pass=agapai143&t=1775720354654"} className="w-full h-full object-cover" autoPlay muted playsInline controls />
-        </div>
-      );
-    // }
+  } else if (streamUrl && !streamError) {
+    // MJPEG stream from AI service
+    content = (
+      <img 
+        ref={imgRef}
+        className="w-full h-full object-cover" 
+        alt={cameraName}
+      />
+    );
   } else {
-    // No stream available
+    // Stream unavailable or error
     content = (
       <div className="w-full h-full flex items-center justify-center bg-black text-white">
         <div className="text-center">
           <div className="text-2xl font-semibold mb-2">Stream Unavailable</div>
-          <div className="text-sm text-gray-300">No stream URL configured for this camera.</div>
+          <div className="text-sm text-gray-300">{streamError ? 'AI service connection failed' : 'No stream URL configured for this camera.'}</div>
         </div>
       </div>
     );
@@ -88,7 +87,7 @@ function VideoFeed({ camId, cameraName, location, isFocused, onFocusChange, stre
     <div ref={wrapperRef} className={`group bg-black rounded-none shadow-md overflow-hidden border-2 border-gray-700 relative ${!isFocused ? 'cursor-pointer hover:border-teal-500 transition-all' : 'border-teal-600'}`} onClick={() => !isFocused && onFocusChange?.(camId)}>
       <div className="absolute top-0 left-0 w-full text-white p-2 flex items-center justify-between z-10">
         <div className="flex items-center gap-2 overflow-hidden min-w-0">
-          <h4 className="font-semibold text-sm truncate">{cameraName}11234567890-80798675</h4>
+          <h4 className="font-semibold text-sm truncate">{cameraName}</h4>
           <p className="text-xs text-gray-400 truncate font-normal">{location}</p>
         </div>
         <div className="flex items-center gap-2">
@@ -111,9 +110,15 @@ function VideoFeed({ camId, cameraName, location, isFocused, onFocusChange, stre
         </div>
 
         {isFocused ? (
-          <button onClick={(e) => { e.stopPropagation(); onFocusChange?.(null); }} className="absolute top-2 right-2 p-2 bg-black/60 rounded-full text-white hover:bg-red-600 transition-colors z-20" title="Return to Grid"><FaTimes /></button>
+          <div className="absolute top-2 right-2 flex gap-2 z-20">
+            <button onClick={(e) => { e.stopPropagation(); fetch(`/api/cameras/${camId}/publish`, { method: 'POST' }).then(() => window.open('http://localhost:3000', '_blank')).catch(err => console.error('Failed to start AI:', err)); }} className="p-2 bg-blue-600/80 rounded-full text-white hover:bg-blue-700 transition-colors" title="View AI Detection"><FaBrain /></button>
+            <button onClick={(e) => { e.stopPropagation(); onFocusChange?.(null); }} className="p-2 bg-black/60 rounded-full text-white hover:bg-red-600 transition-colors" title="Return to Grid"><FaTimes /></button>
+          </div>
         ) : (
-          <div className="absolute top-2 right-2 p-2 bg-black/60 rounded-full text-white opacity-0 group-hover:opacity-100 transition-opacity z-20" title="Focus"><FaExpand /></div>
+          <div className="absolute top-2 right-2 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity z-20">
+            <button onClick={(e) => { e.stopPropagation(); fetch(`/api/cameras/${camId}/publish`, { method: 'POST' }).then(() => window.open('http://localhost:3000', '_blank')).catch(err => console.error('Failed to start AI:', err)); }} className="p-2 bg-blue-600/80 rounded-full text-white hover:bg-blue-700 transition-colors" title="View AI Detection"><FaBrain /></button>
+            <div className="p-2 bg-black/60 rounded-full text-white" title="Focus"><FaExpand /></div>
+          </div>
         )}
       </div>
     </div>
