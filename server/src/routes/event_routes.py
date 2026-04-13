@@ -101,8 +101,33 @@ async def get_missed_alerts(timestamp_ms: int, user_id: str = Depends(get_curren
         ]
     }
     """
-    result, code = await get_missed_alerts_logic(timestamp_ms)
+    result, code = await get_missed_alerts(timestamp_ms)
     return safe_json_response(status_code=code, content=result)
+
+
+@router.delete('/event_logs')
+async def clear_event_logs(user_id: str = Depends(get_current_user_id)):
+    """Clear all event logs from database (admin only)"""
+    try:
+        from database import db
+        
+        # Delete all event logs
+        deleted = await db.eventlog.delete_many()
+        
+        return safe_json_response(
+            status_code=200, 
+            content={
+                'status': 'success',
+                'message': f'Deleted {deleted} event logs',
+                'count': deleted
+            }
+        )
+    except Exception as e:
+        print(f"[DELETE LOGS ERROR] {e}")
+        return safe_json_response(
+            status_code=500,
+            content={'status': 'error', 'message': str(e)}
+        )
 
 
 @router.post("/alerts/{alert_id}/acknowledge")

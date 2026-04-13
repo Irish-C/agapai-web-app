@@ -8,6 +8,24 @@ from datetime import datetime, timezone
 from flask import Flask, Response, request, render_template_string, jsonify, send_from_directory
 from ultralytics import YOLO
 
+# ==========================================
+# --- OPENVINO DEVICE CONFIGURATION ---
+# ==========================================
+# Try GPU first, fallback to CPU if GPU not accessible
+# (Important for WSL2 environments)
+try:
+    from openvino import Core
+    available_devices = Core().available_devices
+    if 'GPU' in available_devices:
+        os.environ['OPENVINO_DEVICE'] = 'GPU'
+        print("[DEVICE] GPU detected - using OpenVINO GPU (Intel UHD Graphics)")
+    else:
+        os.environ['OPENVINO_DEVICE'] = 'CPU'
+        print("[DEVICE] GPU not available - using CPU")
+except Exception as e:
+    os.environ['OPENVINO_DEVICE'] = 'CPU'
+    print(f"[DEVICE] Could not detect devices, using CPU: {e}")
+
 app = Flask(__name__)
 
 # Setup snapshots directory
@@ -145,7 +163,8 @@ fall_classes = ["Forward Fall", "Backward Fall", "Sideward Fall"]
 try:
     model = YOLO(MODEL_PATH, task="detect")
     AI_AVAILABLE = True
-    print(f"[SYSTEM] Model loaded successfully via OpenVINO.")
+    print(f"[SYSTEM] Model loaded successfully")
+    print(f"[DEVICE] Using device: CPU (OpenVINO will use GPU if available via env vars)")
 except Exception as e:
     AI_AVAILABLE = False
     print(f"[ERROR] Could not load model: {e}")
@@ -388,7 +407,7 @@ def generate_frames(rtsp_url):
 
     frame_skip_counter = 0
     last_inference_time = time.time()
-    inference_interval = 0.15  # Run YOLO every 150ms (~6-7 FPS)
+    inference_interval = 0.25  # Run YOLO every 250ms (4 FPS - optimized for CPU)
     
     # FPS tracking
     frame_count = 0
@@ -439,7 +458,7 @@ def generate_frames(rtsp_url):
         draw_text_outline(frame, fps_text, (20, 15), (0, 0, 0))
         draw_text_outline(frame, instruction_text, (20, 30), (0, 0, 0))
 
-        # --- AI INFERENCE (Only every 150ms, not every frame) ---
+        # --- AI INFERENCE (Only every 250ms, not every frame) ---
         floor_detections = []
         if should_infer and AI_AVAILABLE:
             last_inference_time = current_time

@@ -124,7 +124,7 @@ async def create_event_logic(data):
                 where={'id': recent_event.id},
                 data={'file_path': file_path_json},
                 include={
-                    'camera': True,
+                    'camera': {'include': {'location': True}},
                     'event_class': True
                 }
             )
@@ -136,10 +136,26 @@ async def create_event_logic(data):
             display_snapshot_url = parsed['first_snapshot'] if parsed else updated_event.file_path
             
             from src.services.socket_manager import socketio_server 
+            
+            # Determine location - try location first, fall back to camera name, then ID
+            location_display = 'Unknown'
+            if updated_event.camera:
+                if updated_event.camera.location and updated_event.camera.location.loc_name:
+                    location_display = updated_event.camera.location.loc_name
+                    print(f"  [LOCATION] ✓ Using location: {location_display}")
+                elif updated_event.camera.cam_name:
+                    location_display = updated_event.camera.cam_name
+                    print(f"  [LOCATION] Using camera name: {location_display}")
+                else:
+                    location_display = f"Camera {updated_event.camera.id}"
+                    print(f"  [LOCATION] Using camera ID: {location_display}")
+            else:
+                print(f"  [LOCATION] ⚠️ Camera {camera_id} not found in database!")
+            
             payload = {
                 'id': str(updated_event.id),
                 'type': updated_event.event_class.class_name,
-                'location': updated_event.camera.cam_name if updated_event.camera else 'Unknown',
+                'location': location_display,
                 'timestamp': updated_event.timestamp.isoformat(),
                 'snapshot_url': display_snapshot_url,
                 'occurrence_count': len(existing_snapshots),
@@ -164,16 +180,32 @@ async def create_event_logic(data):
                     'file_path': file_path_json
                 },
                 include={
-                    'camera': True,
+                    'camera': {'include': {'location': True}},
                     'event_class': True
                 }
             )
 
             from src.services.socket_manager import socketio_server 
+            
+            # Determine location - try location first, fall back to camera name, then ID
+            location_display = 'Unknown'
+            if new_event.camera:
+                if new_event.camera.location and new_event.camera.location.loc_name:
+                    location_display = new_event.camera.location.loc_name
+                    print(f"  [LOCATION] ✓ Using location: {location_display}")
+                elif new_event.camera.cam_name:
+                    location_display = new_event.camera.cam_name
+                    print(f"  [LOCATION] Using camera name: {location_display}")
+                else:
+                    location_display = f"Camera {new_event.camera.id}"
+                    print(f"  [LOCATION] Using camera ID: {location_display}")
+            else:
+                print(f"  [LOCATION] ⚠️ Camera {camera_id} not found in database!")
+            
             payload = {
                 'id': str(new_event.id),
                 'type': new_event.event_class.class_name,
-                'location': new_event.camera.cam_name if new_event.camera else 'Unknown',
+                'location': location_display,
                 'timestamp': new_event.timestamp.isoformat(),
                 'snapshot_url': snapshot_url,
                 'occurrence_count': 1,
