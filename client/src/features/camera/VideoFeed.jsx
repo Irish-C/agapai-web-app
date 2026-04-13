@@ -16,30 +16,27 @@ function VideoFeed({ camId, cameraName, location, isFocused, onFocusChange, stre
     return () => clearInterval(timer);
   }, []);
 
-  // Set up MJPEG stream from AI service
+  // Set up stream from Flask AI service
   useEffect(() => {
-    if (!streamUrl || !imgRef.current) return;
+    if (!streamUrl) return;
 
-    const updateMjpegStream = () => {
-      if (imgRef.current) {
-        // Force stream refresh by adding cache-busting parameter
-        imgRef.current.src = `${streamUrl}&t=${Date.now()}`;
-      }
-    };
-
-    // Initial load
-    updateMjpegStream();
-
-    // Set error handler
     const handleError = () => {
       setStreamError(true);
-      // Retry every 5 seconds
-      const timer = setTimeout(updateMjpegStream, 5000);
+      // Retry after 5 seconds if stream fails
+      const timer = setTimeout(() => {
+        // Try to reconnect by triggering a reload
+        if (imgRef.current && imgRef.current.src) {
+          imgRef.current.src = streamUrl + `&t=${Date.now()}`;
+        }
+      }, 5000);
       return () => clearTimeout(timer);
     };
 
-    imgRef.current.addEventListener('error', handleError);
-    imgRef.current.addEventListener('load', () => setStreamError(false));
+    // Set error handler
+    if (imgRef.current) {
+      imgRef.current.addEventListener('error', handleError);
+      imgRef.current.addEventListener('load', () => setStreamError(false));
+    }
 
     return () => {
       if (imgRef.current) {
@@ -63,12 +60,15 @@ function VideoFeed({ camId, cameraName, location, isFocused, onFocusChange, stre
       </div>
     );
   } else if (streamUrl && !streamError) {
-    // MJPEG stream from AI service
+    // MJPEG stream from AI service - use img tag for MJPEG support
     content = (
-      <img 
+      <img
         ref={imgRef}
-        className="w-full h-full object-cover" 
+        className="w-full h-full object-contain"
+        src={streamUrl}
         alt={cameraName}
+        onError={() => setStreamError(true)}
+        onLoad={() => setStreamError(false)}
       />
     );
   } else {
@@ -95,7 +95,7 @@ function VideoFeed({ camId, cameraName, location, isFocused, onFocusChange, stre
         </div>
       </div>
 
-      <div className={`w-full bg-gray-900 flex items-center justify-center relative ${isFocused ? '' : 'aspect-video'}`} style={isFocused ? { width: '100%', height: 'calc(100vh - 6rem)', maxHeight: 'calc(100vh - 6rem)' } : {}}>
+      <div className={`w-full bg-gray-900 flex items-center justify-center relative overflow-hidden ${isFocused ? '' : 'aspect-video'}`} style={isFocused ? { width: '100%', height: 'calc(100vh - 6rem)', maxHeight: 'calc(100vh - 6rem)' } : {}}>
         {(!noDisplay && cameraStatus !== 'online') && (
           <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-black/70 text-white">
             <div className="text-lg font-semibold mb-2">{cameraStatus === 'online' ? 'Online' : 'Offline'}</div>

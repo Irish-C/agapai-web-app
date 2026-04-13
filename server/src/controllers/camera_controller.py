@@ -65,6 +65,28 @@ async def create_camera_logic(camera_data):
         }
 
         new_camera = await db.camera.create(data=data_payload)
+        
+        # AUTO-START AI SERVICE FOR NEW CAMERA
+        try:
+            response = requests.post(
+                'http://localhost:3000/api/start',
+                json={
+                    'camera_id': int(new_camera.id),
+                    'rtsp_url': new_camera.stream_url
+                },
+                timeout=5
+            )
+            if response.status_code == 200:
+                print(f"[create_camera] ✓ AI service initialized for camera {new_camera.id}")
+            else:
+                print(f"[create_camera] ⚠ AI service returned {response.status_code}")
+        except requests.exceptions.Timeout:
+            print(f"[create_camera] ⚠ AI service timeout (non-critical)")
+        except requests.exceptions.ConnectionError:
+            print(f"[create_camera] ⚠ AI service unavailable (non-critical)")
+        except Exception as e:
+            print(f"[create_camera] ⚠ Could not reach AI service: {e}")
+        
         return {"status": "success", "camera_id": str(new_camera.id)}, 201
     except Exception as e:
         return {"error": str(e)}, 500
@@ -76,6 +98,11 @@ async def update_camera_logic(camera_id, camera_data):
         stream_url = camera_data.get("stream_url")
         if loc_id is None:
             return {"error": "loc_id is required and cannot be None"}, 400
+        
+        # Get old stream URL to detect changes
+        old_camera = await db.camera.find_unique(where={"id": int(camera_id)})
+        old_stream_url = old_camera.stream_url if old_camera else None
+        
         update_payload = {
             "cam_name": cam_name,
             "loc_id": int(loc_id),
@@ -86,6 +113,24 @@ async def update_camera_logic(camera_id, camera_data):
             where={"id": int(camera_id)},
             data=update_payload
         )
+        
+        # RESTART AI SERVICE IF RTSP URL CHANGED
+        if stream_url and old_stream_url != stream_url:
+            try:
+                response = requests.post(
+                    'http://localhost:3000/api/start',
+                    json={
+                        'camera_id': int(camera_id),
+                        'rtsp_url': stream_url
+                    },
+                    timeout=5
+                )
+                if response.status_code == 200:
+                    print(f"[update_camera] ✓ AI service restarted with new RTSP URL for camera {camera_id}")
+                else:
+                    print(f"[update_camera] ⚠ AI service returned {response.status_code}")
+            except Exception as e:
+                print(f"[update_camera] ⚠ Could not restart AI service: {e}")
 
         return {"status": "success", "camera_id": str(updated_camera.id)}, 200
     except Exception as e:
@@ -96,6 +141,16 @@ async def delete_camera_logic(camera_id):
         camera = await db.camera.find_unique(where={"id": int(camera_id)})
         if not camera:
             return {"error": "Camera not found"}, 404
+
+        # STOP AI SERVICE BEFORE ARCHIVING
+        try:
+            requests.post(
+                'http://localhost:3000/api/stop',
+                timeout=3
+            )
+            print(f"[delete_camera] ✓ AI service stopped for camera {camera_id}")
+        except Exception as e:
+            print(f"[delete_camera] ⚠ Could not stop AI service: {e}")
 
         # Archive instead of hard delete so incident history keeps camera linkage.
         archived_name = camera.cam_name

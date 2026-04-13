@@ -6,6 +6,31 @@ import { useCameraSocket } from '../../hooks/useCamera.js';
 import { FaSpinner, FaVideo, FaSync } from 'react-icons/fa';
 import { fetchCameraList } from '../../services/apiService.js';
 
+// Helper: Extract IP and password from RTSP URL
+// rtsp://admin:password@192.168.2.211/cam/realmonitor?channel=1&subtype=1
+function parseRtspUrl(rtspUrl) {
+  try {
+    const url = new URL(rtspUrl.replace('rtsp://', 'http://'));
+    const ip = url.hostname;
+    const password = url.password;
+    if (ip && password) {
+      return { ip, password };
+    }
+  } catch (e) {
+    console.warn('[CameraGrid] Failed to parse RTSP URL:', rtspUrl, e);
+  }
+  return null;
+}
+
+// Helper: Construct direct Flask video feed URL
+function getVideoFeedUrl(streamUrl) {
+  const parsed = parseRtspUrl(streamUrl);
+  if (parsed) {
+    return `http://localhost:3000/video_feed?ip=${parsed.ip}&pass=${parsed.password}`;
+  }
+  return null;
+}
+
 export default function CameraGrid() {
   const { cameraData, alerts, isConnected } = useCameraSocket();
 
@@ -13,14 +38,6 @@ export default function CameraGrid() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const [focusedCameraId, setFocusedCameraId] = useState(null);
-  const [publishedCameras, setPublishedCameras] = useState(() => {
-    try {
-      const stored = localStorage.getItem('publishedCameras');
-      return stored ? new Set(JSON.parse(stored)) : new Set();
-    } catch (e) {
-      return new Set();
-    }
-  });
   const [mediamtxHealth, setMediamtxHealth] = useState(null);
 
   useEffect(() => {
@@ -69,58 +86,18 @@ export default function CameraGrid() {
     };
   }, []);
 
-  useEffect(() => {
-    const handleStorageChange = () => {
-      try {
-        const stored = localStorage.getItem('publishedCameras');
-        setPublishedCameras(stored ? new Set(JSON.parse(stored)) : new Set());
-      } catch (e) {
-        console.error('Error loading publishedCameras from localStorage:', e);
-      }
-    };
 
-    window.addEventListener('storage', handleStorageChange);
-    return () => window.removeEventListener('storage', handleStorageChange);
-  }, []);
 
-  // Sync published cameras to backend whenever they change
-  useEffect(() => {
-    if (!isConnected) {
-      return;
-    }
-
-    const syncPublishedCameras = async () => {
-      try {
-        const cameras = Array.from(publishedCameras);
-        const response = await fetch('/api/sync_published_cameras', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ cameras })
-        });
-        if (response.ok) {
-          console.log(`[CameraGrid] Synced ${cameras.length} published cameras to backend`);
-        } else {
-          console.error('[CameraGrid] Failed to sync published cameras:', response.status);
-        }
-      } catch (err) {
-        console.error('[CameraGrid] Failed to sync published cameras:', err);
-      }
-    };
-    syncPublishedCameras();
-  }, [publishedCameras, isConnected]);
-
-  // Memoize publishedCameraList to prevent unnecessary VideoFeed remounts
-  const publishedCameraList = useMemo(
-    () => {
-      return cameraList.filter(cam => publishedCameras.has(cam.id));
-    },
-    [cameraList, publishedCameras]
+  // All cameras become visible automatically (no publish step needed)
+  const visibleCameraList = useMemo(
+    () => cameraList,
+    [cameraList]
   );
   
   // Memoize focusedCamera to prevent VideoFeed remounting when incidents change
   const focusedCamera = useMemo(
-    () => publishedCameraList.find((c) => c.id === focusedCameraId),
-    [publishedCameraList, focusedCameraId]
+    () => visibleCameraList.find((c) => c.id === focusedCameraId),
+    [visibleCameraList, focusedCameraId]
   );
 
   // Streaming URL generation removed; frontend will render placeholders only.
@@ -205,8 +182,8 @@ export default function CameraGrid() {
         <div className="flex-grow w-full">
           {header}
           {(() => {
-            // Handle focused camera streaming (MJPEG from AI service)
-            const dynamicStreamUrl = `/mjpeg/?camera_id=${focusedCamera.id}`;
+            // Handle focused camera streaming (direct from Flask AI service)
+            const dynamicStreamUrl = getVideoFeedUrl(focusedCamera.stream_url);
             
             console.log(`[CameraGrid] [STREAM] Focused camera ${focusedCamera.id}: ${dynamicStreamUrl}`);
             return (
@@ -227,17 +204,17 @@ export default function CameraGrid() {
         <>
           <div className="flex-grow lg:w-3/4">
             {header}
-            {!isLoading && publishedCameraList.length > 0 && (
+            {!isLoading && visibleCameraList.length > 0 && (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-0">
-                {publishedCameraList.map((camera) => {
+                {visibleCameraList.map((camera) => {
                   const location = camera.location_name || camera.location || camera.loc_name;
                   
-                  // Determine stream URL for MJPEG stream from AI service
-                  const dynamicStreamUrl = `/mjpeg/?camera_id=${camera.id}`;
+                  // Determine stream URL for direct Flask video feed
+                  const dynamicStreamUrl = getVideoFeedUrl(camera.stream_url);
                   
                   console.log(`[CameraGrid] [STREAM] Grid camera ${camera.id}: ${dynamicStreamUrl}`);
                   return (
-                    <div key={camera.id} className={publishedCameraList.length === 1 ? 'md:col-span-2' : ''}>
+                    <div key={camera.id} className={visibleCameraList.length === 1 ? 'md:col-span-2' : ''}>
                       <VideoFeed
                         camId={camera.id}
                         cameraName={camera.name}
@@ -252,9 +229,9 @@ export default function CameraGrid() {
                 })}
               </div>
             )}
-            {!isLoading && publishedCameraList.length === 0 && cameraList.length > 0 && (
+            {!isLoading && visibleCameraList.length === 0 && (
               <div className="p-8 bg-gray-50 border border-gray-200 rounded-lg text-center text-gray-600">
-                <p>No published cameras. Go to <strong>Management</strong> tab to publish cameras.</p>
+                <p>No cameras available. Go to <strong>Management</strong> tab to add cameras.</p>
               </div>
             )}
           </div>

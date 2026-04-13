@@ -8,12 +8,26 @@ from ultralytics import YOLO
 
 app = Flask(__name__)
 
+# Enable CORS for frontend to access video_feed
+@app.after_request
+def add_cors_headers(response):
+    response.headers['Access-Control-Allow-Origin'] = '*'
+    response.headers['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS'
+    response.headers['Access-Control-Allow-Headers'] = 'Content-Type'
+    return response
+
 # ==========================================
 # --- CONFIGURATION & HARDWARE ---
 # ==========================================
 SERIAL_PORT = 'COM3'  # Update based on your Mini PC's Device Manager
 BAUD_RATE = 115200
 MODEL_PATH = r"best_openvino_model"
+
+# ==========================================
+# --- CAMERA RTSP STORAGE (Auto-Start) ---
+# ==========================================
+current_rtsp_url = None
+current_camera_id = None
 
 esp32 = None
 try:
@@ -292,25 +306,29 @@ def generate_frames(rtsp_url):
     
     os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "rtsp_transport;tcp|timeout;5000000"
     cap = cv2.VideoCapture(rtsp_url, cv2.CAP_FFMPEG)
-    cap.set(cv2.CAP_PROP_BUFFERSIZE, 2) 
+    cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)  # Minimize buffer for low latency
     
     if not cap.isOpened():
         print(f"[ERROR] Could not connect to stream: {rtsp_url}")
         return
 
     frame_skip_counter = 0
+    last_inference_time = time.time()
+    inference_interval = 0.15  # Run YOLO every 150ms (~6-7 FPS)
 
     while True:
         success, frame = cap.read()
         if not success:
-            time.sleep(1)
+            time.sleep(0.01)
             continue
             
         frame_skip_counter += 1
-        if frame_skip_counter % 3 != 0:
-            continue 
-            
+        if frame_skip_counter % 5 != 0:  # Process 1/5 frames for streaming
+            continue
+        
         current_time = time.time()
+        should_infer = (current_time - last_inference_time) >= inference_interval 
+            
         h, w = frame.shape[:2]
 
         pixel_rois = []
@@ -332,12 +350,12 @@ def generate_frames(rtsp_url):
         instruction_text = f"Zones Active: {len(pixel_rois)}/30"
         draw_text_outline(frame, instruction_text, (20, 30), (0, 0, 0))
 
-        # --- AI INFERENCE ---
-        if AI_AVAILABLE:
+        # --- AI INFERENCE (Only every 150ms, not every frame) ---
+        floor_detections = []
+        if should_infer and AI_AVAILABLE:
+            last_inference_time = current_time
             with model_lock:
-                results = model(frame, verbose=False, conf=0.5, imgsz=640)
-            
-            floor_detections = [] 
+                results = model(frame, verbose=False, conf=0.5, imgsz=640) 
             
             for r in results:
                 for box in r.boxes:
@@ -448,9 +466,7 @@ def generate_frames(rtsp_url):
                 else:
                     trigger_hardware("OFF")
 
-        fps = 1 / (time.time() - current_time + 0.0001) 
-        draw_text_outline(frame, f"FPS: {fps:.1f}", (20, h - 20), (0, 0, 0))
-
+        # Encode to JPEG (high quality for good FPS)
         success, buffer = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 70])
         if not success:
             continue
@@ -465,10 +481,64 @@ def generate_frames(rtsp_url):
 def index():
     return render_template_string(HTML_PAGE, ai_status=AI_AVAILABLE)
 
+@app.route('/api/start', methods=['POST'])
+def api_start():
+    """Initialize AI detection for a camera (called from backend when camera is added)."""
+    global current_rtsp_url, current_camera_id
+    
+    data = request.json
+    camera_id = data.get('camera_id')
+    rtsp_url = data.get('rtsp_url')
+    
+    if not camera_id or not rtsp_url:
+        return jsonify({"status": "error", "message": "Missing camera_id or rtsp_url"}), 400
+    
+    # Store RTSP URL globally
+    current_rtsp_url = rtsp_url
+    current_camera_id = camera_id
+    
+    # Reset detection state
+    with state_lock:
+        global rois, bed_trackers, active_alerts, hardware_muted, hardware_on_until
+        rois = []
+        bed_trackers.clear()
+        active_alerts = []
+        hardware_muted = False
+        hardware_on_until = 0.0
+    
+    print(f"[API] ✓ AI service initialized for camera {camera_id}")
+    return jsonify({"status": "success", "message": f"Detection ready for camera {camera_id}"}), 200
+
+@app.route('/api/stop', methods=['POST'])
+def api_stop():
+    """Stop AI detection (called from backend when camera is deleted)."""
+    global current_rtsp_url, current_camera_id
+    
+    # Clear stored RTSP URL
+    current_rtsp_url = None
+    current_camera_id = None
+    
+    # Reset all state
+    with state_lock:
+        global active_alerts, hardware_muted, hardware_on_until
+        active_alerts = []
+        hardware_muted = False
+        hardware_on_until = 0.0
+    
+    trigger_hardware("OFF")
+    print(f"[API] ✓ AI service stopped")
+    return jsonify({"status": "success", "message": "Detection stopped"}), 200
+
 @app.route('/video_feed')
 def video_feed():
     ip = request.args.get('ip')
     pw = request.args.get('pass')
+    if not ip or not pw:
+        # Check if backend initialized camera
+        if current_rtsp_url:
+            return Response(generate_frames(current_rtsp_url), mimetype='multipart/x-mixed-replace; boundary=frame')
+        return jsonify({"error": "No camera configured"}), 400
+    
     url = f"rtsp://admin:{pw}@{ip}:554/cam/realmonitor?channel=1&subtype=0"
     return Response(generate_frames(url), mimetype='multipart/x-mixed-replace; boundary=frame')
 

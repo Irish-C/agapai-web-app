@@ -39,8 +39,8 @@ async def get_single_camera(camera_id: int, user_id: str = Depends(get_current_u
 
 # Logic for manually adding a camera via the Management UI
 @router.post('/cameras')
-async def create_camera(camera_data: dict, user_id: str = Depends(require_admin_user_id)):
-    camera_data = sanitize_input(camera_data)
+async def create_camera(request: Request, user_id: str = Depends(require_admin_user_id)):
+    camera_data = await get_sanitized_json(request)
     # 1. Save the camera details (Name, RTSP Link, Location) to the database
     result, code = await create_camera_logic(camera_data)
     
