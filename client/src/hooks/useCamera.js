@@ -57,10 +57,45 @@ export const useCameraSocket = () => {
       addEventToBuffer('new_alert', alert);
     };
 
+    const handleAlertAccumulated = (alert) => {
+      // Handle accumulated alert (multiple detections grouped together)
+      // Same structure as new_alert but with occurrence_count
+      const alertId = alert?.id;
+      
+      // Skip if we've already processed this alert
+      if (alertId && seenAlertIdsRef.current.has(alertId)) {
+        console.debug('[useCameraSocket] Skipping duplicate accumulated alert:', alertId);
+        return;
+      }
+      
+      if (alertId) {
+        seenAlertIdsRef.current.add(alertId);
+      }
+      
+      const incidentWithTs = { ...alert, ts: Date.now() };
+      setAlerts((prev) => {
+        // Update existing alert if it's from the same detection cluster
+        const updated = prev.map(a => 
+          String(a.id) === String(alertId) 
+            ? incidentWithTs 
+            : a
+        );
+        // If not found, add as new
+        if (!updated.some(a => String(a.id) === String(alertId))) {
+          updated.unshift(incidentWithTs);
+        }
+        return updated;
+      });
+      
+      // Buffer event if disconnected
+      addEventToBuffer('alert_accumulated', alert);
+    };
+
     socket.on('connect', handleConnect);
     socket.on('disconnect', handleDisconnect);
     socket.on('camera_frame', handleFrame);
     socket.on('new_alert', handleNewAlert);
+    socket.on('alert_accumulated', handleAlertAccumulated);
 
     setIsConnected(socket.connected);
 
@@ -102,6 +137,7 @@ export const useCameraSocket = () => {
       socket.off('disconnect', handleDisconnect);
       socket.off('camera_frame', handleFrame);
       socket.off('new_alert', handleNewAlert);
+      socket.off('alert_accumulated', handleAlertAccumulated);
       latestFramesRef.current.clear();
       lastFrameTimeRef.current.clear();
     };

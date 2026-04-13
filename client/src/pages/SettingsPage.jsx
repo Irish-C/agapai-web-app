@@ -1,11 +1,10 @@
 // src/pages/Settings.jsx
 import React, { useState } from 'react';
-import { FaUserCog, FaCogs, FaBell, FaUsers, FaConnectdevelop} from 'react-icons/fa'; 
+import { FaUserCog, FaCogs, FaUsers, FaConnectdevelop} from 'react-icons/fa'; 
 
 import { normalizeRole } from '../utils/roleUtils.js';
 
 import AccountSettingsForm from '../features/form/AccountSettingsForm.jsx';
-import CameraNotificationSettings from '../features/camera/CameraNotificationSettings.jsx';
 import UserManager from '../features/manager/UserManager.jsx'; 
 import ManagementDashboard from "../features/manager/ManagementDashboard.jsx";
 
@@ -25,7 +24,6 @@ export default function Settings({ user }) {
     const fullNavItems = [
         { id: 'my_account', name: 'My Account', icon: FaUserCog, role: 'all' },
         { id: 'devloc_management', name: 'Device and Location', icon: FaConnectdevelop, role: 'admin_supervisor_guard' }, 
-        { id: 'notification', name: 'Notifications', icon: FaBell, role: 'all' },
         { id: 'user_management', name: 'User Management', icon: FaUsers, role: 'admin_or_supervisor' }, 
     ];
     
@@ -55,8 +53,6 @@ export default function Settings({ user }) {
                     <p className="text-red-500">Access Denied: You must be an Administrator, Supervisor, or Guard to view devices and locations.</p>
                 );
 
-            case 'notification':
-                return <CameraNotificationSettings />;
             case 'user_management': 
                 return (isAdmin || isSupervisor)
                     ? <UserManager user={user} readOnly={!isAdmin} />

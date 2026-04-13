@@ -70,7 +70,7 @@ async def delete_camera(camera_id: int, user_id: str = Depends(require_admin_use
 
 
 @router.post('/cameras/{camera_id}/publish')
-async def publish_camera_disabled(camera_id: int, user_id: str = Depends(require_admin_user_id)):
+async def publish_camera_disabled(camera_id: int, user_id: str = Depends(get_current_user_id)):
     # Start publish -> spawn relay or processing worker
     try:
         result, code = await publish_camera_to_mediamtx(camera_id)
@@ -80,7 +80,7 @@ async def publish_camera_disabled(camera_id: int, user_id: str = Depends(require
 
 
 @router.post('/cameras/{camera_id}/unpublish')
-async def unpublish_camera_disabled(camera_id: int, user_id: str = Depends(require_admin_user_id)):
+async def unpublish_camera_disabled(camera_id: int, user_id: str = Depends(get_current_user_id)):
     try:
         result, code = await unpublish_camera_from_mediamtx(camera_id)
         return safe_json_response(status_code=code, content=result)

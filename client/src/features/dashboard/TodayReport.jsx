@@ -2,6 +2,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { FaExclamationTriangle, FaCheckCircle, FaDownload, FaFileAlt, FaCheck } from 'react-icons/fa';
 import { fetchReportsData, fetchApi } from '../../services/apiService.js';
+import SnapshotGallery from '../../components/SnapshotGallery';
 
 /**
  * Renders the Today's Incident Log, Activity Summary, and Log Downloader sidebar.
@@ -49,6 +50,11 @@ export default function TodayReport({ incidents = [], alerts = [], user }) {
     const [error, setError] = useState(null);
     const [allIncidents, setAllIncidents] = useState([]);
     const [acknowledgeLoading, setAcknowledgeLoading] = useState({});
+
+    // Gallery States
+    const [galleryOpen, setGalleryOpen] = useState(false);
+    const [gallerySnapshots, setGallerySnapshots] = useState([]);
+    const [galleryTitle, setGalleryTitle] = useState('');
 
     // --- STATE: Log Downloader (New) ---
     // Default to today's date in YYYY-MM-DD format
@@ -125,6 +131,27 @@ export default function TodayReport({ incidents = [], alerts = [], user }) {
 
     const getSnapshotUrl = (incident) => {
         return incident.snapshot_url || incident.snapshotUrl || incident.file_path || incident.filePath || null;
+    };
+
+    const openGallery = (incident) => {
+        let snapshots = [];
+
+        // Parse accumulated snapshot data
+        if (incident.all_snapshots && Array.isArray(incident.all_snapshots)) {
+            snapshots = incident.all_snapshots;
+        } else if (getSnapshotUrl(incident)) {
+            snapshots = [getSnapshotUrl(incident)];
+        }
+
+        if (snapshots.length > 0) {
+            const type = getIncidentType(incident);
+            const occurrenceText = incident.occurrence_count && incident.occurrence_count > 1 
+                ? ` (${incident.occurrence_count} occurrences)`
+                : '';
+            setGalleryTitle(`${type}${occurrenceText}`);
+            setGallerySnapshots(snapshots);
+            setGalleryOpen(true);
+        }
     };
 
     // --- HELPER: Date Formatter ---
@@ -298,6 +325,11 @@ export default function TodayReport({ incidents = [], alerts = [], user }) {
                                             <div className="flex items-center gap-2">
                                                 <FaExclamationTriangle className={`text-lg ${isAcknowledged ? 'text-gray-400' : 'text-red-700'}`} />
                                                 <span className={`font-bold text-base ${isAcknowledged ? 'text-gray-600' : 'text-red-700'}`}>{type}</span>
+                                                {incident.occurrence_count && incident.occurrence_count > 1 && (
+                                                    <span className="text-xs font-bold rounded-full bg-orange-100 text-orange-700 px-2 py-1">
+                                                        {incident.occurrence_count}x
+                                                    </span>
+                                                )}
                                                 {isAcknowledged && (
                                                     <span className="text-xs font-semibold text-green-600 flex items-center gap-1 bg-green-100 px-2 py-1 rounded-full">
                                                         <FaCheck className="text-xs" /> Acknowledged
@@ -310,10 +342,8 @@ export default function TodayReport({ incidents = [], alerts = [], user }) {
                                     {/* Action Buttons Section */}
                                     <div className="flex gap-2">
                                         {snapshotUrl && (
-                                            <a
-                                                href={snapshotUrl}
-                                                target="_blank"
-                                                rel="noopener noreferrer"
+                                            <button
+                                                onClick={() => openGallery(incident)}
                                                 className={`flex-1 inline-flex items-center justify-center text-xs font-semibold px-3 py-2 rounded transition-colors ${
                                                     isAcknowledged
                                                         ? 'text-gray-600 bg-gray-200 hover:bg-gray-300'
@@ -321,7 +351,7 @@ export default function TodayReport({ incidents = [], alerts = [], user }) {
                                                 }`}
                                             >
                                                 View Snapshot
-                                            </a>
+                                            </button>
                                         )}
                                         {isAcknowledged ? (
                                             <button
@@ -407,6 +437,14 @@ export default function TodayReport({ incidents = [], alerts = [], user }) {
                     </div>
                 </div>
             </div> */}
+
+            {/* --- SNAPSHOT GALLERY MODAL --- */}
+            <SnapshotGallery
+                isOpen={galleryOpen}
+                onClose={() => setGalleryOpen(false)}
+                snapshots={gallerySnapshots}
+                title={galleryTitle}
+            />
         </div>
     );
 }

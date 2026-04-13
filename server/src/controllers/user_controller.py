@@ -45,8 +45,6 @@ async def list_users_logic(include_archived: bool = False, archived_only: bool =
             'email': user.email,
             'birthdate': user.birthdate.isoformat() if user.birthdate else None,
             'is_active': bool(getattr(user, 'is_active', True)),
-            'email_notifications': user.email_notifications,
-            'alert_threshold': user.alert_threshold,
         })
     return result, 200
 async def get_profile_logic(user_id):

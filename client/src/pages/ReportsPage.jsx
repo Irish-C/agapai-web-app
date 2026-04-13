@@ -6,6 +6,7 @@ import {
     FaSearch, FaTimes, FaCircle, FaDownload, FaFilter 
 } from 'react-icons/fa';
 import { fetchReportsData, fetchApi } from '../services/apiService';
+import SnapshotGallery from '../components/SnapshotGallery';
 
 export default function ReportsPage() {
     const ALLOWED_LIMITS = [20, 50, 100, 1000];
@@ -26,6 +27,11 @@ export default function ReportsPage() {
     const [filterStatus, setFilterStatus] = useState([]);
     const [showAllClassifications, setShowAllClassifications] = useState(false);
     const [rowActionLoading, setRowActionLoading] = useState({});
+
+    // Gallery States
+    const [galleryOpen, setGalleryOpen] = useState(false);
+    const [gallerySnapshots, setGallerySnapshots] = useState([]);
+    const [galleryTitle, setGalleryTitle] = useState('');
 
     // Pagination States
     const [currentPage, setCurrentPage] = useState(1);
@@ -264,6 +270,26 @@ export default function ReportsPage() {
         }
     };
 
+    const openGallery = (log) => {
+        let snapshots = [];
+
+        // Parse accumulated snapshot data
+        if (log.all_snapshots && Array.isArray(log.all_snapshots)) {
+            snapshots = log.all_snapshots;
+        } else if (log.snapshot_url) {
+            snapshots = [log.snapshot_url];
+        }
+
+        if (snapshots.length > 0) {
+            const occurrenceText = log.occurrence_count && log.occurrence_count > 1 
+                ? ` (${log.occurrence_count} occurrences)`
+                : '';
+            setGalleryTitle(`${log.type || 'Event'}${occurrenceText}`);
+            setGallerySnapshots(snapshots);
+            setGalleryOpen(true);
+        }
+    };
+
     const renderTableBody = () => {
         if (isLoading) return (
             <tr>
@@ -342,14 +368,19 @@ export default function ReportsPage() {
                                 : ((log.status || '').toLowerCase() === 'acknowledged' ? 'Unack' : 'Acknowledge')}
                         </button>
                         {log.snapshot_url ? (
-                            <a
-                                href={log.snapshot_url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="px-3 py-2 text-xs font-bold rounded-xl bg-teal-600 text-white hover:bg-teal-700 transition"
-                            >
-                                View
-                            </a>
+                            <div className="flex items-center gap-2">
+                                {log.occurrence_count && log.occurrence_count > 1 && (
+                                    <span className="px-2 py-1 text-xs font-bold rounded-full bg-orange-100 text-orange-700">
+                                        {log.occurrence_count}x
+                                    </span>
+                                )}
+                                <button
+                                    onClick={() => openGallery(log)}
+                                    className="px-3 py-2 text-xs font-bold rounded-xl bg-teal-600 text-white hover:bg-teal-700 transition"
+                                >
+                                    View
+                                </button>
+                            </div>
                         ) : null}
                         <button
                             type="button"
@@ -501,6 +532,14 @@ export default function ReportsPage() {
                     </div>
                 </div>
             </div>
+
+            {/* --- SNAPSHOT GALLERY MODAL --- */}
+            <SnapshotGallery
+                isOpen={galleryOpen}
+                onClose={() => setGalleryOpen(false)}
+                snapshots={gallerySnapshots}
+                title={galleryTitle}
+            />
 
         </div>
     );

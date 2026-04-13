@@ -1,6 +1,7 @@
 from database import db
 from datetime import datetime, timedelta, timezone
 from src.utils.role_utils import normalize_role
+import json
 
 
 def _location_label(camera_obj):
@@ -10,12 +11,53 @@ def _location_label(camera_obj):
         return camera_obj.cam_name
     return "Unknown"
 
+
+def _parse_snapshot_data(file_path_str):
+    """Parse snapshot data from file_path field (which stores JSON).
+    
+    Returns:
+        dict: {"snapshots": [], "count": int, "first_snapshot": str} or 
+              None if file_path is a simple URL string.
+    """
+    if not file_path_str:
+        return None
+    
+    try:
+        data = json.loads(file_path_str)
+        if isinstance(data, dict) and 'snapshots' in data:
+            return data
+    except (json.JSONDecodeError, ValueError):
+        pass
+    
+    return None
+
+
+def _serialize_snapshot_data(snapshots, first_snapshot=None):
+    """Serialize snapshot data as JSON for storage in file_path field.
+    
+    Args:
+        snapshots: list of snapshot URLs
+        first_snapshot: URL of the first snapshot (for display)
+    
+    Returns:
+        str: JSON string
+    """
+    data = {
+        "snapshots": snapshots,
+        "count": len(snapshots),
+        "first_snapshot": first_snapshot or (snapshots[0] if snapshots else None)
+    }
+    return json.dumps(data)
+
+
 async def create_event_logic(data):
     try:
         # 1. If class_name is provided, look up the correct event_class_id from database
         # 2. Otherwise use the provided event_class_id
         event_class_id = int(data.get('event_class_id', 1))
         class_name = data.get('class_name')
+        camera_id = int(data['camera_id'])
+        snapshot_url = data.get('snapshot_url', '')
         
         print(f"\n[EVENT_CREATE] START")
         print(f"  Incoming data: {data}")
@@ -35,37 +77,107 @@ async def create_event_logic(data):
         else:
             print(f"  [LOOKUP] No class_name provided, using event_class_id={event_class_id}")
         
-        # Create the event log entry
-        new_event = await db.eventlog.create(
-            data={
-                'cam_id': int(data['camera_id']),
-                'event_class_id': event_class_id,
-                'timestamp': datetime.now(timezone.utc),
-                'file_path': data.get('snapshot_url', '')
-            },
-            include={
-                'camera': True,
-                'event_class': True
-            }
-        )
-
-        # Use the socketio_server instance from socket_manager
-        from src.services.socket_manager import socketio_server 
-        payload = {
-            'id': str(new_event.id),
-            'type': new_event.event_class.class_name,
-            'location': new_event.camera.cam_name if new_event.camera else 'Unknown',
-            'timestamp': new_event.timestamp.isoformat(),
-            'snapshot_url': new_event.file_path,
-            'status': 'unacknowledged'
-        }
-        print(f"  [STORED] EventLog ID={new_event.id}, event_class_id={new_event.event_class_id}, type='{payload['type']}'")
-        print(f"[EVENT_CREATE] END\n")
+        # Check for recent matching incident (within 5 seconds)
+        time_window = datetime.now(timezone.utc) - timedelta(seconds=5)
         
-        # Emit alert to frontend
-        await socketio_server.emit('new_alert', payload)
+        recent_event = await db.eventlog.find_first(
+            where={
+                'cam_id': camera_id,
+                'event_class_id': event_class_id,
+                'timestamp': {'gte': time_window},
+                'event_status': 'unacknowledged'
+            },
+            order={'timestamp': 'desc'}
+        )
+        
+        if recent_event:
+            print(f"  [DEDUP] Found recent matching incident (ID={recent_event.id})")
+            # Accumulate snapshots
+            existing_data = _parse_snapshot_data(recent_event.file_path)
+            
+            if existing_data:
+                # Already accumulated format
+                existing_snapshots = existing_data.get('snapshots', [])
+                first_snapshot = existing_data.get('first_snapshot', snapshot_url)
+            else:
+                # First accumulation (upgrade from single URL)
+                existing_snapshots = [recent_event.file_path] if recent_event.file_path else []
+                first_snapshot = recent_event.file_path if recent_event.file_path else snapshot_url
+            
+            # Add new snapshot if different
+            if snapshot_url and snapshot_url not in existing_snapshots:
+                existing_snapshots.append(snapshot_url)
+            
+            # Serialize updated data
+            file_path_json = _serialize_snapshot_data(existing_snapshots, first_snapshot)
+            
+            # Update the existing event
+            updated_event = await db.eventlog.update(
+                where={'id': recent_event.id},
+                data={'file_path': file_path_json},
+                include={
+                    'camera': True,
+                    'event_class': True
+                }
+            )
+            
+            print(f"  [DEDUP] Updated accumulation: {len(existing_snapshots)} snapshots")
+            
+            # Prepare display snapshot_url for frontend
+            parsed = _parse_snapshot_data(updated_event.file_path)
+            display_snapshot_url = parsed['first_snapshot'] if parsed else updated_event.file_path
+            
+            from src.services.socket_manager import socketio_server 
+            payload = {
+                'id': str(updated_event.id),
+                'type': updated_event.event_class.class_name,
+                'location': updated_event.camera.cam_name if updated_event.camera else 'Unknown',
+                'timestamp': updated_event.timestamp.isoformat(),
+                'snapshot_url': display_snapshot_url,
+                'occurrence_count': len(existing_snapshots),
+                'status': 'unacknowledged'
+            }
+            print(f"  [STORED] Updated EventLog ID={updated_event.id}, count={len(existing_snapshots)}")
+            print(f"[EVENT_CREATE] END\n")
+            
+            # Emit update to frontend
+            await socketio_server.emit('alert_accumulated', payload)
+            
+            return {"status": "success", "data": payload, "accumulated": True}, 200
+        else:
+            # No recent match, create new event
+            file_path_json = _serialize_snapshot_data([snapshot_url], snapshot_url)
+            
+            new_event = await db.eventlog.create(
+                data={
+                    'cam_id': camera_id,
+                    'event_class_id': event_class_id,
+                    'timestamp': datetime.now(timezone.utc),
+                    'file_path': file_path_json
+                },
+                include={
+                    'camera': True,
+                    'event_class': True
+                }
+            )
 
-        return {"status": "success", "data": payload}, 201
+            from src.services.socket_manager import socketio_server 
+            payload = {
+                'id': str(new_event.id),
+                'type': new_event.event_class.class_name,
+                'location': new_event.camera.cam_name if new_event.camera else 'Unknown',
+                'timestamp': new_event.timestamp.isoformat(),
+                'snapshot_url': snapshot_url,
+                'occurrence_count': 1,
+                'status': 'unacknowledged'
+            }
+            print(f"  [CREATED] New EventLog ID={new_event.id}, event_class_id={new_event.event_class_id}, type='{payload['type']}'")
+            print(f"[EVENT_CREATE] END\n")
+            
+            # Emit alert to frontend
+            await socketio_server.emit('new_alert', payload)
+
+            return {"status": "success", "data": payload, "accumulated": False}, 201
     except Exception as e:
         return {"status": "error", "message": str(e)}, 500
 
@@ -138,12 +250,28 @@ async def get_event_logs_logic(filters=None):
         # Convert BigInt and DateTime to strings for JSON
         formatted_data = []
         for log in sorted_logs:
+            # Parse accumulated snapshot data
+            parsed_data = _parse_snapshot_data(log.file_path)
+            
+            if parsed_data:
+                # Accumulated format
+                snapshot_url = parsed_data['first_snapshot']
+                occurrence_count = parsed_data['count']
+                all_snapshots = parsed_data['snapshots']
+            else:
+                # Legacy single URL format
+                snapshot_url = log.file_path
+                occurrence_count = 1
+                all_snapshots = [log.file_path] if log.file_path else []
+            
             formatted_data.append({
                 "id": str(log.id),
                 "type": log.event_class.class_name if log.event_class else "Unknown",
                 "location": _location_label(log.camera),
                 "timestamp": log.timestamp.isoformat(),
-                "snapshot_url": log.file_path,
+                "snapshot_url": snapshot_url,
+                "all_snapshots": all_snapshots,
+                "occurrence_count": occurrence_count,
                 "status": log.event_status,
                 "acknowledged_by_username": log.acknowledged_by.username if log.acknowledged_by else None
             })
@@ -178,12 +306,28 @@ async def get_viewed_event_logs_logic(filters=None):
         # Convert BigInt and DateTime to strings for JSON
         formatted_data = []
         for log in sorted_logs:
+            # Parse accumulated snapshot data
+            parsed_data = _parse_snapshot_data(log.file_path)
+            
+            if parsed_data:
+                # Accumulated format
+                snapshot_url = parsed_data['first_snapshot']
+                occurrence_count = parsed_data['count']
+                all_snapshots = parsed_data['snapshots']
+            else:
+                # Legacy single URL format
+                snapshot_url = log.file_path
+                occurrence_count = 1
+                all_snapshots = [log.file_path] if log.file_path else []
+            
             formatted_data.append({
                 "id": str(log.id),
                 "type": log.event_class.class_name if log.event_class else "Unknown",
                 "location": _location_label(log.camera),
                 "timestamp": log.timestamp.isoformat(),
-                "snapshot_url": log.file_path,
+                "snapshot_url": snapshot_url,
+                "all_snapshots": all_snapshots,
+                "occurrence_count": occurrence_count,
                 "status": log.event_status
             })
             
