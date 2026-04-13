@@ -320,7 +320,7 @@ export default function TodayReport({ incidents = [], alerts = [], user }) {
                                                         : 'text-gray-700 bg-red-200 hover:bg-gray-300'
                                                 }`}
                                             >
-                                                View
+                                                View Snapshot
                                             </a>
                                         )}
                                         {isAcknowledged ? (

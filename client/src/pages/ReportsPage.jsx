@@ -58,16 +58,12 @@ export default function ReportsPage() {
                     setLogs(dataArray);
                 }
 
-                // Merge classifications from DB event types and fetched logs
+                // Only use classifications that exist in the database (EventClass table)
                 const dbClassifications = Array.isArray(classResponse)
                     ? classResponse.map(c => c.name || c.type).filter(Boolean)
                     : [];
-                const logClassifications = Array.isArray(dataArray)
-                    ? dataArray.map(log => log.event_class_name || log.type).filter(Boolean)
-                    : [];
 
-                const mergedClassifications = [...new Set([...dbClassifications, ...logClassifications])];
-                setClassifications(prev => mergedClassifications.length > 0 ? mergedClassifications : prev);
+                setClassifications(prev => dbClassifications.length > 0 ? dbClassifications : prev);
 
                 setCurrentPage(1); 
             } catch (err) {
@@ -459,6 +455,7 @@ export default function ReportsPage() {
                             <option value={50}>50 Rows</option>
                             <option value={100}>100 Rows</option>
                             <option value={1000}>1000 Rows</option>
+                            <option value={5000}>5000 Rows</option>
                         </select>
                         <button
                             onClick={handleGenerateReport}

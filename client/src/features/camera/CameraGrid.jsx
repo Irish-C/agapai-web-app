@@ -23,10 +23,14 @@ function parseRtspUrl(rtspUrl) {
 }
 
 // Helper: Construct direct Flask video feed URL
-function getVideoFeedUrl(streamUrl) {
+function getVideoFeedUrl(streamUrl, cameraId = null) {
   const parsed = parseRtspUrl(streamUrl);
   if (parsed) {
-    return `http://localhost:3000/video_feed?ip=${parsed.ip}&pass=${parsed.password}`;
+    let url = `http://localhost:3000/video_feed?ip=${parsed.ip}&pass=${parsed.password}`;
+    if (cameraId) {
+      url += `&camera_id=${cameraId}`;
+    }
+    return url;
   }
   return null;
 }
@@ -183,7 +187,7 @@ export default function CameraGrid() {
           {header}
           {(() => {
             // Handle focused camera streaming (direct from Flask AI service)
-            const dynamicStreamUrl = getVideoFeedUrl(focusedCamera.stream_url);
+            const dynamicStreamUrl = getVideoFeedUrl(focusedCamera.stream_url, focusedCamera.id);
             
             console.log(`[CameraGrid] [STREAM] Focused camera ${focusedCamera.id}: ${dynamicStreamUrl}`);
             return (
@@ -210,7 +214,7 @@ export default function CameraGrid() {
                   const location = camera.location_name || camera.location || camera.loc_name;
                   
                   // Determine stream URL for direct Flask video feed
-                  const dynamicStreamUrl = getVideoFeedUrl(camera.stream_url);
+                  const dynamicStreamUrl = getVideoFeedUrl(camera.stream_url, camera.id);
                   
                   console.log(`[CameraGrid] [STREAM] Grid camera ${camera.id}: ${dynamicStreamUrl}`);
                   return (

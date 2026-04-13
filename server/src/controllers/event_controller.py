@@ -1,5 +1,5 @@
 from database import db
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from src.utils.role_utils import normalize_role
 
 
@@ -12,13 +12,23 @@ def _location_label(camera_obj):
 
 async def create_event_logic(data):
     try:
-        # 1. Use 'eventlog' (lowercase of model name EventLog)
-        # 2. Use schema field names: cam_id and file_path
+        # 1. If class_name is provided, look up the correct event_class_id from database
+        # 2. Otherwise use the provided event_class_id
+        event_class_id = int(data.get('event_class_id', 1))
+        class_name = data.get('class_name')
+        
+        if class_name:
+            # Look up the EventClass by name to get the correct ID
+            event_class = await db.eventclass.find_first(where={'class_name': class_name})
+            if event_class:
+                event_class_id = event_class.id
+        
+        # Create the event log entry
         new_event = await db.eventlog.create(
             data={
                 'cam_id': int(data['camera_id']),
-                'event_class_id': int(data['event_class_id']),
-                'timestamp': datetime.now(),
+                'event_class_id': event_class_id,
+                'timestamp': datetime.now(timezone.utc),
                 'file_path': data.get('snapshot_url', '')
             },
             include={

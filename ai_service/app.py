@@ -4,10 +4,27 @@ import time
 import threading
 import serial
 import requests
-from flask import Flask, Response, request, render_template_string, jsonify
+from datetime import datetime, timezone
+from flask import Flask, Response, request, render_template_string, jsonify, send_from_directory
 from ultralytics import YOLO
 
 app = Flask(__name__)
+
+# Setup snapshots directory
+SNAPSHOTS_DIR = os.path.join(os.path.dirname(__file__), 'snapshots')
+os.makedirs(SNAPSHOTS_DIR, exist_ok=True)
+
+# Serve snapshots as static files
+@app.route('/api/snapshots/<filename>')
+def serve_snapshot(filename):
+    """Serve snapshot images"""
+    try:
+        # Sanitize filename to prevent directory traversal
+        if '/' in filename or '\\' in filename:
+            return jsonify({'error': 'Invalid filename'}), 400
+        return send_from_directory(SNAPSHOTS_DIR, filename)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 404
 
 # Enable CORS for frontend to access video_feed
 @app.after_request
@@ -48,22 +65,49 @@ def trigger_hardware(state):
         except:
             pass
 
-def publish_alert_to_backend(camera_id, alert_message, event_type="Detection"):
+def publish_alert_to_backend(camera_id, alert_message, frame=None, event_type="Detection"):
     """Publish alert to backend for database logging and Socket.IO broadcasting"""
     try:
-        # Map alert message to event class ID
-        event_class_id = 1  # Default: General Detection
-        if "Floor" in alert_message or "Fall" in alert_message:
-            event_class_id = 2  # Fall/Floor
+        # Extract the actual detected class name from alert message
+        # Alert messages are like: "Floor: Backward Fall Detected!" or "Zone 1: Critical Inactivity (...)"
+        class_name = None
+        event_class_id = 1  # Default
+        
+        if "Floor:" in alert_message:
+            # Extract fall type: "Floor: Backward Fall Detected!" → "Backward Fall"
+            parts = alert_message.split("Floor: ")[1].split(" Detected")[0]
+            class_name = parts
+            event_class_id = 2  # Falls
         elif "Inactivity" in alert_message:
+            # Extract inactivity level: "Zone 1: Inactivity (High) (30:45)" → "Inactivity (High)"
+            if "Inactivity" in alert_message:
+                parts = alert_message.split(": ")[1].split(" (")[0]
+                class_name = parts  # "Inactivity (High)", "Inactivity (Medium)", etc.
             event_class_id = 3  # Inactivity
+        
+        # Save snapshot if frame is provided
+        snapshot_url = ''
+        if frame is not None:
+            try:
+                timestamp = int(time.time() * 1000)  # milliseconds for uniqueness
+                snapshot_filename = f"alert_cam{camera_id}_{timestamp}.jpg"
+                snapshot_path = os.path.join(SNAPSHOTS_DIR, snapshot_filename)
+                
+                # Save the frame as JPEG
+                success = cv2.imwrite(snapshot_path, frame, [cv2.IMWRITE_JPEG_QUALITY, 85])
+                if success:
+                    snapshot_url = f"http://localhost:3000/api/snapshots/{snapshot_filename}"
+                    print(f"[SNAPSHOT SAVED] {snapshot_filename}")
+            except Exception as e:
+                print(f"[SNAPSHOT ERROR] Could not save snapshot: {e}")
         
         payload = {
             'camera_id': camera_id,
             'event_class_id': event_class_id,
             'alert_message': alert_message,
-            'snapshot_url': '',
-            'timestamp': time.time()
+            'class_name': class_name,  # Send the extracted class name
+            'snapshot_url': snapshot_url,
+            'timestamp': datetime.now(timezone.utc).isoformat()
         }
         response = requests.post(
             'http://localhost:5000/api/alerts',
@@ -462,7 +506,7 @@ def generate_frames(rtsp_url):
                             if elapsed >= INACTIVITY_HIGH_SEC:
                                 box_color = (0, 0, 255)       
                                 status_text = f"HIGH INACT [{time_str}]"
-                                current_frame_alerts.append(f"Zone {i+1}: Critical Inactivity ({time_str})")
+                                current_frame_alerts.append(f"Zone {i+1}: Inactivity (High) ({time_str})")
                             elif elapsed >= INACTIVITY_MED_SEC:
                                 box_color = (0, 165, 255)     
                                 status_text = f"MED INACT [{time_str}]"
@@ -500,7 +544,7 @@ def generate_frames(rtsp_url):
                 # Publish new alerts to backend for logging and Socket.IO
                 if len(current_frame_alerts) > 0:
                     for alert in current_frame_alerts:
-                        publish_alert_to_backend(current_camera_id, alert)
+                        publish_alert_to_backend(current_camera_id, alert, frame=frame)
                 
                 # If there is a new alert and we haven't muted it, push the timer 10 seconds into the future
                 if len(active_alerts) > 0 and not hardware_muted:
@@ -581,13 +625,21 @@ def api_stop():
 
 @app.route('/video_feed')
 def video_feed():
+    global current_camera_id
+    
     ip = request.args.get('ip')
     pw = request.args.get('pass')
+    camera_id = request.args.get('camera_id')  # Get camera_id from request
+    
     if not ip or not pw:
         # Check if backend initialized camera
         if current_rtsp_url:
             return Response(generate_frames(current_rtsp_url), mimetype='multipart/x-mixed-replace; boundary=frame')
         return jsonify({"error": "No camera configured"}), 400
+    
+    # Set current_camera_id for alert tracking
+    if camera_id:
+        current_camera_id = camera_id
     
     url = f"rtsp://admin:{pw}@{ip}:554/cam/realmonitor?channel=1&subtype=0"
     return Response(generate_frames(url), mimetype='multipart/x-mixed-replace; boundary=frame')
