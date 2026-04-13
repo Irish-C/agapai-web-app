@@ -7,7 +7,7 @@ import agapai_Bg from './src/assets/bg/gray-bg.png';
 
 // services
 import { loginUser, fetchCameraList, logoutUser } from './src/services/apiService.js';
-
+import { socket } from './src/services/socket.js';
 
 // helpers
 import { normalizeRole } from './src/utils/roleUtils.js';
@@ -16,6 +16,7 @@ import { normalizeRole } from './src/utils/roleUtils.js';
 import Header from './src/components/layout/Header.jsx';
 import Footer from './src/components/layout/Footer.jsx';
 import ConnectionStatus from "./src/components/ConnectionStatus.jsx";
+import RealTimeAlertModal from './src/features/modal/RealTimeAlertModal.jsx';
 
 // Pages
 import LandingPage from './src/pages/LandingPage.jsx';
@@ -32,6 +33,50 @@ export default function App() {
     const location = useLocation();
 
     const [cameras, setCameras] = useState([]);
+    const [alertIncident, setAlertIncident] = useState(null);
+
+    // Listen for real-time alerts from backend
+    useEffect(() => {
+        const handleAlert = (data) => {
+            console.log('[App] Received alert:', data);
+            
+            // Format incident data for the modal
+            const incident = {
+                alert_id: data.id,  // Database ID for acknowledgment
+                type: data.type || 'Unknown Alert',
+                location: data.location || 'Unknown Location',
+                timestamp: data.timestamp ? new Date(data.timestamp).getTime() / 1000 : Math.floor(Date.now() / 1000),
+                snapshot_url: data.snapshot_url,
+                camera_id: data.camera_id
+            };
+            
+            console.log('[App] Incident object:', incident);
+            setAlertIncident(incident);
+        };
+
+        // Listen for both new alerts and accumulated alerts
+        socket.on('new_alert', handleAlert);
+        socket.on('alert_accumulated', handleAlert);
+
+        return () => {
+            socket.off('new_alert', handleAlert);
+            socket.off('alert_accumulated', handleAlert);
+        };
+    }, []);
+
+    const handleAcknowledgeAlert = () => {
+        console.log('[App] Alert acknowledged');
+        setAlertIncident(null);
+        
+        // Send acknowledgment back to backend with correct format
+        if (alertIncident && user) {
+            socket.emit('ack_alert', {
+                alert_id: alertIncident.alert_id,
+                user_id: user.id
+            });
+            console.log('[App] Sent ack_alert with alert_id:', alertIncident.alert_id);
+        }
+    };
 
     // Track location and save to localStorage
     useEffect(() => {
@@ -103,6 +148,12 @@ export default function App() {
                     </Routes>
                 )}
             </main>
+
+            {/* Global Real-Time Alert Modal - shows on all pages */}
+            <RealTimeAlertModal 
+                incident={alertIncident} 
+                onAcknowledge={handleAcknowledgeAlert}
+            />
 
             {user && <Footer />}
         </div>

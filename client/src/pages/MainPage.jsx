@@ -6,7 +6,7 @@ import CameraGrid from '../features/camera/CameraGrid.jsx';
  * @param {object} props - Props containing user data.
  */
 export default function MainPage({ user }) {
-  // App.jsx handles the Header, Footer, and the gray "flex-grow" background.
+  // App.jsx handles the Header, Footer, and global alerts
   return (
     <div className="container mx-auto">
       <CameraGrid />

@@ -143,11 +143,10 @@ async def handle_ack_alert(sid, data):
     """Handle alert acknowledgement from frontend.
     
     Client sends this when user clicks 'ACKNOWLEDGE' button.
-    Updates database and turns off hardware alarm.
+    Updates database and silences alarm.
     """
     try:
         from database import db
-        from src.services.hardware import hardware_alert
         from datetime import datetime, timezone
         
         alert_id = data.get('alert_id') if isinstance(data, dict) else None
@@ -163,7 +162,7 @@ async def handle_ack_alert(sid, data):
         except ValueError:
             pass
         
-        print(f"[Socket.IO] Alert {alert_id} acknowledged by user {user_id}")
+        print(f"[Socket.IO] 🔔 Alert {alert_id} acknowledged by user {user_id}")
         
         # Update database
         try:
@@ -178,13 +177,6 @@ async def handle_ack_alert(sid, data):
         except Exception as e:
             print(f"[Socket.IO] ⚠️ Failed to update database: {e}")
         
-        # Turn off hardware alarm
-        try:
-            hardware_alert.stop_alarm()
-            print(f"[Socket.IO] 🔴 Hardware alarm stopped")
-        except Exception as e:
-            print(f"[Socket.IO] ⚠️ Warning: Could not stop hardware alarm: {e}")
-        
         # Broadcast acknowledgement to all clients
         try:
             await socketio_server.emit('alert_acknowledged', {
@@ -192,7 +184,7 @@ async def handle_ack_alert(sid, data):
                 'acknowledged_by': user_id,
                 'timestamp': datetime.now(timezone.utc).isoformat()
             }, broadcast=True)
-            print(f"[Socket.IO] ✅ Broadcasted alert_acknowledged")
+            print(f"[Socket.IO] ✅ Broadcasted alert_acknowledged to all clients")
         except Exception as e:
             print(f"[Socket.IO] ⚠️ Failed to broadcast acknowledgement: {e}")
         

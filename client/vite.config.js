@@ -31,26 +31,23 @@ export default defineConfig({
     // Note: This proxy only matters for 'npm run dev' on your laptop. 
     // Your Nginx config handles the proxying in the Docker image.
     proxy: {
-      // Backend running on 127.0.0.1:5000 in local dev (uvicorn/Flask).
-      '/api': { target: 'http://127.0.0.1:5000', changeOrigin: true, secure: false },
-      '/socket.io': { target: 'http://127.0.0.1:5000', ws: true, changeOrigin: true, secure: false },
-      '/detect': { target: 'http://127.0.0.1:5000', changeOrigin: true, secure: false },
-      // Snapshots from AI Service (port 3000)
-      '/snapshots/': {
-        target: 'http://127.0.0.1:3000/api/snapshots',
+      // Snapshots from AI Service (port 3000) - MUST BE BEFORE /api rule
+      '/api/snapshots': {
+        target: 'http://127.0.0.1:3000',
         changeOrigin: true,
-        secure: false,
-        rewrite: (path) => path.replace(/^\/snapshots\//, ''),
+        secure: false
       },
       // MJPEG streams from AI Service (port 3000)
-      // Browser requests: /mjpeg/?camera_id=1
-      // Forward to: http://127.0.0.1:3000/api/video_feed?camera_id=1
-      '/mjpeg/': {
+      '/mjpeg': {
         target: 'http://127.0.0.1:3000/api/video_feed',
         changeOrigin: true,
         secure: false,
-        rewrite: (path) => path.replace(/^\/mjpeg\//, ''),
-      }
+        rewrite: (path) => path.replace(/^\/mjpeg/, '')
+      },
+      // Backend running on 127.0.0.1:5000 in local dev (uvicorn/Flask) - AFTER specific routes
+      '/api': { target: 'http://127.0.0.1:5000', changeOrigin: true, secure: false },
+      '/socket.io': { target: 'http://127.0.0.1:5000', ws: true, changeOrigin: true, secure: false },
+      '/detect': { target: 'http://127.0.0.1:5000', changeOrigin: true, secure: false }
     }
   }
 });

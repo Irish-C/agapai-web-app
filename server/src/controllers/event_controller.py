@@ -187,7 +187,10 @@ async def create_event_logic(data):
 
             return {"status": "success", "data": payload, "accumulated": False}, 201
     except Exception as e:
-        return {"status": "error", "message": str(e)}, 500
+        import traceback
+        print(f"[EVENT_CREATE] ERROR: {str(e)}")
+        print(f"[EVENT_CREATE] Traceback:\n{traceback.format_exc()}")
+        return {"status": "error", "message": str(e), "traceback": traceback.format_exc()}, 500
 
 async def get_event_types_logic():
     try:
