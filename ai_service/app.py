@@ -315,6 +315,11 @@ def generate_frames(rtsp_url):
     frame_skip_counter = 0
     last_inference_time = time.time()
     inference_interval = 0.15  # Run YOLO every 150ms (~6-7 FPS)
+    
+    # FPS tracking
+    frame_count = 0
+    fps_start_time = time.time()
+    current_fps = 0
 
     while True:
         success, frame = cap.read()
@@ -325,6 +330,14 @@ def generate_frames(rtsp_url):
         frame_skip_counter += 1
         if frame_skip_counter % 5 != 0:  # Process 1/5 frames for streaming
             continue
+        
+        # Update FPS counter
+        frame_count += 1
+        elapsed = time.time() - fps_start_time
+        if elapsed >= 1.0:  # Update FPS every second
+            current_fps = frame_count / elapsed
+            frame_count = 0
+            fps_start_time = time.time()
         
         current_time = time.time()
         should_infer = (current_time - last_inference_time) >= inference_interval 
@@ -348,6 +361,8 @@ def generate_frames(rtsp_url):
                     bed_trackers[i] = {"label": None, "start_time": 0, "last_seen": 0, "box": None}
 
         instruction_text = f"Zones Active: {len(pixel_rois)}/30"
+        fps_text = f"FPS: {current_fps:.1f}"
+        draw_text_outline(frame, fps_text, (20, 15), (0, 0, 0))
         draw_text_outline(frame, instruction_text, (20, 30), (0, 0, 0))
 
         # --- AI INFERENCE (Only every 150ms, not every frame) ---

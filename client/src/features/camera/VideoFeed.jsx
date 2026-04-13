@@ -87,8 +87,6 @@ function VideoFeed({ camId, cameraName, location, isFocused, onFocusChange, stre
     <div ref={wrapperRef} className={`group bg-black rounded-none shadow-md overflow-hidden border-2 border-gray-700 relative ${!isFocused ? 'cursor-pointer hover:border-teal-500 transition-all' : 'border-teal-600'}`} onClick={() => !isFocused && onFocusChange?.(camId)}>
       <div className="absolute top-0 left-0 w-full text-white p-2 flex items-center justify-between z-10">
         <div className="flex items-center gap-2 overflow-hidden min-w-0">
-          <h4 className="font-semibold text-sm truncate">{cameraName}</h4>
-          <p className="text-xs text-gray-400 truncate font-normal">{location}</p>
         </div>
         <div className="flex items-center gap-2">
           <span className={`w-2 h-2 rounded-full ${cameraStatus === 'online' ? 'bg-green-500' : 'bg-red-500'}`}></span>
@@ -105,8 +103,12 @@ function VideoFeed({ camId, cameraName, location, isFocused, onFocusChange, stre
 
         {content}
 
-        <div className="absolute bottom-2 left-2 bg-transparent text-white px-3 py-1 rounded text-xs font-mono">
-          <div>DATE: {currentDateTime.toLocaleDateString()} {currentDateTime.toLocaleTimeString()}</div>
+        <div className="absolute bottom-2 left-2 text-white px-2 py-1 rounded text-xs font-mono">
+          <div className="flex gap-1 mb-0.5">
+            <div className="font-semibold text-sm px-1 py-0.5 rounded" style={{ color: '#ffffff', backgroundColor: 'rgba(0, 0, 0, 0.3)' }}>{cameraName}</div>
+            <div className="text-xs px-1 py-0.5 rounded" style={{ color: '#ffffff', backgroundColor: 'rgba(0, 0, 0, 0.3)' }}>{location}</div>
+          </div>
+          <div className="text-xs px-1 py-0.5 rounded" style={{ color: '#ffffff', backgroundColor: 'rgba(0, 0, 0, 0.3)' }}>DATE: {currentDateTime.toLocaleDateString()} {currentDateTime.toLocaleTimeString()}</div>
         </div>
 
         {isFocused ? (
