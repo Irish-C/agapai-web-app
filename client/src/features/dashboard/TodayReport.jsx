@@ -98,7 +98,15 @@ export default function TodayReport({ incidents = [], alerts = [], user }) {
                 const dateKey = getLocalDateKey(ts);
                 return dateKey === todayKey;
             })
-            .sort((a, b) => getIncidentEpochMs(b) - getIncidentEpochMs(a));
+            .sort((a, b) => {
+                // First sort by status: unacknowledged (0) before acknowledged (1)
+                const statusA = (a.status === 'unacknowledged') ? 0 : 1;
+                const statusB = (b.status === 'unacknowledged') ? 0 : 1;
+                if (statusA !== statusB) return statusA - statusB;
+                
+                // Then sort by timestamp (most recent first)
+                return getIncidentEpochMs(b) - getIncidentEpochMs(a);
+            });
     }, [allIncidents, incidents, alerts]);
 
     // --- Derived State ---
