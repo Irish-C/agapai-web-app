@@ -366,7 +366,7 @@ export default function TodayReport({ incidents = [], alerts = [], user }) {
                                             >
                                                 {isLoading
                                                     ? 'Updating...'
-                                                    : `Acknowledged by ${incident.acknowledged_by_username || 'Unknown User'}`}
+                                                    : `Acknowledged${incident.acknowledged_by_username ? ` by ${incident.acknowledged_by_username}` : ''}`}
                                             </button>
                                         ) : (
                                             <button

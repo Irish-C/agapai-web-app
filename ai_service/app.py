@@ -55,9 +55,76 @@ def add_cors_headers(response):
 # ==========================================
 # --- CONFIGURATION & HARDWARE ---
 # ==========================================
-SERIAL_PORT = 'COM3'  # Update based on your Mini PC's Device Manager
 BAUD_RATE = 115200
 MODEL_PATH = r"best_openvino_model"
+
+# ==========================================
+# --- AUTO-DETECT SERIAL PORT ---
+# ==========================================
+def find_esp32_port():
+    """Auto-detect ESP32 serial port (works on Windows, Linux, macOS)"""
+    import platform
+    import glob
+    import os
+    
+    system = platform.system()
+    
+    # Check common USB serial ports explicitly (more reliable than glob)
+    common_ports = []
+    if system == 'Windows':
+        common_ports = [f'COM{i}' for i in range(1, 256)]
+    elif system == 'Darwin':
+        common_ports = glob.glob('/dev/tty.*') + glob.glob('/dev/cu.*')
+    else:
+        # Linux: Check explicit USB ports first (they may not show in glob if just attached via USB/IP)
+        for i in range(10):
+            common_ports.append(f'/dev/ttyUSB{i}')
+            common_ports.append(f'/dev/ttyACM{i}')
+        # Skip /dev/ttyS* as they're usually system ports with permission issues
+    
+    print(f"[HARDWARE] Looking for USB serial devices...")
+    print(f"[HARDWARE] Checking: /dev/ttyUSB0-9, /dev/ttyACM0-9")
+    
+    # First pass: Check which ports exist and are accessible
+    accessible_ports = []
+    for port in common_ports:
+        if os.path.exists(port):
+            accessible_ports.append(port)
+            print(f"[HARDWARE]   ✓ Found device file: {port}")
+    
+    if not accessible_ports:
+        print(f"[HARDWARE] ✗ No USB devices found!")
+        print(f"[HARDWARE] If ESP32 is physically connected, check USB/IP passthrough:")
+        print(f"[HARDWARE]   Windows PS (Admin): usbipd attach --wsl --busid <BUSID>")
+        print(f"[HARDWARE]   Then: ls /dev/ttyUSB*")
+        return None
+    
+    print(f"[HARDWARE] Attempting connection to {len(accessible_ports)} device(s)...")
+    
+    # Second pass: Try to connect
+    for port in accessible_ports:
+        try:
+            print(f"[HARDWARE]   Connecting to {port}...")
+            s = serial.Serial(port, BAUD_RATE, timeout=1.0)
+            time.sleep(0.2)
+            s.close()
+            print(f"[HARDWARE] ✓ Successfully connected to {port}")
+            return port
+        except PermissionError:
+            print(f"[HARDWARE]   Permission denied on {port}")
+            print(f"[HARDWARE]   Fix: sudo chmod 666 {port}")
+            continue
+        except Exception as e:
+            print(f"[HARDWARE]   Failed: {type(e).__name__}: {str(e)[:50]}")
+            continue
+    
+    return None
+
+SERIAL_PORT = find_esp32_port()
+if SERIAL_PORT:
+    print(f"[HARDWARE] Auto-detected ESP32 on {SERIAL_PORT} ✓")
+else:
+    print(f"[HARDWARE] No ESP32 detected on common serial ports")
 
 # ==========================================
 # --- CAMERA RTSP STORAGE (Auto-Start) ---
@@ -66,13 +133,39 @@ current_rtsp_url = None
 current_camera_id = None
 
 esp32 = None
-try:
-    print(f"[HARDWARE] Connecting to ESP32 on {SERIAL_PORT}...")
-    esp32 = serial.Serial(SERIAL_PORT, BAUD_RATE, timeout=0.1)
-    time.sleep(2) 
-    print("[HARDWARE] ESP32 Connected!")
-except Exception as e:
-    print(f"[HARDWARE ERROR] Could not connect: {e}")
+if SERIAL_PORT:
+    try:
+        print(f"[HARDWARE] Connecting to ESP32 on {SERIAL_PORT}...")
+        esp32 = serial.Serial(SERIAL_PORT, BAUD_RATE, timeout=0.1)
+        time.sleep(2) 
+        print("[HARDWARE] ESP32 Connected!")
+
+        # --- INSERT LISTENER HERE ---
+        def serial_listener():
+            global hardware_muted, hardware_on_until
+            while True:
+                if esp32 and esp32.is_open:
+                    try:
+                        if esp32.in_waiting > 0:
+                            # Listen for the message from ESP32
+                            line = esp32.readline().decode('utf-8').strip()
+                            if line == "BUTTON_PRESSED":
+                                print("[HARDWARE] Physical Button Pressed! Muting Alert.")
+                                with state_lock:
+                                    hardware_muted = True
+                                    hardware_on_until = 0.0 # Resets the 10s timer
+                    except:
+                        pass
+                time.sleep(0.1) # Small sleep to prevent high CPU usage
+
+        # Start the thread immediately
+        threading.Thread(target=serial_listener, daemon=True).start()
+        # ----------------------------
+        
+    except Exception as e:
+        print(f"[HARDWARE ERROR] Could not connect: {e}")
+else:
+    print("[HARDWARE] Skipping ESP32 initialization - no port detected")
 
 def trigger_hardware(state):
     """Sends ON/OFF signals to the ESP32."""

@@ -345,8 +345,8 @@ export default function ReportsPage() {
                     </div>
                 </td>
                 <td className="px-8 py-6 whitespace-nowrap text-xs text-gray-400 italic font-medium font-sans">
-                    {(log.status || '').toLowerCase() === 'acknowledged'
-                        ? (log.acknowledged_by_username || 'Unknown User')
+                    {(log.status || '').toLowerCase() === 'acknowledged' && log.acknowledged_by_username
+                        ? log.acknowledged_by_username
                         : ''}
                 </td>
                 <td className="px-8 py-6 whitespace-nowrap text-right">
