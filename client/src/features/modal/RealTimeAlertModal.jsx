@@ -4,7 +4,7 @@ import React from 'react';
 /**
  * A full-screen, persistent modal to display an urgent fall alert.
  */
-export default function RealTimeAlertModal({ incident, onAcknowledge }) {
+export default function RealTimeAlertModal({ incident, onDismiss }) {
     if (!incident) return null;
 
     const formattedTime = new Date(incident.timestamp * 1000).toLocaleTimeString('en-US', {
@@ -13,9 +13,9 @@ export default function RealTimeAlertModal({ incident, onAcknowledge }) {
         second: '2-digit'
     });
     
-    // Handle acknowledge button click
-    const handleAcknowledgeClick = () => {
-        onAcknowledge();
+    // Handle dismiss button click
+    const handleDismissClick = () => {
+        onDismiss();
     };
 
     return (
@@ -64,7 +64,7 @@ export default function RealTimeAlertModal({ incident, onAcknowledge }) {
                 
                 <div className="mt-5 flex gap-2">
                     <button
-                        onClick={handleAcknowledgeClick}
+                        onClick={handleDismissClick}
                         className="flex-1 inline-flex justify-center rounded-lg border-none shadow-md px-4 py-2 bg-red-600 text-sm font-bold text-white hover:bg-red-700 active:bg-red-800 transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
                     >
                         Dismiss

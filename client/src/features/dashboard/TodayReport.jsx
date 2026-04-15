@@ -86,18 +86,43 @@ export default function TodayReport({ incidents = [], alerts = [], user }) {
     const sortedIncidents = useMemo(() => {
         const todayKey = getLocalDateKey(new Date());
         
-        // Combine database logs + real-time incidents/alerts
-        const combined = [...allIncidents, ...incidents, ...alerts];
+        // Build set of acknowledged incident IDs from database
+        // This ensures Socket.IO incidents that are already acknowledged don't appear as duplicates
+        const acknowledgedIncidentIds = new Set(
+            allIncidents
+                .filter(inc => inc.status === 'acknowledged')
+                .map(inc => String(inc.id || inc.log_id))
+                .filter(id => id && id !== 'undefined' && id !== 'null') // Remove invalid IDs
+        );
         
-        // Remove duplicates by timestamp + type
-        const unique = Array.from(new Map(
-            combined.map(item => {
-                const key = `${getIncidentEpochMs(item)}-${item.type || item.event_class || 'unknown'}`;
-                return [key, item];
-            })
-        ).values());
+        console.log('[TodayReport] Acknowledged IDs:', Array.from(acknowledgedIncidentIds), 'Count:', acknowledgedIncidentIds.size);
+        
+        // Filter out incidents from Socket.IO that are already acknowledged in the database
+        // This prevents duplicates when a user acknowledges an incident
+        const filteredIncidents = incidents.filter(inc => {
+            const incId = String(inc.id || inc.log_id);
+            const isAcknowledged = acknowledgedIncidentIds.has(incId);
+            if (isAcknowledged) {
+                console.log('[TodayReport] ✓ Filtering out Socket.IO incident (already acknowledged, ID:', incId, ')');
+            }
+            return !isAcknowledged;
+        });
+        
+        const filteredAlerts = alerts.filter(inc => {
+            const incId = String(inc.id || inc.log_id);
+            const isAcknowledged = acknowledgedIncidentIds.has(incId);
+            if (isAcknowledged) {
+                console.log('[TodayReport] ✓ Filtering out Socket.IO alert (already acknowledged, ID:', incId, ')');
+            }
+            return !isAcknowledged;
+        });
+        
+        console.log('[TodayReport] allIncidents:', allIncidents.length, 'incidents (filtered):', filteredIncidents.length, 'alerts (filtered):', filteredAlerts.length);
+        
+        // Combine database logs + real-time incidents/alerts (filtered)
+        const combined = [...allIncidents, ...filteredIncidents, ...filteredAlerts];
 
-        return (unique || [])
+        return combined
             .filter((inc) => {
                 const ts = getIncidentEpochMs(inc);
                 if (!ts) return false;
@@ -176,23 +201,63 @@ export default function TodayReport({ incidents = [], alerts = [], user }) {
 
             // Call the backend API to acknowledge the incident in the database
             const response = await fetchApi(`/events/${incidentId}/acknowledge`, 'POST');
+            console.log('[TodayReport] Full acknowledge response:', response);
+            console.log('[TodayReport] Response type:', typeof response);
+            console.log('[TodayReport] Response keys:', response ? Object.keys(response) : 'null');
             
-            if (response.status === 'success') {
+            // Check for success - very flexible validation
+            const isSuccess = response && (
+                response.status === 'success' || 
+                response.message === 'Event acknowledged' ||
+                response.message?.includes('acknowledged')
+            );
+            
+            console.log('[TodayReport] Is success?', isSuccess);
+            
+            if (isSuccess) {
                 const currentUsername = getCurrentUsername();
+                console.log('[TodayReport] Updating state for incident', incidentId, 'with username:', currentUsername);
+                
                 // Update the incident in state to reflect acknowledged status
-                setAllIncidents(prev => 
-                    prev.map(inc => 
-                        (inc.id === incidentId || inc.log_id === incidentId)
-                            ? {
+                setAllIncidents(prev => {
+                    const updated = prev.map(inc => {
+                        // Check multiple ID fields for matching
+                        const incId = String(inc.id || inc.log_id || '');
+                        const targetId = String(incidentId);
+                        const matches = incId === targetId;
+                        
+                        if (matches) {
+                            console.log('[TodayReport] ✓ Marked incident as acknowledged. Before:', inc.status, '| After: acknowledged');
+                            return {
                                 ...inc,
+                                id: inc.id || incidentId,
+                                log_id: inc.log_id || incidentId,
                                 status: 'acknowledged',
                                 event_status: 'acknowledged',
                                 acknowledged_by_username: currentUsername || inc.acknowledged_by_username,
-                            }
-                            : inc
-                    )
-                );
+                            };
+                        }
+                        return inc;
+                    });
+                    console.log('[TodayReport] Updated incidents list, length:', updated.length);
+                    return updated;
+                });
+                
+                // Force re-fetch database logs to ensure consistency with backend
+                // This prevents Socket.IO events from overriding the acknowledged status
+                setTimeout(async () => {
+                    try {
+                        const response = await fetchReportsData(1000, '', '');
+                        const todaysLogs = response.report || response.data || [];
+                        console.log('[TodayReport] Re-fetched database logs after acknowledge, count:', todaysLogs.length);
+                        setAllIncidents(todaysLogs);
+                    } catch (err) {
+                        console.error('[TodayReport] Failed to re-fetch logs:', err);
+                    }
+                }, 300); // Small delay to ensure backend has processed the update
+
             } else {
+                console.error('[TodayReport] Unexpected response:', response);
                 setError('Failed to acknowledge incident. Please try again.');
             }
         } catch (err) {
@@ -218,24 +283,62 @@ export default function TodayReport({ incidents = [], alerts = [], user }) {
             setError(null);
 
             // Call the backend API to unacknowledge the incident in the database
-            // Assuming there's a PATCH endpoint or similar for updating status
             const response = await fetchApi(`/events/${incidentId}/unacknowledge`, 'POST');
+            console.log('[TodayReport] Full unacknowledge response:', response);
+            console.log('[TodayReport] Response type:', typeof response);
+            console.log('[TodayReport] Response keys:', response ? Object.keys(response) : 'null');
             
-            if (response.status === 'success') {
+            // Check for success - very flexible validation
+            const isSuccess = response && (
+                response.status === 'success' || 
+                response.message === 'Event unacknowledged' ||
+                response.message?.includes('unacknowledged')
+            );
+            
+            console.log('[TodayReport] Is unacknowledge success?', isSuccess);
+            
+            if (isSuccess) {
+                console.log('[TodayReport] Updating state to unacknowledged for incident', incidentId);
+                
                 // Update the incident in state to reflect unacknowledged status
-                setAllIncidents(prev => 
-                    prev.map(inc => 
-                        (inc.id === incidentId || inc.log_id === incidentId)
-                            ? {
+                setAllIncidents(prev => {
+                    const updated = prev.map(inc => {
+                        // Check multiple ID fields for matching
+                        const incId = String(inc.id || inc.log_id || '');
+                        const targetId = String(incidentId);
+                        const matches = incId === targetId;
+                        
+                        if (matches) {
+                            console.log('[TodayReport] ✓ Marked incident as unacknowledged. Before:', inc.status, '| After: unacknowledged');
+                            return {
                                 ...inc,
+                                id: inc.id || incidentId,
+                                log_id: inc.log_id || incidentId,
                                 status: 'unacknowledged',
                                 event_status: 'unacknowledged',
                                 acknowledged_by_username: null,
-                            }
-                            : inc
-                    )
-                );
+                            };
+                        }
+                        return inc;
+                    });
+                    console.log('[TodayReport] Updated incidents list after unacknowledge');
+                    return updated;
+                });
+                
+                // Force re-fetch database logs to ensure consistency with backend
+                setTimeout(async () => {
+                    try {
+                        const response = await fetchReportsData(1000, '', '');
+                        const todaysLogs = response.report || response.data || [];
+                        console.log('[TodayReport] Re-fetched database logs after unacknowledge, count:', todaysLogs.length);
+                        setAllIncidents(todaysLogs);
+                    } catch (err) {
+                        console.error('[TodayReport] Failed to re-fetch logs:', err);
+                    }
+                }, 300);
+
             } else {
+                console.error('[TodayReport] Unexpected response:', response);
                 setError('Failed to unacknowledge incident. Please try again.');
             }
         } catch (err) {

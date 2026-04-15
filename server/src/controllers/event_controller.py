@@ -381,39 +381,51 @@ async def get_viewed_event_logs_logic(filters=None):
 
 async def mark_viewed_logic(log_id, user_id):
     try:
-        await db.eventlog.update(
+        print(f"[ACKNOWLEDGE] Start - log_id={log_id}, user_id={user_id}")
+        
+        result = await db.eventlog.update(
             where={'id': int(log_id)},
             data={
                 'ack_by_user_id': int(user_id),
                 'event_status': 'acknowledged'
             }
         )
+        
+        print(f"[ACKNOWLEDGE] ✓ Success - Event {log_id} acknowledged by user {user_id}")
         return {"status": "success", "message": "Event acknowledged"}, 200
     except Exception as e:
+        print(f"[ACKNOWLEDGE] ✗ Error: {e}")
         return {"status": "error", "message": str(e)}, 500
 
 async def mark_unviewed_logic(log_id, user_id):
     try:
+        print(f"[UNACKNOWLEDGE] Start - log_id={log_id}, user_id={user_id}")
+        
         existing_log = await db.eventlog.find_unique(where={'id': int(log_id)})
         if not existing_log:
+            print(f"[UNACKNOWLEDGE] ✗ Event not found with id={log_id}")
             return {"status": "error", "message": "Event not found"}, 404
 
         # Only the original acknowledger may unacknowledge this event.
         if existing_log.ack_by_user_id is None or int(existing_log.ack_by_user_id) != int(user_id):
+            print(f"[UNACKNOWLEDGE] ✗ User {user_id} cannot unacknowledge (ack_by_user_id={existing_log.ack_by_user_id})")
             return {
                 "status": "error",
                 "message": "Only the user who acknowledged this event can unacknowledge it"
             }, 403
 
-        await db.eventlog.update(
+        result = await db.eventlog.update(
             where={'id': int(log_id)},
             data={
                 'ack_by_user_id': None,
                 'event_status': 'unacknowledged'
             }
         )
+        
+        print(f"[UNACKNOWLEDGE] ✓ Success - Event {log_id} unacknowledged")
         return {"status": "success", "message": "Event unacknowledged"}, 200
     except Exception as e:
+        print(f"[UNACKNOWLEDGE] ✗ Error: {e}")
         return {"status": "error", "message": str(e)}, 500
 
 async def get_event_types():

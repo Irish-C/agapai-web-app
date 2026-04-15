@@ -28,6 +28,9 @@ export const fetchApi = async (endpoint, method = 'GET', data = null) => {
 
     if (token) {
         options.headers['Authorization'] = `Bearer ${token}`;
+        console.log(`fetchApi: Token found - ${token.substring(0, 20)}...`);
+    } else {
+        console.warn(`fetchApi: No token found for endpoint ${endpoint}`);
     }
 
     if (data) {
@@ -67,7 +70,14 @@ export const fetchApi = async (endpoint, method = 'GET', data = null) => {
         // Attempt to parse JSON response
         const contentType = response.headers.get("content-type");
         if (contentType && contentType.includes("application/json")) {
-            return await response.json(); 
+            const jsonResponse = await response.json();
+            
+            // Log acknowledge/unacknowledge responses for debugging
+            if (endpoint.includes('/events/') && endpoint.includes('/acknowledge')) {
+                console.log(`fetchApi: ${endpoint} response:`, jsonResponse);
+            }
+            
+            return jsonResponse;
         } else {
             return { status: 'success', message: 'Operation successful' };
         }
@@ -85,6 +95,7 @@ export const loginUser = async (username, password) => {
 
         if (response && (response.access_token || response.token)) {
             const token = response.access_token || response.token;
+            console.log('loginUser: Token received from login:', token.substring(0, 20) + '...');
             
             const userData = {
                 username: response.username,
@@ -95,6 +106,7 @@ export const loginUser = async (username, password) => {
 
             localStorage.setItem('user', JSON.stringify(userData));
             localStorage.setItem(AUTH_TOKEN_KEY, token); 
+            console.log('loginUser: Token saved to localStorage');
             
             return response;
         } else {

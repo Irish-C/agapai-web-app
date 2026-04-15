@@ -250,20 +250,37 @@ export default function ReportsPage() {
             setError(null);
 
             const response = await fetchApi(endpoint, 'POST');
-            if (response?.status !== 'success') {
+            console.log('[ReportsPage] Full status update response:', response, 'endpoint:', endpoint);
+            console.log('[ReportsPage] Response type:', typeof response);
+            console.log('[ReportsPage] Response keys:', response ? Object.keys(response) : 'null');
+            
+            // Check for success - very flexible validation
+            const isSuccess = response && (response.status === 'success' || response.message?.includes('Event'));
+            console.log('[ReportsPage] Is success?', isSuccess, 'willAcknowledge?', willAcknowledge);
+            
+            if (!isSuccess) {
                 throw new Error(response?.message || 'Status update failed.');
             }
 
-            setLogs(prevLogs => prevLogs.map(item => {
-                if (String(item.id) !== String(logId)) return item;
+            console.log('[ReportsPage] Updating state for log', logId, 'Action:', willAcknowledge ? 'acknowledge' : 'unacknowledge');
+            setLogs(prevLogs => {
+                const updated = prevLogs.map(item => {
+                    if (String(item.id) !== String(logId)) return item;
 
-                return {
-                    ...item,
-                    status: willAcknowledge ? 'acknowledged' : 'unacknowledged',
-                    acknowledged_by_username: willAcknowledge ? getCurrentUsername() : null,
-                };
-            }));
+                    const updatedItem = {
+                        ...item,
+                        status: willAcknowledge ? 'acknowledged' : 'unacknowledged',
+                        event_status: willAcknowledge ? 'acknowledged' : 'unacknowledged',
+                        acknowledged_by_username: willAcknowledge ? getCurrentUsername() : null,
+                    };
+                    console.log('[ReportsPage] Updated log item:', updatedItem);
+                    return updatedItem;
+                });
+                console.log('[ReportsPage] Updated logs list, total:', updated.length);
+                return updated;
+            });
         } catch (err) {
+            console.error('[ReportsPage] Error updating status:', err);
             setError(err.message || 'Failed to update acknowledgment status.');
         } finally {
             setRowActionLoading(prev => ({ ...prev, [logId]: false }));

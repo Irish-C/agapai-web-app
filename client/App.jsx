@@ -64,15 +64,22 @@ export default function App() {
         };
     }, []);
 
+    const handleDismissAlert = () => {
+        console.log('[App] Alert modal dismissed (not acknowledged)');
+        setAlertIncident(null);
+        // Modal is closed but alert remains unacknowledged in database
+    };
+
     const handleAcknowledgeAlert = () => {
-        console.log('[App] Alert acknowledged');
+        console.log('[App] Alert acknowledged explicitly');
         setAlertIncident(null);
         
         // Send acknowledgment back to backend with correct format
-        if (alertIncident && user) {
+        if (alertIncident && user && token) {
             socket.emit('ack_alert', {
                 alert_id: alertIncident.alert_id,
-                user_id: user.id
+                user_id: user.id,
+                token: token
             });
             console.log('[App] Sent ack_alert with alert_id:', alertIncident.alert_id);
         }
@@ -152,7 +159,7 @@ export default function App() {
             {/* Global Real-Time Alert Modal - shows on all pages */}
             <RealTimeAlertModal 
                 incident={alertIncident} 
-                onAcknowledge={handleAcknowledgeAlert}
+                onDismiss={handleDismissAlert}
             />
 
             {user && <Footer />}

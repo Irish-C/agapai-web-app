@@ -52,7 +52,9 @@ async def get_event_logs(request: Request, user_id: str = Depends(get_current_us
 
 @router.post('/events/{log_id}/acknowledge')
 async def acknowledge_event(log_id: int, user_id: str = Depends(get_current_user_id)):
+    print(f"[ROUTE] acknowledge_event endpoint reached: log_id={log_id}, user_id={user_id}")
     result, code = await mark_viewed_logic(log_id, user_id)
+    print(f"[ROUTE] acknowledge_event result: {result}, code={code}")
     return safe_json_response(status_code=code, content=result)
 
 @router.post('/events/{log_id}/unacknowledge')
