@@ -151,7 +151,16 @@ bed_trackers = {}
 active_alerts = [] 
 hardware_muted = False 
 hardware_on_until = 0.0 # NEW: Tracks the 10-second timer
-PATIENCE_SECONDS = 3.0 
+PATIENCE_SECONDS = 3.0
+
+# --- STREAM HEALTH MONITORING ---
+stream_lock = threading.Lock()
+stream_connected = False
+stream_last_success_time = 0.0
+consecutive_failed_reads = 0
+stream_error_message = "Not started"
+MAX_CONSECUTIVE_FAILURES = 50  # ~5 seconds at 10 FPS
+FRAME_TIMEOUT_SECONDS = 3.0    # Timeout if no frame for 3 seconds 
 
 INACTIVITY_LOW_SEC = 300   # 5 minutes
 INACTIVITY_MED_SEC = 900   # 15 minutes
@@ -208,6 +217,12 @@ HTML_PAGE = """
                 <span class="px-3 py-1 rounded text-xs font-bold {{ 'bg-green-600' if ai_status else 'bg-red-600' }}">
                     {{ 'YOLOv11 LOADED' if ai_status else 'MODEL ERROR' }}
                 </span>
+                <div class="mt-3">
+                    <span class="block text-[10px] text-slate-500 uppercase tracking-widest">Stream Status</span>
+                    <span id="streamStatus" class="px-3 py-1 rounded text-xs font-bold bg-gray-600 cursor-help" title="Checking...">
+                        CHECKING...
+                    </span>
+                </div>
             </div>
         </div>
         
@@ -256,6 +271,27 @@ HTML_PAGE = """
     </div>
 
     <script>
+        // --- STREAM HEALTH MONITORING ---
+        setInterval(() => {
+            fetch('/stream_health').then(r => r.json()).then(data => {
+                const statusBadge = document.getElementById('streamStatus');
+                if (data.connected) {
+                    statusBadge.className = 'px-3 py-1 rounded text-xs font-bold bg-green-600 cursor-help';
+                    statusBadge.textContent = 'STREAM ACTIVE';
+                    statusBadge.title = `Connected (Camera ID: ${data.camera_id || 'N/A'})\nTime since last frame: ${data.time_since_last_frame.toFixed(1)}s`;
+                } else {
+                    statusBadge.className = 'px-3 py-1 rounded text-xs font-bold bg-red-600 cursor-help';
+                    statusBadge.textContent = 'STREAM OFFLINE';
+                    statusBadge.title = `Error: ${data.error_message}\nFailed reads: ${data.consecutive_failed_reads}`;
+                }
+            }).catch(err => {
+                const statusBadge = document.getElementById('streamStatus');
+                statusBadge.className = 'px-3 py-1 rounded text-xs font-bold bg-yellow-600 cursor-help';
+                statusBadge.textContent = 'UNREACHABLE';
+                statusBadge.title = 'Cannot reach AI service health endpoint';
+            });
+        }, 1000);
+
         // --- ALERT POLLING LOGIC ---
         let alertsMuted = false;
         let previousAlertCount = 0;
@@ -396,14 +432,27 @@ HTML_PAGE = """
 # ==========================================
 def generate_frames(rtsp_url):
     global active_alerts, hardware_muted, hardware_on_until
+    global stream_connected, stream_last_success_time, consecutive_failed_reads, stream_error_message
     
     os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "rtsp_transport;tcp|timeout;5000000"
     cap = cv2.VideoCapture(rtsp_url, cv2.CAP_FFMPEG)
     cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)  # Minimize buffer for low latency
     
     if not cap.isOpened():
-        print(f"[ERROR] Could not connect to stream: {rtsp_url}")
+        error_msg = f"[ERROR] Could not connect to stream: {rtsp_url}"
+        print(error_msg)
+        with stream_lock:
+            stream_connected = False
+            stream_error_message = "Failed to open stream"
+            consecutive_failed_reads = 0
         return
+
+    # Initialize stream as connected
+    with stream_lock:
+        stream_connected = True
+        stream_last_success_time = time.time()
+        consecutive_failed_reads = 0
+        stream_error_message = "Stream active"
 
     frame_skip_counter = 0
     last_inference_time = time.time()
@@ -416,9 +465,29 @@ def generate_frames(rtsp_url):
 
     while True:
         success, frame = cap.read()
+        current_time = time.time()
+        
         if not success:
+            with stream_lock:
+                consecutive_failed_reads += 1
+                # Check if we've exceeded max consecutive failures
+                if consecutive_failed_reads >= MAX_CONSECUTIVE_FAILURES:
+                    stream_connected = False
+                    stream_error_message = f"Too many failed reads ({consecutive_failed_reads})"
+                # Check for frame timeout
+                elif current_time - stream_last_success_time > FRAME_TIMEOUT_SECONDS:
+                    stream_connected = False
+                    stream_error_message = f"Frame timeout (no frame for {FRAME_TIMEOUT_SECONDS}s)"
+            
             time.sleep(0.01)
             continue
+        
+        # Successfully read a frame - reset failure counter and update timestamp
+        with stream_lock:
+            consecutive_failed_reads = 0
+            stream_last_success_time = current_time
+            stream_connected = True
+            stream_error_message = "Stream active"
             
         frame_skip_counter += 1
         if frame_skip_counter % 5 != 0:  # Process 1/5 frames for streaming
@@ -432,7 +501,6 @@ def generate_frames(rtsp_url):
             frame_count = 0
             fps_start_time = time.time()
         
-        current_time = time.time()
         should_infer = (current_time - last_inference_time) >= inference_interval 
             
         h, w = frame.shape[:2]
@@ -667,6 +735,19 @@ def video_feed():
 def get_alerts():
     with state_lock:
         return jsonify({"alerts": active_alerts})
+
+@app.route('/stream_health')
+def stream_health():
+    """Return current stream health status"""
+    with stream_lock:
+        time_since_last_frame = time.time() - stream_last_success_time if stream_last_success_time else 0
+        return jsonify({
+            "connected": stream_connected,
+            "error_message": stream_error_message,
+            "consecutive_failed_reads": consecutive_failed_reads,
+            "time_since_last_frame": time_since_last_frame,
+            "camera_id": current_camera_id
+        })
 
 @app.route('/ack_alerts', methods=['POST'])
 def ack_alerts():
