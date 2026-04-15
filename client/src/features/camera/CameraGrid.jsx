@@ -1,6 +1,5 @@
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import VideoFeed from './VideoFeed.jsx';
-import { fetchApi } from '../../services/apiService.js';
 import TodayReport from '../dashboard/TodayReport.jsx';
 import { useCameraSocket } from '../../hooks/useCamera.js';
 import { FaSpinner, FaVideo, FaSync } from 'react-icons/fa';
@@ -26,7 +25,7 @@ function parseRtspUrl(rtspUrl) {
 function getVideoFeedUrl(streamUrl, cameraId = null) {
   const parsed = parseRtspUrl(streamUrl);
   if (parsed) {
-    let url = `http://localhost:3000/video_feed?ip=${parsed.ip}&pass=${parsed.password}`;
+    let url = `http://localhost:3000/video_feed?ip=${parsed.ip}&pass=${parsed.password}&t=${new Date().getTime()}`;
     if (cameraId) {
       url += `&camera_id=${cameraId}`;
     }
