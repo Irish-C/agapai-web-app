@@ -114,7 +114,7 @@ def publish_alert_to_backend(camera_id, alert_message, frame=None, event_type="D
                 # Save the frame as JPEG
                 success = cv2.imwrite(snapshot_path, frame, [cv2.IMWRITE_JPEG_QUALITY, 85])
                 if success:
-                    snapshot_url = f"/api/snapshots/{snapshot_filename}"
+                    snapshot_url = f"http://localhost:3000/api/snapshots/{snapshot_filename}"
                     print(f"[SNAPSHOT SAVED] {snapshot_filename}")
             except Exception as e:
                 print(f"[SNAPSHOT ERROR] Could not save snapshot: {e}")
