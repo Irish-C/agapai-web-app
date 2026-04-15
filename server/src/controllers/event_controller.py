@@ -158,6 +158,7 @@ async def create_event_logic(data):
                 'location': location_display,
                 'timestamp': updated_event.timestamp.isoformat(),
                 'snapshot_url': display_snapshot_url,
+                'all_snapshots': existing_snapshots,
                 'occurrence_count': len(existing_snapshots),
                 'status': 'unacknowledged'
             }
@@ -208,6 +209,7 @@ async def create_event_logic(data):
                 'location': location_display,
                 'timestamp': new_event.timestamp.isoformat(),
                 'snapshot_url': snapshot_url,
+                'all_snapshots': [snapshot_url],
                 'occurrence_count': 1,
                 'status': 'unacknowledged'
             }

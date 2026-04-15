@@ -92,13 +92,12 @@ export default function TodayReport({ incidents = [], alerts = [], user }) {
             allIncidents
                 .filter(inc => inc.status === 'acknowledged')
                 .map(inc => String(inc.id || inc.log_id))
-                .filter(id => id && id !== 'undefined' && id !== 'null') // Remove invalid IDs
+                .filter(id => id && id !== 'undefined' && id !== 'null')
         );
         
         console.log('[TodayReport] Acknowledged IDs:', Array.from(acknowledgedIncidentIds), 'Count:', acknowledgedIncidentIds.size);
         
         // Filter out incidents from Socket.IO that are already acknowledged in the database
-        // This prevents duplicates when a user acknowledges an incident
         const filteredIncidents = incidents.filter(inc => {
             const incId = String(inc.id || inc.log_id);
             const isAcknowledged = acknowledgedIncidentIds.has(incId);
@@ -119,10 +118,48 @@ export default function TodayReport({ incidents = [], alerts = [], user }) {
         
         console.log('[TodayReport] allIncidents:', allIncidents.length, 'incidents (filtered):', filteredIncidents.length, 'alerts (filtered):', filteredAlerts.length);
         
-        // Combine database logs + real-time incidents/alerts (filtered)
+        // Combine all incidents: database + real-time (filtered)
         const combined = [...allIncidents, ...filteredIncidents, ...filteredAlerts];
+        
+        // Deduplicate by ID: build a Map where each ID maps to the most complete version
+        const deduped = new Map();
+        
+        for (const inc of combined) {
+            const incId = String(inc.id || inc.log_id);
+            const existing = deduped.get(incId);
+            
+            if (!existing) {
+                // First occurrence of this ID
+                deduped.set(incId, inc);
+            } else {
+                // Merge with existing: prioritize database version (has all_snapshots) but combine snapshots
+                const mergedInc = { ...existing };
+                
+                // Merge snapshots: combine all_snapshots arrays
+                const existingSnapshots = existing.all_snapshots || (existing.snapshot_url ? [existing.snapshot_url] : []);
+                const incomingSnapshots = inc.all_snapshots || (inc.snapshot_url ? [inc.snapshot_url] : []);
+                
+                // Union of snapshots (remove duplicates by URL)
+                const snapshotSet = new Set([...existingSnapshots, ...incomingSnapshots].filter(Boolean));
+                mergedInc.all_snapshots = Array.from(snapshotSet);
+                
+                // Update occurrence count to match number of snapshots
+                mergedInc.occurrence_count = mergedInc.all_snapshots.length;
+                
+                // Keep the first snapshot_url if not already set
+                if (!mergedInc.snapshot_url && mergedInc.all_snapshots.length > 0) {
+                    mergedInc.snapshot_url = mergedInc.all_snapshots[0];
+                }
+                
+                console.log('[TodayReport] Merged incident ID:', incId, 'Snapshots:', mergedInc.all_snapshots.length);
+                deduped.set(incId, mergedInc);
+            }
+        }
 
-        return combined
+        // Convert map back to array and filter by today's date
+        const dedupedArray = Array.from(deduped.values());
+        
+        return dedupedArray
             .filter((inc) => {
                 const ts = getIncidentEpochMs(inc);
                 if (!ts) return false;
@@ -161,7 +198,7 @@ export default function TodayReport({ incidents = [], alerts = [], user }) {
     const openGallery = (incident) => {
         let snapshots = [];
 
-        // Parse accumulated snapshot data
+        // Parse accumulated snapshot data - prioritize all_snapshots
         if (incident.all_snapshots && Array.isArray(incident.all_snapshots)) {
             snapshots = incident.all_snapshots;
         } else if (getSnapshotUrl(incident)) {
@@ -170,9 +207,11 @@ export default function TodayReport({ incidents = [], alerts = [], user }) {
 
         if (snapshots.length > 0) {
             const type = getIncidentType(incident);
-            const occurrenceText = incident.occurrence_count && incident.occurrence_count > 1 
-                ? ` (${incident.occurrence_count} occurrences)`
+            const count = snapshots.length;
+            const occurrenceText = count && count > 1 
+                ? ` (${count} snapshots)`
                 : '';
+            console.log('[TodayReport] Opening gallery for incident:', incident.id, 'with', count, 'snapshots');
             setGalleryTitle(`${type}${occurrenceText}`);
             setGallerySnapshots(snapshots);
             setGalleryOpen(true);
