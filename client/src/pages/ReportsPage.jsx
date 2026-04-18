@@ -3,7 +3,8 @@
 import React, { useState, useEffect } from 'react';
 import { 
     FaFileAlt, FaSpinner, FaExclamationTriangle, FaEllipsisV, 
-    FaSearch, FaTimes, FaCircle, FaDownload, FaFilter, FaTrash
+    FaSearch, FaTimes, FaCircle, FaDownload, FaFilter, FaTrash,
+    FaCopy, FaStar
 } from 'react-icons/fa';
 import { fetchReportsData, fetchApi } from '../services/apiService';
 import SnapshotGallery from '../components/SnapshotGallery';
@@ -27,6 +28,7 @@ export default function ReportsPage() {
     const [filterStatus, setFilterStatus] = useState([]);
     const [showAllClassifications, setShowAllClassifications] = useState(false);
     const [rowActionLoading, setRowActionLoading] = useState({});
+    const [openMenuLogId, setOpenMenuLogId] = useState(null);
 
     // Gallery States
     const [galleryOpen, setGalleryOpen] = useState(false);
@@ -36,6 +38,11 @@ export default function ReportsPage() {
     // Pagination States
     const [currentPage, setCurrentPage] = useState(1);
     const rowsPerPage = 10;
+
+    // Starred Events & Details Modal States
+    const [starredEvents, setStarredEvents] = useState(new Set());
+    const [detailsModal, setDetailsModal] = useState({ open: false, event: null });
+    const [copyNotification, setCopyNotification] = useState(null);
 
     const normalizeDateRange = (start, end) => {
         if (!start || !end) return { start, end };
@@ -80,6 +87,15 @@ export default function ReportsPage() {
         }; 
         loadPageData(); 
     }, [limit, startDate, endDate]);
+
+    // --- CLOSE KEBAB MENU ON OUTSIDE CLICK ---
+    useEffect(() => {
+        const handleClickOutside = () => setOpenMenuLogId(null);
+        if (openMenuLogId !== null) {
+            document.addEventListener('click', handleClickOutside);
+            return () => document.removeEventListener('click', handleClickOutside);
+        }
+    }, [openMenuLogId]);
 
     // --- FILTER LOGIC ---
     const filteredLogs = logs.filter(log => {
@@ -341,6 +357,59 @@ export default function ReportsPage() {
         }
     };
 
+    const handleCopyEventId = (logId) => {
+        const text = String(logId);
+        
+        // Try modern clipboard API first
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(text).then(() => {
+                setCopyNotification(`Event ID ${logId} copied!`);
+                setTimeout(() => setCopyNotification(null), 2000);
+            }).catch(() => {
+                // Fallback to textarea method
+                fallbackCopy(text, logId);
+            });
+        } else {
+            // Fallback for browsers without clipboard API
+            fallbackCopy(text, logId);
+        }
+    };
+
+    const fallbackCopy = (text, logId) => {
+        const textarea = document.createElement('textarea');
+        textarea.value = text;
+        textarea.style.position = 'fixed';
+        textarea.style.opacity = '0';
+        document.body.appendChild(textarea);
+        textarea.select();
+        
+        try {
+            document.execCommand('copy');
+            setCopyNotification(`Event ID ${logId} copied!`);
+            setTimeout(() => setCopyNotification(null), 2000);
+        } catch (err) {
+            setError('Failed to copy Event ID');
+        } finally {
+            document.body.removeChild(textarea);
+        }
+    };
+
+    const handleToggleStar = (logId) => {
+        setStarredEvents(prev => {
+            const newSet = new Set(prev);
+            if (newSet.has(logId)) {
+                newSet.delete(logId);
+            } else {
+                newSet.add(logId);
+            }
+            return newSet;
+        });
+    };
+
+    const handleViewDetails = (log) => {
+        setDetailsModal({ open: true, event: log });
+    };
+
     const renderTableBody = () => {
         if (isLoading) return (
             <tr>
@@ -433,25 +502,68 @@ export default function ReportsPage() {
                                 </button>
                             </div>
                         ) : null}
-                        <button
-                            onClick={() => handleDeleteEvent(log)}
-                            disabled={!!rowActionLoading[log.id]}
-                            title="Delete this event permanently (soft-delete)"
-                            className={`px-3 py-2 text-xs font-bold rounded-xl transition ${
-                                rowActionLoading[log.id]
-                                    ? 'bg-red-300 text-red-700 cursor-not-allowed opacity-60'
-                                    : 'bg-red-600 text-white hover:bg-red-700 cursor-pointer'
-                            }`}
-                        >
-                            {rowActionLoading[log.id] ? 'Deleting...' : '🗑️'}
-                        </button>
-                        <button
-                            type="button"
-                            aria-label="More actions"
-                            className="w-10 h-10 flex items-center justify-center rounded-full text-gray-400 hover:bg-gray-200 hover:text-gray-700 transition-all"
-                        >
-                            <FaEllipsisV size={14} />
-                        </button>
+                        <div className="relative">
+                            <button
+                                type="button"
+                                aria-label="More actions"
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    setOpenMenuLogId(openMenuLogId === log.id ? null : log.id);
+                                }}
+                                className="w-10 h-10 flex items-center justify-center rounded-full text-gray-400 hover:bg-gray-200 hover:text-gray-700 transition-all"
+                            >
+                                <FaEllipsisV size={14} />
+                            </button>
+                            {openMenuLogId === log.id && (
+                                <div className="absolute right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-50 min-w-[180px]">
+                                    <button
+                                        onClick={() => {
+                                            handleViewDetails(log);
+                                            setOpenMenuLogId(null);
+                                        }}
+                                        className="w-full text-left px-4 py-2 text-xs font-semibold text-teal-600 hover:bg-teal-50 transition flex items-center gap-2"
+                                    >
+                                        <FaFileAlt size={12} />
+                                        View Details
+                                    </button>
+                                    <button
+                                        onClick={() => {
+                                            handleCopyEventId(log.id);
+                                            setOpenMenuLogId(null);
+                                        }}
+                                        className="w-full text-left px-4 py-2 text-xs font-semibold text-blue-600 hover:bg-blue-50 transition flex items-center gap-2 border-t border-gray-100"
+                                    >
+                                        <FaCopy size={12} />
+                                        Copy Event ID
+                                    </button>
+                                    <button
+                                        onClick={() => {
+                                            handleToggleStar(log.id);
+                                            setOpenMenuLogId(null);
+                                        }}
+                                        className={`w-full text-left px-4 py-2 text-xs font-semibold transition flex items-center gap-2 border-t border-gray-100 ${
+                                            starredEvents.has(log.id)
+                                                ? 'text-yellow-600 bg-yellow-50 hover:bg-yellow-100'
+                                                : 'text-gray-600 hover:bg-gray-50'
+                                        }`}
+                                    >
+                                        <FaStar size={12} />
+                                        {starredEvents.has(log.id) ? 'Unstar Event' : 'Star Event'}
+                                    </button>
+                                    <button
+                                        onClick={() => {
+                                            handleDeleteEvent(log);
+                                            setOpenMenuLogId(null);
+                                        }}
+                                        disabled={!!rowActionLoading[log.id]}
+                                        className="w-full text-left px-4 py-2 text-xs font-semibold text-red-600 hover:bg-red-50 transition flex items-center gap-2 border-t border-gray-100 disabled:opacity-60 disabled:cursor-not-allowed"
+                                    >
+                                        <FaTrash size={12} />
+                                        {rowActionLoading[log.id] ? 'Deleting...' : 'Delete Event'}
+                                    </button>
+                                </div>
+                            )}
+                        </div>
                     </div>
                 </td>
             </tr>
@@ -462,6 +574,13 @@ export default function ReportsPage() {
 
     return (
         <div className="container mx-auto p-8 space-y-8 animate-in fade-in duration-500">
+            
+            {/* --- COPY NOTIFICATION TOAST --- */}
+            {copyNotification && (
+                <div className="fixed top-4 right-4 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg animate-in fade-in duration-300 z-50">
+                    {copyNotification}
+                </div>
+            )}
             
             {/* --- TOP BAR --- */}
             <div className="flex flex-col md:flex-row justify-between items-center gap-6">
@@ -603,6 +722,79 @@ export default function ReportsPage() {
                 snapshots={gallerySnapshots}
                 title={galleryTitle}
             />
+
+            {/* --- EVENT DETAILS MODAL --- */}
+            {detailsModal.open && detailsModal.event && (
+                <div className="fixed inset-0 bg-black/30 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setDetailsModal({ open: false, event: null })}>
+                    <div className="bg-white rounded-3xl shadow-2xl max-w-2xl w-full max-h-screen overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+                        {/* Header */}
+                        <div className="sticky top-0 bg-gradient-to-r from-teal-600 to-teal-700 text-white px-8 py-6 flex items-center justify-between border-b border-teal-800">
+                            <h2 className="text-xl font-bold">Event Details</h2>
+                            <button
+                                onClick={() => setDetailsModal({ open: false, event: null })}
+                                className="p-2 hover:bg-teal-500 rounded-full transition-all"
+                            >
+                                <FaTimes size={18} />
+                            </button>
+                        </div>
+
+                        {/* Content */}
+                        <div className="p-8 space-y-6">
+                            <div className="grid grid-cols-2 gap-6">
+                                <div>
+                                    <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">Event ID</span>
+                                    <p className="text-lg font-bold text-gray-800 mt-1">{detailsModal.event.id}</p>
+                                </div>
+                                <div>
+                                    <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">Classification</span>
+                                    <p className="text-lg font-bold text-teal-700 mt-1">{detailsModal.event.event_class_name || detailsModal.event.type}</p>
+                                </div>
+                                <div>
+                                    <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">Location</span>
+                                    <p className="text-lg font-bold text-gray-800 mt-1">{detailsModal.event.location || 'N/A'}</p>
+                                </div>
+                                <div>
+                                    <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">Status</span>
+                                    <div className="mt-1 flex items-center gap-2">
+                                        <FaCircle className={`${ (detailsModal.event.status || '').toLowerCase() === 'unacknowledged' ? 'text-red-500' : 'text-green-500'}`} size={10} />
+                                        <span className={`font-bold uppercase text-sm ${ (detailsModal.event.status || '').toLowerCase() === 'unacknowledged' ? 'text-red-600' : 'text-green-600'}`}>
+                                            {detailsModal.event.status}
+                                        </span>
+                                    </div>
+                                </div>
+                                <div className="col-span-2">
+                                    <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">Timestamp</span>
+                                    <p className="text-lg font-bold text-gray-800 mt-1">{new Date(detailsModal.event.timestamp).toLocaleString()}</p>
+                                </div>
+                                {(detailsModal.event.status || '').toLowerCase() === 'acknowledged' && (
+                                    <div className="col-span-2">
+                                        <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">Acknowledged By</span>
+                                        <p className="text-lg font-bold text-gray-800 mt-1">{detailsModal.event.acknowledged_by_username || 'N/A'}</p>
+                                    </div>
+                                )}
+                                {detailsModal.event.occurrence_count && (
+                                    <div>
+                                        <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">Occurrences</span>
+                                        <p className="text-lg font-bold text-orange-600 mt-1">{detailsModal.event.occurrence_count}</p>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Snapshots Grid */}
+                            {detailsModal.event.all_snapshots && detailsModal.event.all_snapshots.length > 0 && (
+                                <div className="border-t pt-6">
+                                    <h3 className="text-sm font-bold text-gray-600 uppercase tracking-widest mb-4">Snapshots ({detailsModal.event.all_snapshots.length})</h3>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        {detailsModal.event.all_snapshots.map((snapshot, idx) => (
+                                            <img key={idx} src={snapshot} alt={`Snapshot ${idx + 1}`} className="w-full h-48 object-cover rounded-lg border border-gray-200 hover:border-teal-500 transition-all cursor-pointer" />
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
 
         </div>
     );
