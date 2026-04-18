@@ -291,6 +291,8 @@ stream_error_message = "Not started"
 MAX_CONSECUTIVE_FAILURES = 50  # ~5 seconds at 10 FPS
 FRAME_TIMEOUT_SECONDS = 3.0    # Timeout if no frame for 3 seconds 
 
+# --- INACTIVITY CONFIGURATION (DYNAMIC) ---
+config_lock = threading.Lock()
 INACTIVITY_LOW_SEC = 1800   # 30 minutes
 INACTIVITY_MED_SEC = 3600   # 60 minutes
 INACTIVITY_HIGH_SEC = 7200 # 120 minutes
@@ -367,9 +369,28 @@ HTML_PAGE = """
                     </button>
 
                     <label class="block text-xs font-bold text-slate-500 mb-2 uppercase mt-2">Zone Management</label>
-                    <div class="flex space-x-2 mb-2">
+                    <div class="flex space-x-2 mb-4">
                         <button onclick="undoROI()" class="flex-1 bg-yellow-600 hover:bg-yellow-500 py-2 rounded text-xs font-bold transition-all shadow active:scale-95">UNDO (C)</button>
                         <button onclick="clearROIs()" class="flex-1 bg-red-600 hover:bg-red-500 py-2 rounded text-xs font-bold transition-all shadow active:scale-95">CLEAR ALL (X)</button>
+                    </div>
+
+                    <label class="block text-xs font-bold text-slate-500 mb-2 uppercase">Inactivity Thresholds (seconds)</label>
+                    <div class="space-y-2 mb-3">
+                        <div>
+                            <label class="text-[10px] text-slate-400">Low (min):</label>
+                            <input id="lowSec" type="number" value="1800" class="w-full bg-slate-800 p-2 rounded text-sm border border-slate-600 focus:border-blue-500 outline-none transition-colors">
+                        </div>
+                        <div>
+                            <label class="text-[10px] text-slate-400">Medium (min):</label>
+                            <input id="medSec" type="number" value="3600" class="w-full bg-slate-800 p-2 rounded text-sm border border-slate-600 focus:border-blue-500 outline-none transition-colors">
+                        </div>
+                        <div>
+                            <label class="text-[10px] text-slate-400">High (min):</label>
+                            <input id="highSec" type="number" value="7200" class="w-full bg-slate-800 p-2 rounded text-sm border border-slate-600 focus:border-blue-500 outline-none transition-colors">
+                        </div>
+                        <button onclick="updateInactivityThresholds()" class="w-full bg-green-600 hover:bg-green-500 py-2 rounded text-xs font-bold transition-all shadow active:scale-95">
+                            UPDATE THRESHOLDS
+                        </button>
                     </div>
                 </div>
 
@@ -542,6 +563,44 @@ HTML_PAGE = """
 
         function undoROI() { fetch('/undo_roi', {method: 'POST'}); }
         function clearROIs() { fetch('/clear_roi', {method: 'POST'}); }
+
+        // --- INACTIVITY THRESHOLDS UPDATE ---
+        async function updateInactivityThresholds() {
+            const lowSec = parseInt(document.getElementById('lowSec').value);
+            const medSec = parseInt(document.getElementById('medSec').value);
+            const highSec = parseInt(document.getElementById('highSec').value);
+            
+            if (lowSec < 10 || medSec < 10 || highSec < 10) {
+                alert('All values must be at least 10 seconds');
+                return;
+            }
+            
+            if (lowSec >= medSec || medSec >= highSec) {
+                alert('Requirement: Low < Medium < High');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/inactivity-config', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        low_sec: lowSec,
+                        med_sec: medSec,
+                        high_sec: highSec
+                    })
+                });
+                
+                const data = await response.json();
+                if (data.status === 'success') {
+                    alert(`✓ Thresholds Updated!\nLow: ${lowSec}s, Med: ${medSec}s, High: ${highSec}s`);
+                } else {
+                    alert('Update failed: ' + data.message);
+                }
+            } catch (err) {
+                alert('Error: ' + err.message);
+            }
+        }
 
         // --- KEYBOARD SHORTCUTS ---
         document.addEventListener('keydown', function(event) {
@@ -719,14 +778,20 @@ def generate_frames(rtsp_url):
                         time_str = f"{mins:02d}:{secs:02d}"
                         tx1, ty1, tx2, ty2 = tracker["box"]
                         
-                        if elapsed >= INACTIVITY_HIGH_SEC:
+                        # Read thresholds safely
+                        with config_lock:
+                            low_threshold = INACTIVITY_LOW_SEC
+                            med_threshold = INACTIVITY_MED_SEC
+                            high_threshold = INACTIVITY_HIGH_SEC
+                        
+                        if elapsed >= high_threshold:
                             box_color = (0, 0, 255)       
                             status_text = f"HIGH INACT [{time_str}]"
                             current_frame_alerts.append(f"Zone {i+1}: Inactivity (High) ({time_str})")
-                        elif elapsed >= INACTIVITY_MED_SEC:
+                        elif elapsed >= med_threshold:
                             box_color = (0, 165, 255)     
                             status_text = f"MED INACT [{time_str}]"
-                        elif elapsed >= INACTIVITY_LOW_SEC:
+                        elif elapsed >= low_threshold:
                             box_color = (0, 255, 255)     
                             status_text = f"LOW INACT [{time_str}]"
                         else:
@@ -910,6 +975,40 @@ def clear_roi():
         rois = []
         bed_trackers.clear()
     return jsonify({"status": "success"})
+
+@app.route('/api/inactivity-config', methods=['POST'])
+def update_inactivity_config():
+    """Update inactivity thresholds dynamically"""
+    global INACTIVITY_LOW_SEC, INACTIVITY_MED_SEC, INACTIVITY_HIGH_SEC
+    
+    try:
+        data = request.json
+        low = int(data.get('low_sec', 1800))
+        med = int(data.get('med_sec', 3600))
+        high = int(data.get('high_sec', 7200))
+        
+        # Validate
+        if low < 10 or med < 10 or high < 10:
+            return jsonify({"status": "error", "message": "All values must be >= 10 seconds"}), 400
+        if low >= med or med >= high:
+            return jsonify({"status": "error", "message": "Must be: Low < Medium < High"}), 400
+        
+        with config_lock:
+            INACTIVITY_LOW_SEC = low
+            INACTIVITY_MED_SEC = med
+            INACTIVITY_HIGH_SEC = high
+        
+        print(f"[CONFIG] ✓ Inactivity thresholds updated: Low={low}s, Med={med}s, High={high}s")
+        return jsonify({
+            "status": "success",
+            "low_sec": low,
+            "med_sec": med,
+            "high_sec": high,
+            "message": "Thresholds updated successfully"
+        }), 200
+    
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
 
 if __name__ == "__main__":
     # Fetch camera locations from backend on startup
