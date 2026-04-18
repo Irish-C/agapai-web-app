@@ -659,86 +659,86 @@ def generate_frames(rtsp_url):
                     else:
                         floor_detections.append((bx1, by1, bx2, by2, label))
 
-            # --- DRAWING & ALERT GENERATION LOGIC ---
-            current_frame_alerts = []
-            
-            with state_lock:
-                occupied_rois = set()
-                for i, tracker in bed_trackers.items():
-                    if tracker["label"] is not None and (current_time - tracker["last_seen"] <= PATIENCE_SECONDS):
-                        occupied_rois.add(i)
+        # --- DRAWING & ALERT GENERATION LOGIC (Every frame, not just inference frames) ---
+        current_frame_alerts = []
+        
+        with state_lock:
+            occupied_rois = set()
+            for i, tracker in bed_trackers.items():
+                if tracker["label"] is not None and (current_time - tracker["last_seen"] <= PATIENCE_SECONDS):
+                    occupied_rois.add(i)
 
-                for i, (tl, br) in enumerate(pixel_rois):
-                    if i not in occupied_rois:
-                        cv2.rectangle(frame, tl, br, (200, 200, 200), 1) 
+            for i, (tl, br) in enumerate(pixel_rois):
+                if i not in occupied_rois:
+                    cv2.rectangle(frame, tl, br, (200, 200, 200), 1) 
 
-                for i, tracker in bed_trackers.items():
-                    if tracker["label"] is not None:
-                        if current_time - tracker["last_seen"] > PATIENCE_SECONDS:
-                            tracker["label"] = None
-                            tracker["box"] = None
+            for i, tracker in bed_trackers.items():
+                if tracker["label"] is not None:
+                    if current_time - tracker["last_seen"] > PATIENCE_SECONDS:
+                        tracker["label"] = None
+                        tracker["box"] = None
+                    else:
+                        elapsed = int(current_time - tracker["start_time"])
+                        mins, secs = divmod(elapsed, 60)
+                        time_str = f"{mins:02d}:{secs:02d}"
+                        tx1, ty1, tx2, ty2 = tracker["box"]
+                        
+                        if elapsed >= INACTIVITY_HIGH_SEC:
+                            box_color = (0, 0, 255)       
+                            status_text = f"HIGH INACT [{time_str}]"
+                            current_frame_alerts.append(f"Zone {i+1}: Inactivity (High) ({time_str})")
+                        elif elapsed >= INACTIVITY_MED_SEC:
+                            box_color = (0, 165, 255)     
+                            status_text = f"MED INACT [{time_str}]"
+                        elif elapsed >= INACTIVITY_LOW_SEC:
+                            box_color = (0, 255, 255)     
+                            status_text = f"LOW INACT [{time_str}]"
                         else:
-                            elapsed = int(current_time - tracker["start_time"])
-                            mins, secs = divmod(elapsed, 60)
-                            time_str = f"{mins:02d}:{secs:02d}"
-                            tx1, ty1, tx2, ty2 = tracker["box"]
-                            
-                            if elapsed >= INACTIVITY_HIGH_SEC:
-                                box_color = (0, 0, 255)       
-                                status_text = f"HIGH INACT [{time_str}]"
-                                current_frame_alerts.append(f"Zone {i+1}: Inactivity (High) ({time_str})")
-                            elif elapsed >= INACTIVITY_MED_SEC:
-                                box_color = (0, 165, 255)     
-                                status_text = f"MED INACT [{time_str}]"
-                            elif elapsed >= INACTIVITY_LOW_SEC:
-                                box_color = (0, 255, 255)     
-                                status_text = f"LOW INACT [{time_str}]"
+                            if tracker["label"] == "Lying Down":
+                                box_color = (139, 69, 19) 
                             else:
-                                if tracker["label"] == "Lying Down":
-                                    box_color = (139, 69, 19) 
-                                else:
-                                    box_color = (72, 107, 18) 
-                                status_text = f"{tracker['label']} [{time_str}]"
+                                box_color = (72, 107, 18) 
+                            status_text = f"{tracker['label']} [{time_str}]"
 
-                            cv2.rectangle(frame, (tx1, ty1), (tx2, ty2), box_color, 2)
-                            draw_text_outline(frame, status_text, (tx1, max(10, ty1 - 10)), box_color)
+                        cv2.rectangle(frame, (tx1, ty1), (tx2, ty2), box_color, 2)
+                        draw_text_outline(frame, status_text, (tx1, max(10, ty1 - 10)), box_color)
 
-            for (fx1, fy1, fx2, fy2, flabel) in floor_detections:
-                if flabel == "Lying Down":
-                    continue
-                if flabel in fall_classes:
-                    f_color = (0, 0, 255)
-                    current_frame_alerts.append(f"Floor: {flabel} Detected!")
-                elif flabel in ["Sitting", "Walking", "Standing", "Eating"]:
-                    f_color = (72, 107, 18) 
-                else:
-                    f_color = (150, 150, 150)
+        for (fx1, fy1, fx2, fy2, flabel) in floor_detections:
+            if flabel == "Lying Down":
+                continue
+            if flabel in fall_classes:
+                f_color = (0, 0, 255)
+                current_frame_alerts.append(f"Floor: {flabel} Detected!")
+            elif flabel in ["Sitting", "Walking", "Standing", "Eating"]:
+                f_color = (72, 107, 18) 
+            else:
+                f_color = (150, 150, 150)
 
-                cv2.rectangle(frame, (fx1, fy1), (fx2, fy2), f_color, 2)
-                draw_text_outline(frame, flabel, (fx1, max(10, fy1 - 10)), f_color)
+            cv2.rectangle(frame, (fx1, fy1), (fx2, fy2), f_color, 2)
+            draw_text_outline(frame, flabel, (fx1, max(10, fy1 - 10)), f_color)
 
-            # --- UPDATED 10-SECOND HARDWARE TIMER LOGIC ---
-            with state_lock:
-                active_alerts = current_frame_alerts
-                
-                # Publish new alerts to backend for logging and Socket.IO
-                if len(current_frame_alerts) > 0:
-                    for alert in current_frame_alerts:
-                        publish_alert_to_backend(current_camera_id, alert, frame=frame)
-                
-                # If there is a new alert and we haven't muted it, push the timer 10 seconds into the future
-                if len(active_alerts) > 0 and not hardware_muted:
-                    hardware_on_until = current_time + 10.0
-                
-                # If the 10 seconds have safely passed and no alerts remain, reset the mute state
-                if current_time >= hardware_on_until and len(active_alerts) == 0:
-                    hardware_muted = False
-                
-                # Fire the hardware if we are currently inside the 10-second window and not muted
-                if current_time < hardware_on_until and not hardware_muted:
-                    trigger_hardware("ON")
-                else:
-                    trigger_hardware("OFF")
+        # --- UPDATED 10-SECOND HARDWARE TIMER LOGIC ---
+        with state_lock:
+            active_alerts = current_frame_alerts
+            
+            # Publish new alerts to backend for logging and Socket.IO
+            if len(current_frame_alerts) > 0:
+                for alert in current_frame_alerts:
+                    publish_alert_to_backend(current_camera_id, alert, frame=frame)
+            
+            # If there is a new alert and we haven't muted it, push the timer 10 seconds into the future
+            if len(active_alerts) > 0 and not hardware_muted:
+                hardware_on_until = current_time + 10.0
+            
+            # If the 10 seconds have safely passed and no alerts remain, reset the mute state
+            if current_time >= hardware_on_until and len(active_alerts) == 0:
+                hardware_muted = False
+            
+            # Fire the hardware if we are currently inside the 10-second window and not muted
+            if current_time < hardware_on_until and not hardware_muted:
+                trigger_hardware("ON")
+            else:
+                trigger_hardware("OFF")
 
         # Encode to JPEG (high quality for good FPS)
         success, buffer = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 70])
