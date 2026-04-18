@@ -176,7 +176,7 @@ def trigger_hardware(state):
         except:
             pass
 
-def publish_alert_to_backend(camera_id, alert_message, frame=None, event_type="Detection"):
+def publish_alert_to_backend(camera_id, alert_message, frame=None, event_type="Detection", location_name="Unknown"):
     """Publish alert to backend for database logging and Socket.IO broadcasting"""
     try:
         # Extract the actual detected class name from alert message
@@ -197,27 +197,38 @@ def publish_alert_to_backend(camera_id, alert_message, frame=None, event_type="D
             event_class_id = 3  # Inactivity
         
         # Save snapshot if frame is provided
-        snapshot_url = ''
+        snapshot_filename = ''
         if frame is not None:
             try:
-                timestamp = int(time.time() * 1000)  # milliseconds for uniqueness
-                snapshot_filename = f"alert_cam{camera_id}_{timestamp}.jpg"
+                # Generate filename: cam{id}_{location}_{YYYYMMDD}_{HHMM}.jpg
+                now = datetime.now(timezone.utc)
+                date_str = now.strftime('%Y%m%d')
+                time_str = now.strftime('%H%M')
+                
+                # Sanitize location name (remove spaces, special chars)
+                location_safe = location_name.lower().replace(' ', '_').replace('/', '_')
+                
+                snapshot_filename = f"cam{camera_id}_{location_safe}_{date_str}_{time_str}.jpg"
                 snapshot_path = os.path.join(SNAPSHOTS_DIR, snapshot_filename)
                 
                 # Save the frame as JPEG
                 success = cv2.imwrite(snapshot_path, frame, [cv2.IMWRITE_JPEG_QUALITY, 85])
                 if success:
-                    snapshot_url = f"http://localhost:3000/api/snapshots/{snapshot_filename}"
                     print(f"[SNAPSHOT SAVED] {snapshot_filename}")
+                else:
+                    print(f"[SNAPSHOT ERROR] Failed to write JPEG to {snapshot_path}")
+                    snapshot_filename = ''
             except Exception as e:
                 print(f"[SNAPSHOT ERROR] Could not save snapshot: {e}")
+                snapshot_filename = ''
         
         payload = {
             'camera_id': camera_id,
             'event_class_id': event_class_id,
             'alert_message': alert_message,
             'class_name': class_name,  # Send the extracted class name
-            'snapshot_url': snapshot_url,
+            'snapshot_filename': snapshot_filename,  # Changed: send filename instead of URL
+            'location_name': location_name,  # NEW: send location
             'timestamp': datetime.now(timezone.utc).isoformat()
         }
         response = requests.post(

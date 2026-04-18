@@ -83,17 +83,29 @@ model GlobalSetting {
   @@map("global_settings")
 }
 
+model Snapshot {
+  id           BigInt    @id @default(autoincrement())
+  filename     String    @db.VarChar(255)  // e.g., "cam9_charbel_20260418_1901.jpg"
+  timestamp    DateTime  @default(now()) @db.Timestamp(6)
+  event_log_id BigInt
+  event_log    EventLog  @relation(fields: [event_log_id], references: [id], onDelete: Cascade)
+
+  @@map("snapshots")
+}
+
 model EventLog {
   id              BigInt      @id @default(autoincrement())
   timestamp       DateTime    @default(now()) @db.Timestamp(6)
   event_status    String      @default("unacknowledged") @db.VarChar(50)
-  file_path       String?     @db.VarChar(255)
+  file_path       String?     @db.VarChar(255)  // DEPRECATED: for backward compatibility only
   cam_id          BigInt?
   event_class_id  BigInt?
   ack_by_user_id  BigInt?
+  deleted_at      DateTime?   @db.Timestamp(6)  // Soft delete timestamp
   acknowledged_by User?       @relation(fields: [ack_by_user_id], references: [id])
   camera          Camera?     @relation(fields: [cam_id], references: [id])
   event_class     EventClass? @relation(fields: [event_class_id], references: [id])
+  snapshots       Snapshot[]  // NEW: Track individual snapshots
 
   @@map("event_logs")
 }

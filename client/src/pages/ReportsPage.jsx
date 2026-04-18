@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
     FaFileAlt, FaSpinner, FaExclamationTriangle, FaEllipsisV, 
-    FaSearch, FaTimes, FaCircle, FaDownload, FaFilter 
+    FaSearch, FaTimes, FaCircle, FaDownload, FaFilter, FaTrash
 } from 'react-icons/fa';
 import { fetchReportsData, fetchApi } from '../services/apiService';
 import SnapshotGallery from '../components/SnapshotGallery';
@@ -287,6 +287,40 @@ export default function ReportsPage() {
         }
     };
 
+    const handleDeleteEvent = async (log) => {
+        const logId = log?.id;
+        if (!logId) {
+            setError('Cannot delete: invalid log ID.');
+            return;
+        }
+
+        // Confirmation dialog
+        if (!window.confirm(`Delete this event (${log.event_class_name || log.type})? This action cannot be undone.`)) {
+            return;
+        }
+
+        try {
+            setRowActionLoading(prev => ({ ...prev, [logId]: true }));
+            setError(null);
+
+            const response = await fetchApi(`/events/${logId}`, 'DELETE');
+
+            // Validate response
+            if (!response || (response.status !== 'success' && !response.message)) {
+                throw new Error('Delete failed: no response from server');
+            }
+
+            // Optimistic UI update - remove from state immediately
+            setLogs(prevLogs => prevLogs.filter(item => String(item.id) !== String(logId)));
+            
+        } catch (err) {
+            console.error('[ReportsPage] Error deleting event:', err);
+            setError(err.message || 'Failed to delete event.');
+        } finally {
+            setRowActionLoading(prev => ({ ...prev, [logId]: false }));
+        }
+    };
+
     const openGallery = (log) => {
         let snapshots = [];
 
@@ -399,6 +433,18 @@ export default function ReportsPage() {
                                 </button>
                             </div>
                         ) : null}
+                        <button
+                            onClick={() => handleDeleteEvent(log)}
+                            disabled={!!rowActionLoading[log.id]}
+                            title="Delete this event permanently (soft-delete)"
+                            className={`px-3 py-2 text-xs font-bold rounded-xl transition ${
+                                rowActionLoading[log.id]
+                                    ? 'bg-red-300 text-red-700 cursor-not-allowed opacity-60'
+                                    : 'bg-red-600 text-white hover:bg-red-700 cursor-pointer'
+                            }`}
+                        >
+                            {rowActionLoading[log.id] ? 'Deleting...' : '🗑️'}
+                        </button>
                         <button
                             type="button"
                             aria-label="More actions"

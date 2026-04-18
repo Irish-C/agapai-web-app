@@ -26,14 +26,15 @@ async def create_alert_from_flask(request: Request):
     """Receive alerts from Flask AI service and broadcast via Socket.IO"""
     try:
         data = await get_sanitized_json(request)
-        # Flask sends: camera_id, alert_message, event_class_id, class_name, snapshot_url, timestamp
+        # Flask sends: camera_id, alert_message, event_class_id, class_name, snapshot_filename, location_name, timestamp
         # Convert to event_logic format
         event_data = {
             'camera_id': data.get('camera_id'),
             'event_class_id': data.get('event_class_id', 1),
-            'class_name': data.get('class_name'),  # ADD THIS - critical for classification lookup!
+            'class_name': data.get('class_name'),  # Critical for classification lookup!
             'message': data.get('alert_message', ''),
-            'snapshot_url': data.get('snapshot_url', ''),
+            'snapshot_filename': data.get('snapshot_filename', ''),  # NEW: filename instead of URL
+            'location_name': data.get('location_name', 'Unknown'),  # NEW: location from AI service
             'timestamp': data.get('timestamp')
         }
         result, code = await create_event_logic(event_data)
@@ -44,7 +45,7 @@ async def create_alert_from_flask(request: Request):
 
 # server/src/routes/event_routes.py
 
-@router.get('/event_logs') # Ensure this is exactly '/event_logs'
+@router.get('/event_logs')
 async def get_event_logs(request: Request, user_id: str = Depends(get_current_user_id)):
     params = sanitize_input(dict(request.query_params))
     result, code = await get_event_logs_logic(params)
@@ -60,6 +61,13 @@ async def acknowledge_event(log_id: int, user_id: str = Depends(get_current_user
 @router.post('/events/{log_id}/unacknowledge')
 async def unacknowledge_event(log_id: int, user_id: str = Depends(get_current_user_id)):
     result, code = await mark_unviewed_logic(log_id, user_id)
+    return safe_json_response(status_code=code, content=result)
+
+@router.delete('/events/{log_id}')
+async def delete_event(log_id: int, user_id: str = Depends(get_current_user_id)):
+    """Soft delete an event by setting deleted_at timestamp"""
+    from src.controllers.event_controller import delete_event_logic
+    result, code = await delete_event_logic(log_id)
     return safe_json_response(status_code=code, content=result)
 
 # Add this route to your existing router
@@ -103,7 +111,7 @@ async def get_missed_alerts(timestamp_ms: int, user_id: str = Depends(get_curren
         ]
     }
     """
-    result, code = await get_missed_alerts(timestamp_ms)
+    result, code = await get_missed_alerts_logic(timestamp_ms)
     return safe_json_response(status_code=code, content=result)
 
 
