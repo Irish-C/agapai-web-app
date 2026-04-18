@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { 
     FaFileAlt, FaSpinner, FaExclamationTriangle, FaEllipsisV, 
     FaSearch, FaTimes, FaCircle, FaDownload, FaFilter, FaTrash,
-    FaCopy, FaStar
+    FaCopy
 } from 'react-icons/fa';
 import { fetchReportsData, fetchApi } from '../services/apiService';
 import SnapshotGallery from '../components/SnapshotGallery';
@@ -39,8 +39,7 @@ export default function ReportsPage() {
     const [currentPage, setCurrentPage] = useState(1);
     const rowsPerPage = 10;
 
-    // Starred Events & Details Modal States
-    const [starredEvents, setStarredEvents] = useState(new Set());
+    // Details Modal & Copy Notification States
     const [detailsModal, setDetailsModal] = useState({ open: false, event: null });
     const [copyNotification, setCopyNotification] = useState(null);
 
@@ -394,18 +393,6 @@ export default function ReportsPage() {
         }
     };
 
-    const handleToggleStar = (logId) => {
-        setStarredEvents(prev => {
-            const newSet = new Set(prev);
-            if (newSet.has(logId)) {
-                newSet.delete(logId);
-            } else {
-                newSet.add(logId);
-            }
-            return newSet;
-        });
-    };
-
     const handleViewDetails = (log) => {
         setDetailsModal({ open: true, event: log });
     };
@@ -535,20 +522,6 @@ export default function ReportsPage() {
                                     >
                                         <FaCopy size={12} />
                                         Copy Event ID
-                                    </button>
-                                    <button
-                                        onClick={() => {
-                                            handleToggleStar(log.id);
-                                            setOpenMenuLogId(null);
-                                        }}
-                                        className={`w-full text-left px-4 py-2 text-xs font-semibold transition flex items-center gap-2 border-t border-gray-100 ${
-                                            starredEvents.has(log.id)
-                                                ? 'text-yellow-600 bg-yellow-50 hover:bg-yellow-100'
-                                                : 'text-gray-600 hover:bg-gray-50'
-                                        }`}
-                                    >
-                                        <FaStar size={12} />
-                                        {starredEvents.has(log.id) ? 'Unstar Event' : 'Star Event'}
                                     </button>
                                     <button
                                         onClick={() => {

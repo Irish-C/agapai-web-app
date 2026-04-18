@@ -54,13 +54,12 @@ export default function App() {
             setAlertIncident(incident);
         };
 
-        // Listen for both new alerts and accumulated alerts
+        // Only show modal for NEW alerts, not accumulated ones (same class within 60s)
+        // alert_accumulated events are handled silently by TodayReport via useCamera hook
         socket.on('new_alert', handleAlert);
-        socket.on('alert_accumulated', handleAlert);
 
         return () => {
             socket.off('new_alert', handleAlert);
-            socket.off('alert_accumulated', handleAlert);
         };
     }, []);
 

@@ -257,6 +257,31 @@ hardware_muted = False
 hardware_on_until = 0.0 # NEW: Tracks the 10-second timer
 PATIENCE_SECONDS = 3.0
 
+# --- CAMERA LOCATION CACHE ---
+camera_locations = {}  # {camera_id: location_name}
+location_cache_lock = threading.Lock()
+
+def fetch_camera_locations():
+    """Fetch camera locations from backend and cache them"""
+    global camera_locations
+    try:
+        response = requests.get('http://localhost:5000/api/cameras/config/locations', timeout=2)
+        if response.status_code == 200:
+            data = response.json()
+            if 'cameras' in data:
+                with location_cache_lock:
+                    camera_locations = data['cameras']
+                print(f"[LOCATION CACHE] Updated camera locations: {camera_locations}")
+        else:
+            print(f"[LOCATION ERROR] Backend returned {response.status_code}")
+    except Exception as e:
+        print(f"[LOCATION ERROR] Could not fetch camera locations: {e}")
+
+def get_camera_location(camera_id):
+    """Get location for a camera ID, or default to Unknown"""
+    with location_cache_lock:
+        return camera_locations.get(str(camera_id), "Unknown")
+
 # --- STREAM HEALTH MONITORING ---
 stream_lock = threading.Lock()
 stream_connected = False
@@ -266,9 +291,9 @@ stream_error_message = "Not started"
 MAX_CONSECUTIVE_FAILURES = 50  # ~5 seconds at 10 FPS
 FRAME_TIMEOUT_SECONDS = 3.0    # Timeout if no frame for 3 seconds 
 
-INACTIVITY_LOW_SEC = 300   # 5 minutes
-INACTIVITY_MED_SEC = 900   # 15 minutes
-INACTIVITY_HIGH_SEC = 1800 # 30 minutes
+INACTIVITY_LOW_SEC = 1800   # 30 minutes
+INACTIVITY_MED_SEC = 3600   # 60 minutes
+INACTIVITY_HIGH_SEC = 7200 # 120 minutes
 
 safe_bed_classes = ["Lying Down", "Sitting", "Eating"]
 fall_classes = ["Forward Fall", "Backward Fall", "Sideward Fall"]
@@ -735,7 +760,9 @@ def generate_frames(rtsp_url):
             # Publish new alerts to backend for logging and Socket.IO
             if len(current_frame_alerts) > 0:
                 for alert in current_frame_alerts:
-                    publish_alert_to_backend(current_camera_id, alert, frame=frame)
+                    # Get the actual camera location for snapshot filename
+                    location = get_camera_location(current_camera_id)
+                    publish_alert_to_backend(current_camera_id, alert, frame=frame, location_name=location)
             
             # If there is a new alert and we haven't muted it, push the timer 10 seconds into the future
             if len(active_alerts) > 0 and not hardware_muted:
@@ -885,4 +912,8 @@ def clear_roi():
     return jsonify({"status": "success"})
 
 if __name__ == "__main__":
+    # Fetch camera locations from backend on startup
+    print("[STARTUP] Fetching camera locations from backend...")
+    fetch_camera_locations()
+    
     app.run(host='0.0.0.0', port=3000, threaded=True)

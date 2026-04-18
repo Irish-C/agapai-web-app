@@ -145,3 +145,40 @@ async def permanently_delete_camera(camera_id: int, user_id: str = Depends(requi
         return safe_json_response(status_code=code, content=result)
     except Exception as e:
         return safe_json_response(status_code=500, content={'error': str(e)})
+
+
+@router.get('/cameras/config/locations')
+async def get_camera_locations():
+    """Get camera IDs and their locations (public endpoint for AI service).
+    
+    Used by Port 3000 AI service to retrieve camera location mappings
+    for snapshot filename generation.
+    
+    Returns: {<camera_id>: <location_name>, ...}
+    Example: {"1": "Living Room", "2": "Bedroom A"}
+    """
+    try:
+        from database import db
+        
+        cameras = await db.camera.find_many(
+            where={'cam_status': True},
+            include={'location': True}
+        )
+        
+        locations_map = {}
+        for cam in cameras:
+            loc_name = 'Unknown'
+            if cam.location and cam.location.loc_name:
+                loc_name = cam.location.loc_name
+            locations_map[str(cam.id)] = loc_name
+        
+        return safe_json_response(
+            status_code=200,
+            content={'status': 'success', 'cameras': locations_map}
+        )
+    except Exception as e:
+        print(f"[ERROR] Failed to fetch camera locations: {e}")
+        return safe_json_response(
+            status_code=500,
+            content={'status': 'error', 'message': str(e)}
+        )
