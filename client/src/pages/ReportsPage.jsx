@@ -699,21 +699,21 @@ export default function ReportsPage() {
             {/* --- EVENT DETAILS MODAL --- */}
             {detailsModal.open && detailsModal.event && (
                 <div className="fixed inset-0 bg-black/30 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setDetailsModal({ open: false, event: null })}>
-                    <div className="bg-white rounded-3xl shadow-2xl max-w-2xl w-full max-h-screen overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+                    <div className="bg-white rounded-3xl shadow-2xl max-w-6xl w-full max-h-screen overflow-y-auto" onClick={(e) => e.stopPropagation()}>
                         {/* Header */}
-                        <div className="sticky top-0 bg-gradient-to-r from-teal-600 to-teal-700 text-white px-8 py-6 flex items-center justify-between border-b border-teal-800">
-                            <h2 className="text-xl font-bold">Event Details</h2>
+                        <div className="sticky top-0 bg-gradient-to-r from-teal-600 to-teal-700 text-white px-8 py-5 flex items-center justify-between border-b border-teal-800">
+                            <h2 className="text-2xl font-bold">Event Details</h2>
                             <button
                                 onClick={() => setDetailsModal({ open: false, event: null })}
                                 className="p-2 hover:bg-teal-500 rounded-full transition-all"
                             >
-                                <FaTimes size={18} />
+                                <FaTimes size={20} />
                             </button>
                         </div>
 
                         {/* Content */}
-                        <div className="p-8 space-y-6">
-                            <div className="grid grid-cols-2 gap-6">
+                        <div className="p-6 space-y-5">
+                            <div className="grid grid-cols-2 gap-5">
                                 <div>
                                     <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">Event ID</span>
                                     <p className="text-lg font-bold text-gray-800 mt-1">{detailsModal.event.id}</p>
@@ -729,7 +729,7 @@ export default function ReportsPage() {
                                 <div>
                                     <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">Status</span>
                                     <div className="mt-1 flex items-center gap-2">
-                                        <FaCircle className={`${ (detailsModal.event.status || '').toLowerCase() === 'unacknowledged' ? 'text-red-500' : 'text-green-500'}`} size={10} />
+                                        <FaCircle className={`${ (detailsModal.event.status || '').toLowerCase() === 'unacknowledged' ? 'text-red-500' : 'text-green-500'}`} size={12} />
                                         <span className={`font-bold uppercase text-sm ${ (detailsModal.event.status || '').toLowerCase() === 'unacknowledged' ? 'text-red-600' : 'text-green-600'}`}>
                                             {detailsModal.event.status}
                                         </span>
@@ -755,11 +755,11 @@ export default function ReportsPage() {
 
                             {/* Snapshots Grid */}
                             {detailsModal.event.all_snapshots && detailsModal.event.all_snapshots.length > 0 && (
-                                <div className="border-t pt-6">
+                                <div className="border-t pt-5">
                                     <h3 className="text-sm font-bold text-gray-600 uppercase tracking-widest mb-4">Snapshots ({detailsModal.event.all_snapshots.length})</h3>
                                     <div className="grid grid-cols-2 gap-4">
                                         {detailsModal.event.all_snapshots.map((snapshot, idx) => (
-                                            <img key={idx} src={snapshot} alt={`Snapshot ${idx + 1}`} className="w-full h-48 object-cover rounded-lg border border-gray-200 hover:border-teal-500 transition-all cursor-pointer" />
+                                            <img key={idx} src={snapshot} alt={`Snapshot ${idx + 1}`} className="w-full h-56 object-cover rounded-lg border border-gray-200 hover:border-teal-500 transition-all cursor-pointer" />
                                         ))}
                                     </div>
                                 </div>
