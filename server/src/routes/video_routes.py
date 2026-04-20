@@ -1,66 +1,48 @@
 import os
-import asyncio
 import httpx
+import sys
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse
-from urllib.parse import urlparse
 
 router = APIRouter()
 
+AI_SERVICE_URL = "http://127.0.0.1:3000"
 
-@router.get('/mediamtx_health')
-async def mediamtx_health():
-    """Check MediaMTX HTTP (API) and RTSP ingest reachability.
-
-    Returns a JSON summary with actionable messages for the UI.
-    """
-    MEDIAMTX_API = os.getenv('MEDIAMTX_API', 'http://127.0.0.1:8888')
-    MEDIAMTX_URL = os.getenv('MEDIAMTX_URL', 'rtsp://127.0.0.1:8888')
-
-    result = {
-        'api': {'url': MEDIAMTX_API, 'ok': False, 'status_code': None, 'error': None},
-        'rtsp': {'url': MEDIAMTX_URL, 'ok': False, 'error': None},
-        'ok': False,
+@router.get('/stream_health')
+async def get_stream_health():
+    """Proxy stream health from AI service"""
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            response = await client.get(f"{AI_SERVICE_URL}/stream_health")
+            if response.status_code == 200:
+                return response.json()
+    except Exception as e:
+        # Return disconnected status if AI service is unavailable
+        print(f"[STREAM_HEALTH_ERROR] {type(e).__name__}: {e}", file=sys.stderr)
+        pass
+    
+    return {
+        "connected": False,
+        "error_message": "AI service unavailable",
+        "consecutive_failed_reads": 0,
+        "time_since_last_frame": 0,
+        "camera_id": 1
     }
 
-    async def _check_http(url, key):
-        try:
-            async with httpx.AsyncClient(timeout=5) as client:
-                r = await client.get(url)
-                result[key]['status_code'] = r.status_code
-                result[key]['ok'] = r.status_code < 500
-        except Exception as e:
-            result[key]['error'] = str(e)
-
-    async def _check_rtsp(rtsp_url):
-        try:
-            p = urlparse(rtsp_url)
-            host = p.hostname or '127.0.0.1'
-            port = p.port or 554
-            fut = asyncio.open_connection(host, port)
-            reader, writer = await asyncio.wait_for(fut, timeout=3)
-            writer.close()
-            try:
-                await writer.wait_closed()
-            except Exception:
-                pass
-            result['rtsp']['ok'] = True
-        except Exception as e:
-            result['rtsp']['error'] = str(e)
-
-    await asyncio.gather(
-        _check_http(MEDIAMTX_API, 'api'),
-        _check_rtsp(MEDIAMTX_URL),
-    )
-
-    result['ok'] = result['api']['ok'] and result['rtsp']['ok']
-
-    # Add friendly messages
-    messages = []
-    if not result['api']['ok']:
-        messages.append('MediaMTX HTTP API unreachable. Check MEDIAMTX_API and that MediaMTX is running.')
-    if not result['rtsp']['ok']:
-        messages.append('MediaMTX RTSP ingest unreachable. Backend cannot push RTSP streams to MediaMTX.')
-
-    result['messages'] = messages
-    return JSONResponse(content=result)
+@router.get('/hardware_health')
+async def get_hardware_health():
+    """Proxy hardware health from AI service"""
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            response = await client.get(f"{AI_SERVICE_URL}/hardware_health")
+            if response.status_code == 200:
+                return response.json()
+    except Exception as e:
+        # Return disconnected status if AI service is unavailable
+        pass
+    
+    return {
+        "connected": False,
+        "error_message": "AI service unavailable",
+        "last_successful_send": None
+    }
