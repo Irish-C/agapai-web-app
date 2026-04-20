@@ -1,4 +1,5 @@
 import cv2
+import numpy as np
 import os
 import time
 import threading
@@ -142,7 +143,7 @@ if SERIAL_PORT:
 
         # --- INSERT LISTENER HERE ---
         def serial_listener():
-            global hardware_muted, hardware_on_until
+            global esp32, hardware_muted, hardware_on_until, hardware_connected, hardware_error_message, SERIAL_PORT
             while True:
                 if esp32 and esp32.is_open:
                     try:
@@ -154,8 +155,13 @@ if SERIAL_PORT:
                                 with state_lock:
                                     hardware_muted = True
                                     hardware_on_until = 0.0 # Resets the 10s timer
-                    except:
-                        pass
+                    except Exception as e:
+                        # Error reading from serial - port may have disconnected
+                        print(f"[HARDWARE LISTENER] Error reading from {SERIAL_PORT}: {str(e)[:50]}")
+                        with hardware_lock:
+                            hardware_connected = False
+                            hardware_error_message = f"Listener error: {str(e)[:30]}"
+                        esp32 = None  # Signal reconnection needed
                 time.sleep(0.1) # Small sleep to prevent high CPU usage
 
         # Start the thread immediately
@@ -168,34 +174,87 @@ else:
     print("[HARDWARE] Skipping ESP32 initialization - no port detected")
 
 def trigger_hardware(state):
-    """Sends ON/OFF signals to the ESP32."""
-    global esp32
+    """Sends ON/OFF signals to the ESP32 and tracks connection health."""
+    global esp32, hardware_connected, hardware_last_successful_send, consecutive_hardware_failures, hardware_error_message, SERIAL_PORT
+    
+    # Attempt to reconnect if port was detected before but connection is dead
+    if (esp32 is None or not esp32.is_open) and SERIAL_PORT:
+        try:
+            print(f"[HARDWARE] Attempting to reconnect to {SERIAL_PORT}...")
+            esp32 = serial.Serial(SERIAL_PORT, BAUD_RATE, timeout=0.1)
+            time.sleep(0.5)
+            print(f"[HARDWARE] ✓ Reconnected to {SERIAL_PORT}")
+        except Exception as e:
+            print(f"[HARDWARE] Reconnection failed: {e}")
+            with hardware_lock:
+                hardware_connected = False
+                hardware_error_message = f"Reconnection failed: {str(e)[:30]}"
+            return
+    
     if esp32 and esp32.is_open:
         try:
             esp32.write(b'1' if state == "ON" else b'0')
-        except:
-            pass
+            # Success - update health tracking
+            with hardware_lock:
+                hardware_connected = True
+                hardware_last_successful_send = time.time()
+                consecutive_hardware_failures = 0
+                hardware_error_message = "Connected"
+        except Exception as e:
+            with hardware_lock:
+                consecutive_hardware_failures += 1
+                hardware_error_message = f"Write failed: {str(e)[:30]}"
+                if consecutive_hardware_failures >= MAX_HARDWARE_CONSECUTIVE_FAILURES:
+                    hardware_connected = False
+    else:
+        with hardware_lock:
+            hardware_connected = False
+            hardware_error_message = "Serial port closed or not initialized"
+
+# ==========================================
+# --- ALERT PUBLISHING QUEUE (Background) ---
+# ==========================================
+alert_queue = []
+alert_queue_lock = threading.Lock()
+
+def publish_alerts_background():
+    """Background thread that publishes alerts without blocking the stream"""
+    while True:
+        try:
+            with alert_queue_lock:
+                if alert_queue:
+                    payload = alert_queue.pop(0)
+                else:
+                    payload = None
+            
+            if payload:
+                try:
+                    response = requests.post(
+                        'http://localhost:5000/api/alerts',
+                        json=payload,
+                        timeout=2
+                    )
+                    if response.status_code in [200, 201]:
+                        print(f"[ALERT SENT] Camera {payload.get('camera_id')}: {payload.get('alert_message')}")
+                except Exception as e:
+                    # Put it back in queue to retry
+                    with alert_queue_lock:
+                        alert_queue.insert(0, payload)
+                    print(f"[ALERT ERROR] Retrying: {str(e)[:50]}")
+            else:
+                time.sleep(0.1)  # Small sleep when queue is empty
+        except Exception as e:
+            print(f"[BACKGROUND ALERT ERROR] {e}")
+            time.sleep(1)
+
+# Start alert background thread
+threading.Thread(target=publish_alerts_background, daemon=True).start()
 
 def publish_alert_to_backend(camera_id, alert_message, frame=None, event_type="Detection", location_name="Unknown"):
-    """Publish alert to backend for database logging and Socket.IO broadcasting"""
+    """Queue alert to be published asynchronously by background thread"""
+    global alert_queue
+    
     try:
-        # Extract the actual detected class name from alert message
-        # Alert messages are like: "Floor: Backward Fall Detected!" or "Zone 1: Critical Inactivity (...)"
-        class_name = None
-        event_class_id = 1  # Default
-        
-        if "Floor:" in alert_message:
-            # Extract fall type: "Floor: Backward Fall Detected!" → "Backward Fall"
-            parts = alert_message.split("Floor: ")[1].split(" Detected")[0]
-            class_name = parts
-            event_class_id = 2  # Falls
-        elif "Inactivity" in alert_message:
-            # Extract inactivity level: "Zone 1: Inactivity (High) (30:45)" → "Inactivity (High)"
-            if "Inactivity" in alert_message:
-                parts = alert_message.split(": ")[1].split(" (")[0]
-                class_name = parts  # "Inactivity (High)", "Inactivity (Medium)", etc.
-            event_class_id = 3  # Inactivity
-        
         # Save snapshot if frame is provided
         snapshot_filename = ''
         if frame is not None:
@@ -222,26 +281,39 @@ def publish_alert_to_backend(camera_id, alert_message, frame=None, event_type="D
                 print(f"[SNAPSHOT ERROR] Could not save snapshot: {e}")
                 snapshot_filename = ''
         
+        # Extract the actual detected class name from alert message
+        # Alert messages are like: "Floor: Backward Fall Detected!" or "Zone 1: Critical Inactivity (...)"
+        class_name = None
+        event_class_id = 1  # Default
+        
+        if "Floor:" in alert_message:
+            # Extract fall type: "Floor: Backward Fall Detected!" → "Backward Fall"
+            parts = alert_message.split("Floor: ")[1].split(" Detected")[0]
+            class_name = parts
+            event_class_id = 2  # Falls
+        elif "Inactivity" in alert_message:
+            # Extract inactivity level: "Zone 1: Inactivity (High) (30:45)" → "Inactivity (High)"
+            if "Inactivity" in alert_message:
+                parts = alert_message.split(": ")[1].split(" (")[0]
+                class_name = parts  # "Inactivity (High)", "Inactivity (Medium)", etc.
+            event_class_id = 3  # Inactivity
+        
+        # **Queue it instead of sending directly**
         payload = {
             'camera_id': camera_id,
             'event_class_id': event_class_id,
             'alert_message': alert_message,
-            'class_name': class_name,  # Send the extracted class name
-            'snapshot_filename': snapshot_filename,  # Changed: send filename instead of URL
-            'location_name': location_name,  # NEW: send location
+            'class_name': class_name,
+            'snapshot_filename': snapshot_filename,
+            'location_name': location_name,
             'timestamp': datetime.now(timezone.utc).isoformat()
         }
-        response = requests.post(
-            'http://localhost:5000/api/alerts',
-            json=payload,
-            timeout=2
-        )
-        if response.status_code in [200, 201]:
-            print(f"[ALERT SENT] Camera {camera_id}: {alert_message}")
-        else:
-            print(f"[ALERT ERROR] Backend returned {response.status_code}")
+        
+        with alert_queue_lock:
+            alert_queue.append(payload)
+            
     except Exception as e:
-        print(f"[ALERT ERROR] Could not send to backend: {e}")
+        print(f"[ALERT QUEUE ERROR] {e}")
 
 # ==========================================
 # --- AI & TRACKING STATE INITIALIZATION ---
@@ -275,7 +347,8 @@ def fetch_camera_locations():
         else:
             print(f"[LOCATION ERROR] Backend returned {response.status_code}")
     except Exception as e:
-        print(f"[LOCATION ERROR] Could not fetch camera locations: {e}")
+        print(f"[LOCATION WARNING] Could not fetch camera locations: {e}")
+        # Don't crash - continue with empty cache
 
 def get_camera_location(camera_id):
     """Get location for a camera ID, or default to Unknown"""
@@ -290,6 +363,16 @@ consecutive_failed_reads = 0
 stream_error_message = "Not started"
 MAX_CONSECUTIVE_FAILURES = 50  # ~5 seconds at 10 FPS
 FRAME_TIMEOUT_SECONDS = 3.0    # Timeout if no frame for 3 seconds 
+
+# --- HARDWARE HEALTH MONITORING ---
+hardware_lock = threading.Lock()
+hardware_connected = False
+hardware_last_successful_send = 0.0
+consecutive_hardware_failures = 0
+hardware_error_message = "Not initialized"
+HARDWARE_TIMEOUT_SECONDS = 10.0     # No successful send for 10s = timeout
+HARDWARE_CHECK_INTERVAL = 2.0       # Background monitor checks every 2s
+MAX_HARDWARE_CONSECUTIVE_FAILURES = 50  # Increased threshold (matches stream robustness)
 
 # --- INACTIVITY CONFIGURATION (DYNAMIC) ---
 config_lock = threading.Lock()
@@ -319,6 +402,31 @@ def draw_text_outline(img, text, pos, text_color=(255, 255, 255)):
     cv2.putText(img, text, (x, y), font, font_scale, (255, 255, 255), 3, cv2.LINE_AA)
     cv2.putText(img, text, (x, y), font, font_scale, text_color, 1, cv2.LINE_AA)
 
+def generate_error_frame(error_message, frame_width=1280, frame_height=720):
+    """Generate an error frame to display when RTSP connection fails.
+    
+    This ensures the HTTP response contains data, preventing the browser from cancelling the request.
+    """
+    frame = np.zeros((frame_height, frame_width, 3), dtype=np.uint8)
+    
+    # Red border
+    cv2.rectangle(frame, (0, 0), (frame_width-1, frame_height-1), (0, 0, 255), 5)
+    
+    # Title
+    cv2.putText(frame, "Connection Error", (50, 100), cv2.FONT_HERSHEY_BOLD, 1.5, (0, 0, 255), 2)
+    
+    # Error message
+    y = 180
+    for line in error_message.split('\n'):
+        cv2.putText(frame, line, (50, y), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (150, 150, 150), 1)
+        y += 40
+    
+    # Hint
+    hint = "Check: 1) Camera IP reachable  2) RTSP credentials  3) Firewall settings  4) Network connectivity"
+    cv2.putText(frame, hint, (30, frame_height - 60), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (100, 100, 100), 1)
+    
+    return frame
+
 # ==========================================
 # --- WEB INTERFACE (HTML + JS) ---
 # ==========================================
@@ -327,6 +435,7 @@ HTML_PAGE = """
 <html>
 <head>
     <title>Agapai Multi-Zone Monitor</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='45' fill='%230ea5e9'/><circle cx='50' cy='50' r='35' fill='%23020617'/><text x='50' y='60' font-size='40' font-weight='bold' fill='%230ea5e9' text-anchor='middle'>A</text></svg>">
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         @keyframes flashRed {
@@ -351,6 +460,12 @@ HTML_PAGE = """
                 <div class="mt-3">
                     <span class="block text-[10px] text-slate-500 uppercase tracking-widest">Stream Status</span>
                     <span id="streamStatus" class="px-3 py-1 rounded text-xs font-bold bg-gray-600 cursor-help" title="Checking...">
+                        CHECKING...
+                    </span>
+                </div>
+                <div class="mt-3">
+                    <span class="block text-[10px] text-slate-500 uppercase tracking-widest">Hardware Status</span>
+                    <span id="hardwareStatus" class="px-3 py-1 rounded text-xs font-bold bg-gray-600 cursor-help" title="Checking...">
                         CHECKING...
                     </span>
                 </div>
@@ -440,7 +555,28 @@ HTML_PAGE = """
                 statusBadge.textContent = 'UNREACHABLE';
                 statusBadge.title = 'Cannot reach AI service health endpoint';
             });
-        }, 1000);
+        }, 1000);  // <-- Every 1 second
+
+        // --- HARDWARE HEALTH MONITORING ---
+        setInterval(() => {
+            fetch('/hardware_health').then(r => r.json()).then(data => {
+                const hardwareBadge = document.getElementById('hardwareStatus');
+                if (data.connected) {
+                    hardwareBadge.className = 'px-3 py-1 rounded text-xs font-bold bg-green-600 cursor-help';
+                    hardwareBadge.textContent = 'HARDWARE ACTIVE';
+                    hardwareBadge.title = `ESP32 Connected\nTime since last send: ${data.time_since_last_successful_send.toFixed(1)}s`;
+                } else {
+                    hardwareBadge.className = 'px-3 py-1 rounded text-xs font-bold bg-red-600 cursor-help';
+                    hardwareBadge.textContent = 'HARDWARE FAIL';
+                    hardwareBadge.title = `Error: ${data.error_message}\nConsecutive failures: ${data.consecutive_failures}`;
+                }
+            }).catch(err => {
+                const hardwareBadge = document.getElementById('hardwareStatus');
+                hardwareBadge.className = 'px-3 py-1 rounded text-xs font-bold bg-yellow-600 cursor-help';
+                hardwareBadge.textContent = 'UNREACHABLE';
+                hardwareBadge.title = 'Cannot reach hardware health endpoint';
+            });
+        }, 1000);  // <-- Every 1 second
 
         // --- ALERT POLLING LOGIC ---
         let alertsMuted = false;
@@ -622,7 +758,7 @@ def generate_frames(rtsp_url):
     global active_alerts, hardware_muted, hardware_on_until
     global stream_connected, stream_last_success_time, consecutive_failed_reads, stream_error_message
     
-    os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "rtsp_transport;tcp|timeout;5000000"
+    os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "rtsp_transport;tcp|timeout;2000000"
     cap = cv2.VideoCapture(rtsp_url, cv2.CAP_FFMPEG)
     cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)  # Minimize buffer for low latency
     
@@ -633,6 +769,26 @@ def generate_frames(rtsp_url):
             stream_connected = False
             stream_error_message = "Failed to open stream"
             consecutive_failed_reads = 0
+        
+        # Extract camera details from URL for error message
+        try:
+            # rtsp://admin:password@192.168.2.211:554/...
+            url_parts = rtsp_url.split('@')
+            camera_ip = url_parts[-1].split(':')[0] if '@' in rtsp_url else 'unknown'
+        except:
+            camera_ip = 'unknown'
+        
+        # Yield error frames to prevent empty response/request cancellation
+        error_detail = f"Cannot establish RTSP connection\nCamera IP: {camera_ip}\nURL: {rtsp_url[:60]}..."
+        error_frame = generate_error_frame(error_detail)
+        
+        error_start = time.time()
+        while time.time() - error_start < 5:  # Show error for 5 seconds (reduced from 30s for faster reconnection)
+            success, buffer = cv2.imencode('.jpg', error_frame, [cv2.IMWRITE_JPEG_QUALITY, 70])
+            if success:
+                yield (b'--frame\r\n'
+                       b'Content-Type: image/jpeg\r\n\r\n' + buffer.tobytes() + b'\r\n')
+            time.sleep(0.5)
         return
 
     # Initialize stream as connected
@@ -831,7 +987,7 @@ def generate_frames(rtsp_url):
             
             # If there is a new alert and we haven't muted it, push the timer 10 seconds into the future
             if len(active_alerts) > 0 and not hardware_muted:
-                hardware_on_until = current_time + 10.0
+                hardware_on_until = current_time + 50.0
             
             # If the 10 seconds have safely passed and no alerts remain, reset the mute state
             if current_time >= hardware_on_until and len(active_alerts) == 0:
@@ -945,6 +1101,18 @@ def stream_health():
             "camera_id": current_camera_id
         })
 
+@app.route('/hardware_health')
+def hardware_health():
+    """Return current hardware (ESP32) health status"""
+    with hardware_lock:
+        time_since_last_send = time.time() - hardware_last_successful_send if hardware_last_successful_send else 0
+        return jsonify({
+            "connected": hardware_connected,
+            "error_message": hardware_error_message,
+            "consecutive_failures": consecutive_hardware_failures,
+            "time_since_last_successful_send": time_since_last_send
+        })
+
 @app.route('/ack_alerts', methods=['POST'])
 def ack_alerts():
     global hardware_muted, hardware_on_until
@@ -975,6 +1143,66 @@ def clear_roi():
         rois = []
         bed_trackers.clear()
     return jsonify({"status": "success"})
+
+def hardware_reconnection_monitor():
+    """Background thread that continuously monitors ESP32 connection and auto-reconnects."""
+    global esp32, hardware_connected, consecutive_hardware_failures, hardware_error_message, SERIAL_PORT, hardware_last_successful_send
+    
+    print("[HARDWARE MONITOR] Starting background reconnection monitor...")
+    
+    while True:
+        try:
+            current_time = time.time()
+            
+            # READ STATUS SAFELY WITH LOCK (prevent race conditions)
+            with hardware_lock:
+                is_disconnected = esp32 is None or (isinstance(esp32, serial.Serial) and not esp32.is_open)
+                time_since_last_send = current_time - hardware_last_successful_send if hardware_last_successful_send > 0 else 0
+                is_timeout = (hardware_last_successful_send > 0 and time_since_last_send > HARDWARE_TIMEOUT_SECONDS)
+            
+            if (is_disconnected or is_timeout) and SERIAL_PORT:
+                if is_timeout:
+                    print(f"[HARDWARE MONITOR] Timeout detected: no successful send for {time_since_last_send:.1f}s")
+                else:
+                    print(f"[HARDWARE MONITOR] Detected disconnection. Attempting to reconnect to {SERIAL_PORT}...")
+                
+                try:
+                    # Clean up old connection if it exists (with lock to prevent conflicts)
+                    with hardware_lock:
+                        if esp32 and isinstance(esp32, serial.Serial):
+                            try:
+                                esp32.close()
+                            except:
+                                pass
+                            esp32 = None
+                    
+                    # Attempt new connection (outside lock to avoid blocking other operations)
+                    new_port = serial.Serial(SERIAL_PORT, BAUD_RATE, timeout=0.1)
+                    time.sleep(0.5)
+                    
+                    # Update both esp32 and health status with lock
+                    with hardware_lock:
+                        esp32 = new_port
+                        hardware_connected = True
+                        hardware_last_successful_send = current_time
+                        consecutive_hardware_failures = 0
+                        hardware_error_message = "Reconnected by monitor"
+                    
+                    print(f"[HARDWARE MONITOR] ✓ Successfully reconnected to {SERIAL_PORT}")
+                
+                except Exception as e:
+                    print(f"[HARDWARE MONITOR] Reconnection attempt failed: {str(e)[:50]}")
+                    with hardware_lock:
+                        hardware_connected = False
+                        hardware_error_message = f"Monitor reconnect failed: {str(e)[:25]}"
+                        esp32 = None
+            
+            time.sleep(HARDWARE_CHECK_INTERVAL)
+        
+        except Exception as e:
+            print(f"[HARDWARE MONITOR ERROR] Unexpected error: {e}")
+            time.sleep(HARDWARE_CHECK_INTERVAL)
+
 
 @app.route('/api/inactivity-config', methods=['POST'])
 def update_inactivity_config():
@@ -1011,8 +1239,13 @@ def update_inactivity_config():
         return jsonify({"status": "error", "message": str(e)}), 500
 
 if __name__ == "__main__":
-    # Fetch camera locations from backend on startup
-    print("[STARTUP] Fetching camera locations from backend...")
-    fetch_camera_locations()
+    # Start ESP32 hardware reconnection monitor if port was detected
+    if SERIAL_PORT:
+        print("[STARTUP] Starting background hardware reconnection monitor...")
+        threading.Thread(target=hardware_reconnection_monitor, daemon=True).start()
+    
+    # Fetch camera locations from backend on startup (non-blocking)
+    print("[STARTUP] Fetching camera locations from backend in background...")
+    threading.Thread(target=fetch_camera_locations, daemon=True).start()
     
     app.run(host='0.0.0.0', port=3000, threaded=True)

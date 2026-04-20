@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, memo } from 'react';
-import { FaExpand, FaTimes, FaBrain } from 'react-icons/fa';
+import { FaBrain } from 'react-icons/fa';
 
-function VideoFeed({ camId, cameraName, location, isFocused, onFocusChange, streamUrl, rtspUrl }) {
+function VideoFeed({ camId, cameraName, location, streamUrl, rtspUrl }) {
   const [currentDateTime, setCurrentDateTime] = useState(new Date());
   const [noDisplay, setNoDisplay] = useState(() => {
     try { return localStorage.getItem(`camera_${camId}_no_display`) === '1'; } catch (e) { return false; }
@@ -84,7 +84,7 @@ function VideoFeed({ camId, cameraName, location, isFocused, onFocusChange, stre
   }
 
   return (
-    <div ref={wrapperRef} className={`group bg-black rounded-none shadow-md overflow-hidden border-2 border-gray-700 relative ${!isFocused ? 'cursor-pointer hover:border-teal-500 transition-all' : 'border-teal-600'}`} onClick={() => !isFocused && onFocusChange?.(camId)}>
+    <div ref={wrapperRef} className="group bg-black rounded-none shadow-md overflow-hidden border-2 border-gray-700 relative">
       <div className="absolute top-0 left-0 w-full text-white p-2 flex items-center justify-between z-10">
         <div className="flex items-center gap-2 overflow-hidden min-w-0">
         </div>
@@ -93,7 +93,7 @@ function VideoFeed({ camId, cameraName, location, isFocused, onFocusChange, stre
         </div>
       </div>
 
-      <div className={`w-full bg-gray-900 flex items-center justify-center relative overflow-hidden ${isFocused ? '' : 'aspect-video'}`} style={isFocused ? { width: '100%', height: 'calc(100vh - 6rem)', maxHeight: 'calc(100vh - 6rem)' } : {}}>
+      <div className="w-full bg-gray-900 flex items-center justify-center relative overflow-hidden aspect-video">
         {(!noDisplay && cameraStatus !== 'online') && (
           <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-black/70 text-white">
             <div className="text-lg font-semibold mb-2">{cameraStatus === 'online' ? 'Online' : 'Offline'}</div>
@@ -111,17 +111,9 @@ function VideoFeed({ camId, cameraName, location, isFocused, onFocusChange, stre
           <div className="text-xs px-1 py-0.5 rounded" style={{ color: '#ffffff', backgroundColor: 'rgba(0, 0, 0, 0.3)' }}>DATE: {currentDateTime.toLocaleDateString()} {currentDateTime.toLocaleTimeString()}</div>
         </div>
 
-        {isFocused ? (
-          <div className="absolute top-2 right-2 flex gap-2 z-20">
-            <button onClick={(e) => { e.stopPropagation(); fetch(`/api/cameras/${camId}/publish`, { method: 'POST' }).then(() => window.open('http://localhost:3000', '_blank')).catch(err => console.error('Failed to start AI:', err)); }} className="p-2 bg-green-600/80 rounded-full text-white hover:bg-green-700 transition-colors" title="View AI Detection"><FaBrain /></button>
-            <button onClick={(e) => { e.stopPropagation(); onFocusChange?.(null); }} className="p-2 bg-black/60 rounded-full text-white hover:bg-red-600 transition-colors" title="Return to Grid"><FaTimes /></button>
-          </div>
-        ) : (
-          <div className="absolute top-2 right-2 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity z-20">
-            <button onClick={(e) => { e.stopPropagation(); fetch(`/api/cameras/${camId}/publish`, { method: 'POST' }).then(() => window.open('http://localhost:3000', '_blank')).catch(err => console.error('Failed to start AI:', err)); }} className="p-2 bg-green-600/80 rounded-full text-white hover:bg-green-700 transition-colors" title="View AI Detection"><FaBrain /></button>
-            <div className="p-2 bg-black/60 rounded-full text-white" title="Focus"><FaExpand /></div>
-          </div>
-        )}
+        <div className="absolute top-2 right-2 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity z-20">
+          <button onClick={(e) => { e.stopPropagation(); fetch(`/api/cameras/${camId}/publish`, { method: 'POST' }).then(() => window.open('http://localhost:3000', '_blank')).catch(err => console.error('Failed to start AI:', err)); }} className="p-2 bg-green-600/80 rounded-full text-white hover:bg-green-700 transition-colors" title="View AI Detection"><FaBrain /></button>
+        </div>
       </div>
     </div>
   );
