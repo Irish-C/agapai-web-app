@@ -177,6 +177,10 @@ export const fetchCameraList = () => {
     return fetchApi('/cameras', 'GET');
 }
 
+export const fetchCameraConfig = () => {
+    return fetchApi('/settings/camera', 'GET');
+}
+
 export const fetchDailySummary = () => {
     return fetchApi('/summary/daily', 'GET');
 };
@@ -190,12 +194,12 @@ export const fetchReportsData = (limit, startDate, endDate) => {
     return fetchApi(`/event_logs?${params.toString()}`, 'GET');
 };
 
-// --- CAMERA PUBLISHING ---
+// --- CAMERA DETECTION CONTROL (Single Camera Mode) ---
 
-export const publishCamera = (cameraId) => {
-    return fetchApi(`/cameras/${cameraId}/publish`, 'POST');
+export const startCameraDetection = () => {
+    return fetchApi('/settings/camera/start', 'POST');
 };
 
-export const unpublishCamera = (cameraId) => {
-    return fetchApi(`/cameras/${cameraId}/unpublish`, 'POST');
+export const stopCameraDetection = () => {
+    return fetchApi('/settings/camera/stop', 'POST');
 };

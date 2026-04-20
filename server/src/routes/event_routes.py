@@ -12,6 +12,7 @@ from src.controllers.event_controller import (
     export_logs_by_date_logic,
     get_missed_alerts_logic,
 )
+from src.services.socket_manager import socketio_server
 
 router = APIRouter()
 
@@ -38,6 +39,26 @@ async def create_alert_from_flask(request: Request):
             'timestamp': data.get('timestamp')
         }
         result, code = await create_event_logic(event_data)
+        
+        # Broadcast alert via Socket.IO to all connected clients
+        if code == 200 and isinstance(result, dict):
+            try:
+                alert_payload = {
+                    'alert_id': result.get('id'),
+                    'camera_id': event_data.get('camera_id'),
+                    'class_name': event_data.get('class_name'),
+                    'message': event_data.get('message'),
+                    'location_name': event_data.get('location_name'),
+                    'snapshot_filename': event_data.get('snapshot_filename'),
+                    'timestamp': event_data.get('timestamp'),
+                    'event_status': result.get('event_status', 'new')
+                }
+                # Emit to all connected clients (omit 'to' parameter to broadcast to everyone)
+                await socketio_server.emit('new_alert', alert_payload)
+                print(f"[SOCKET.IO] ✓ Alert broadcast to all clients (alert_id={result.get('id')})")
+            except Exception as emit_err:
+                print(f"[SOCKET.IO] ⚠️ Failed to broadcast alert: {emit_err}")
+        
         return safe_json_response(status_code=code, content=result)
     except Exception as e:
         print(f"[ALERT ROUTE ERROR] {e}")

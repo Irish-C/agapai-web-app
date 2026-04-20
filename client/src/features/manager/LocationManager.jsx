@@ -154,71 +154,76 @@ export default function LocationManager({ onLocationsUpdated }) {
                 </div>
             </form>
 
-            {/* Locations Grid */}
-            {locations.length === 0 ? (
-                <div className="py-12 text-center text-gray-500">
-                    <FaMapMarkerAlt className="text-5xl mx-auto mb-3 opacity-30" />
-                    <p className="text-lg">No locations yet. Add one above to get started.</p>
-                </div>
-            ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-96 overflow-y-auto pr-2">
-                    {locations.map((loc) => (
-                        <div key={loc.id} className="border rounded-lg p-4 bg-gradient-to-br from-purple-50 to-transparenthoover:shadow-md transition-shadow">
-                            {editingLoc && editingLoc.id === loc.id ? (
-                                // Edit Mode
-                                <form onSubmit={handleUpdateLocation} className="space-y-2">
-                                    <input
-                                        type="text"
-                                        value={editingLoc.name}
-                                        onChange={(e) => setEditingLoc(prev => ({ ...prev, name: sanitizeLocationName(e.target.value) }))}
-                                        className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                                        required
-                                    />
-                                    <div className="flex gap-2">
-                                        <button
-                                            type="submit"
-                                            className="flex-1 bg-green-600 text-white py-2 rounded-lg hover:bg-green-700 text-sm font-semibold flex items-center justify-center"
-                                        >
-                                            <FaSave className="mr-1" /> Save
-                                        </button>
-                                        <button
-                                            type="button"
-                                            onClick={() => setEditingLoc(null)}
-                                            className="flex-1 bg-gray-500 text-white py-2 rounded-lg hover:bg-gray-600 text-sm font-semibold"
-                                        >
-                                            Cancel
-                                        </button>
-                                    </div>
-                                </form>
-                            ) : (
-                                // View Mode
-                                <div className="flex items-center justify-between">
-                                    <div className="flex items-center flex-1">
-                                        <FaMapMarkerAlt className="text-purple-600 mr-3 flex-shrink-0" />
-                                        <strong className="text-gray-900 text-lg">{loc.name}</strong>
-                                    </div>
-                                    <div className="flex gap-2 flex-shrink-0">
-                                        <button
-                                            onClick={() => handleEditLocation(loc)}
-                                            className="p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                                            title="Edit location"
-                                        >
-                                            <FaPencilAlt className="w-4 h-4" />
-                                        </button>
-                                        <button
-                                            onClick={() => handleDeleteLocation(loc.id)}
-                                            className="p-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
-                                            title="Delete location"
-                                        >
-                                            <FaTrash className="w-4 h-4" />
-                                        </button>
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-                    ))}
-                </div>
-            )}
+            {/* Locations Table */}
+            <div className="overflow-x-auto bg-white border rounded-lg shadow-sm">
+                <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                        <tr>
+                            <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">Location Name</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                        {locations.length === 0 && (
+                            <tr>
+                                <td colSpan="2" className="px-6 py-4 text-center text-sm text-gray-500">
+                                    No locations yet. Add one above to get started.
+                                </td>
+                            </tr>
+                        )}
+                        {locations.map((loc) => (
+                            <tr key={loc.id}>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                                    {editingLoc && editingLoc.id === loc.id ? (
+                                        <form onSubmit={handleUpdateLocation} className="flex gap-2 items-center">
+                                            <input
+                                                type="text"
+                                                value={editingLoc.name}
+                                                onChange={(e) => setEditingLoc(prev => ({ ...prev, name: sanitizeLocationName(e.target.value) }))}
+                                                className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                                                required
+                                            />
+                                            <button
+                                                type="submit"
+                                                className="bg-green-600 text-white py-2 px-3 rounded-lg hover:bg-green-700 text-sm font-semibold"
+                                            >
+                                                Save
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => setEditingLoc(null)}
+                                                className="bg-gray-500 text-white py-2 px-3 rounded-lg hover:bg-gray-600 text-sm font-semibold"
+                                            >
+                                                Cancel
+                                            </button>
+                                        </form>
+                                    ) : (
+                                        <span>{loc.name}</span>
+                                    )}
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                    {editingLoc && editingLoc.id === loc.id ? null : (
+                                        <>
+                                            <button
+                                                onClick={() => handleEditLocation(loc)}
+                                                className="bg-blue-600 text-white text-xs py-1 px-3 rounded hover:bg-blue-700 font-semibold mr-2"
+                                            >
+                                                Edit
+                                            </button>
+                                            <button
+                                                onClick={() => handleDeleteLocation(loc.id)}
+                                                className="bg-red-600 text-white text-xs py-1 px-3 rounded hover:bg-red-700 font-semibold"
+                                            >
+                                                Delete
+                                            </button>
+                                        </>
+                                    )}
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
 
             {/* DELETE MODAL */}
             {isDeleteModalOpen && (

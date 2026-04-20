@@ -6,7 +6,7 @@ import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import agapai_Bg from './src/assets/bg/gray-bg.png';
 
 // services
-import { loginUser, fetchCameraList, logoutUser } from './src/services/apiService.js';
+import { loginUser, logoutUser } from './src/services/apiService.js';
 import { socket } from './src/services/socket.js';
 
 // helpers
@@ -32,7 +32,6 @@ export default function App() {
     const { user, token, login, logout, isAuthReady } = useContext(AuthContext);
     const location = useLocation();
 
-    const [cameras, setCameras] = useState([]);
     const [alertIncident, setAlertIncident] = useState(null);
 
     // Listen for real-time alerts from backend
@@ -91,27 +90,7 @@ export default function App() {
         }
     }, [location]);
 
-
-
-    const loadCameras = async () => {
-        if (!user) return;
-        try {
-            const cameraList = await fetchCameraList();
-            setCameras(cameraList);
-        } catch (error) {
-            console.error('Failed to fetch cameras:', error);
-            setCameras([]);
-        }
-    };
-
-
-
-    useEffect(() => {
-        if (user) loadCameras();
-        else setCameras([]);
-    }, [user]);
-
-    const authProps = { user, logout, cameras };
+    const authProps = { user, logout };
 
     return (
         <div

@@ -4,11 +4,17 @@ from src.utils.role_utils import normalize_role
 import json
 
 
-def _location_label(camera_obj):
-    if camera_obj and getattr(camera_obj, 'location', None) and getattr(camera_obj.location, 'loc_name', None):
-        return camera_obj.location.loc_name
-    if camera_obj and getattr(camera_obj, 'cam_name', None):
-        return camera_obj.cam_name
+async def _get_location_label():
+    """Get location name from the single camera configuration."""
+    try:
+        result = await db.query_raw(
+            'SELECT loc_name FROM location WHERE id = (SELECT loc_id FROM camera_config WHERE id = 1) LIMIT 1'
+        )
+        if result:
+            loc = result[0] if isinstance(result, list) else result
+            return loc.get('loc_name') if isinstance(loc, dict) else str(loc)
+    except Exception:
+        pass
     return "Unknown"
 
 
@@ -16,7 +22,7 @@ async def create_event_logic(data):
     try:
         event_class_id = int(data.get('event_class_id', 1))
         class_name = data.get('class_name')
-        camera_id = int(data['camera_id'])
+        camera_id = int(data['camera_id'])  # Should always be 1 in single-camera mode
         snapshot_filename = data.get('snapshot_filename', '')
         location_name = data.get('location_name', 'Unknown')
         
@@ -39,19 +45,22 @@ async def create_event_logic(data):
         time_window = datetime.now(timezone.utc) - timedelta(seconds=60)
         
         print(f"  [DEDUP] Checking for recent events:")
-        print(f"    - Camera ID: {camera_id}")
         print(f"    - Event Class ID: {event_class_id}")
         print(f"    - Time window: {time_window} to now")
         
         recent_event = await db.eventlog.find_first(
             where={
-                'cam_id': camera_id,
                 'event_class_id': event_class_id,
                 'timestamp': {'gte': time_window},
                 'deleted_at': None  # Exclude soft-deleted events
             },
             order={'timestamp': 'desc'}
         )
+        
+        # Get the camera's current location_id (immutable for this event)
+        camera_config = await db.cameraconfig.find_unique(where={'id': 1})
+        location_id = camera_config.loc_id if camera_config else None
+        location_display = await _get_location_label()
         
         if recent_event:
             # Accumulate snapshot to existing event
@@ -72,7 +81,6 @@ async def create_event_logic(data):
             updated_event = await db.eventlog.find_unique(
                 where={'id': recent_event.id},
                 include={
-                    'camera': {'include': {'location': True}},
                     'event_class': True,
                     'snapshots': {'orderBy': {'timestamp': 'asc'}}
                 }
@@ -81,11 +89,9 @@ async def create_event_logic(data):
             snapshot_urls = [f"http://localhost:3000/api/snapshots/{s.filename}" for s in updated_event.snapshots]
             display_snapshot_url = snapshot_urls[0] if snapshot_urls else None
             
-            location_display = _location_label(updated_event.camera)
-            
             payload = {
                 'id': str(updated_event.id),
-                'type': updated_event.event_class.class_name,
+                'type': updated_event.event_class.class_name if updated_event.event_class else "Unknown",
                 'location': location_display,
                 'timestamp': updated_event.timestamp.isoformat(),
                 'snapshot_url': display_snapshot_url,
@@ -101,15 +107,14 @@ async def create_event_logic(data):
             
             return {"status": "success", "data": payload, "accumulated": True}, 200
         else:
-            # Create new event
+            # Create new event with location_id immutably stored
             new_event = await db.eventlog.create(
                 data={
-                    'cam_id': camera_id,
                     'event_class_id': event_class_id,
+                    'location_id': location_id,  # Store location at event creation time
                     'timestamp': datetime.now(timezone.utc)
                 },
                 include={
-                    'camera': {'include': {'location': True}},
                     'event_class': True
                 }
             )
@@ -127,11 +132,9 @@ async def create_event_logic(data):
                 snapshot_urls = [f"http://localhost:3000/api/snapshots/{snapshot_filename}"]
                 print(f"  [SNAPSHOT] Created snapshot record: {snapshot_filename}")
             
-            location_display = _location_label(new_event.camera)
-            
             payload = {
                 'id': str(new_event.id),
-                'type': new_event.event_class.class_name,
+                'type': new_event.event_class.class_name if new_event.event_class else "Unknown",
                 'location': location_display,
                 'timestamp': new_event.timestamp.isoformat(),
                 'snapshot_url': snapshot_urls[0] if snapshot_urls else None,
@@ -164,7 +167,9 @@ async def get_event_types_logic():
 async def get_event_logs_logic(filters=None):
     try:
         limit = int(filters.get('limit', 50)) if filters else 50
-        where_clause = {'deleted_at': None}  # Exclude soft-deleted events
+        
+        # Build SQL WHERE clause
+        where_parts = ["el.deleted_at IS NULL"]
         
         if filters:
             start_date = filters.get('start_date')
@@ -172,72 +177,107 @@ async def get_event_logs_logic(filters=None):
             tz_offset_minutes = int(filters.get('tz_offset_minutes', 0) or 0)
 
             if start_date or end_date:
-                timestamp_filter = {}
-
                 if start_date:
                     local_start = datetime.strptime(start_date, '%Y-%m-%d').replace(
-                        hour=0,
-                        minute=0,
-                        second=0,
-                        microsecond=0,
+                        hour=0, minute=0, second=0, microsecond=0,
                     )
                     start_dt = local_start + timedelta(minutes=tz_offset_minutes)
-                    timestamp_filter['gte'] = start_dt
+                    where_parts.append(f"el.timestamp >= '{start_dt.isoformat()}'")
 
                 if end_date:
                     local_end = datetime.strptime(end_date, '%Y-%m-%d').replace(
-                        hour=0,
-                        minute=0,
-                        second=0,
-                        microsecond=0,
+                        hour=0, minute=0, second=0, microsecond=0,
                     ) + timedelta(days=1)
                     end_dt = local_end + timedelta(minutes=tz_offset_minutes)
-                    timestamp_filter['lt'] = end_dt
+                    where_parts.append(f"el.timestamp < '{end_dt.isoformat()}'")
 
-                if timestamp_filter.get('gte') and timestamp_filter.get('lt') and timestamp_filter['gte'] >= timestamp_filter['lt']:
-                    return {"status": "error", "message": "start_date must be on or before end_date"}, 400
-
-                where_clause['timestamp'] = timestamp_filter
+                # Validate date range
+                if start_date and end_date:
+                    start_dt = datetime.strptime(start_date, '%Y-%m-%d').replace(hour=0, minute=0, second=0, microsecond=0)
+                    end_dt = datetime.strptime(end_date, '%Y-%m-%d').replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=1)
+                    if start_dt >= end_dt:
+                        return {"status": "error", "message": "start_date must be on or before end_date"}, 400
         
-        logs = await db.eventlog.find_many(
-            take=limit,
-            where=where_clause,
-            order={'timestamp': 'desc'},
-            include={
-                'camera': {'include': {'location': True}},
-                'event_class': True,
-                'acknowledged_by': True,
-                'snapshots': {'orderBy': {'timestamp': 'asc'}}
-            }
+        where_clause = " AND ".join(where_parts)
+        
+        # Use raw SQL to fetch event logs with their stored locations
+        logs_result = await db.query_raw(
+            f"""
+            SELECT DISTINCT el.id, el.timestamp, el.event_status, el.ack_by_user_id, el.event_class_id, el.file_path, el.location_id, l.loc_name
+            FROM event_logs el
+            LEFT JOIN location l ON el.location_id = l.id
+            WHERE {where_clause}
+            ORDER BY el.timestamp DESC
+            LIMIT {limit}
+            """
         )
         
-        unacknowledged = [log for log in logs if log.event_status == 'unacknowledged']
-        acknowledged = [log for log in logs if log.event_status == 'acknowledged']
-        unacknowledged.sort(key=lambda log: log.timestamp, reverse=True)
-        acknowledged.sort(key=lambda log: log.timestamp, reverse=True)
-        sorted_logs = unacknowledged + acknowledged
+        logs = logs_result if logs_result else []
         
+        # Format each log with its related data
         formatted_data = []
-        for log in sorted_logs:
-            snapshot_urls = [f"http://localhost:3000/api/snapshots/{s.filename}" for s in log.snapshots]
+        for log in logs:
+            log_dict = dict(log) if hasattr(log, 'keys') else log
+            log_id = log_dict.get('id')
+            
+            # Get event class name
+            class_name = "Unknown"
+            if log_dict.get('event_class_id'):
+                ec_result = await db.query_raw(
+                    f"SELECT class_name FROM event_class WHERE id = {log_dict['event_class_id']} LIMIT 1"
+                )
+                if ec_result:
+                    ec_dict = dict(ec_result[0]) if hasattr(ec_result[0], 'keys') else ec_result[0]
+                    class_name = ec_dict.get('class_name', 'Unknown')
+            
+            # Get acknowledged by username
+            ack_username = None
+            if log_dict.get('ack_by_user_id'):
+                user_result = await db.query_raw(
+                    f"SELECT username FROM users WHERE id = {log_dict['ack_by_user_id']} LIMIT 1"
+                )
+                if user_result:
+                    user_dict = dict(user_result[0]) if hasattr(user_result[0], 'keys') else user_result[0]
+                    ack_username = user_dict.get('username')
+            
+            # Get snapshots for this event log
+            snapshot_urls = []
+            snapshots_result = await db.query_raw(
+                f"SELECT filename FROM snapshots WHERE event_log_id = {log_id} ORDER BY timestamp ASC"
+            )
+            if snapshots_result:
+                for snap in snapshots_result:
+                    snap_dict = dict(snap) if hasattr(snap, 'keys') else snap
+                    filename = snap_dict.get('filename') if isinstance(snap_dict, dict) else None
+                    if filename:
+                        snapshot_urls.append(f"http://localhost:3000/api/snapshots/{filename}")
+            
+            # Timestamp from raw SQL is already an isoformat string
+            timestamp_val = log_dict.get('timestamp')
+            if hasattr(timestamp_val, 'isoformat'):
+                timestamp_str = timestamp_val.isoformat()
+            else:
+                timestamp_str = str(timestamp_val) if timestamp_val else ''
             
             formatted_data.append({
-                "id": str(log.id),
-                "type": log.event_class.class_name if log.event_class else "Unknown",
-                "location": _location_label(log.camera),
-                "timestamp": log.timestamp.isoformat(),
+                "id": str(log_id),
+                "type": class_name,
+                "location": log_dict.get('loc_name') or 'Unknown',  # Use stored location from event recording time
+                "timestamp": timestamp_str,
                 "snapshot_url": snapshot_urls[0] if snapshot_urls else None,
                 "all_snapshots": snapshot_urls,
                 "occurrence_count": len(snapshot_urls),
-                "status": log.event_status,
-                "acknowledged_by_username": log.acknowledged_by.username if log.acknowledged_by else None
+                "status": log_dict.get('event_status', 'unacknowledged'),
+                "acknowledged_by_username": ack_username
             })
         
         return {"status": "success", "report": formatted_data}, 200
     except ValueError:
         return {"status": "error", "message": "Invalid date format. Use YYYY-MM-DD"}, 400
     except Exception as e:
+        import traceback
         print(f"Error: {e}")
+        traceback.print_exc()
         return {"status": "error", "message": str(e)}, 500
 
 async def get_viewed_event_logs_logic(filters=None):
@@ -249,7 +289,6 @@ async def get_viewed_event_logs_logic(filters=None):
             where={'deleted_at': None},  # Exclude soft-deleted events
             order={'timestamp': 'desc'},
             include={
-                'camera': {'include': {'location': True}},
                 'event_class': True,
                 'snapshots': {'orderBy': {'timestamp': 'asc'}}
             }
@@ -261,6 +300,8 @@ async def get_viewed_event_logs_logic(filters=None):
         acknowledged.sort(key=lambda log: log.timestamp, reverse=True)
         sorted_logs = unacknowledged + acknowledged
         
+        location_label = await _get_location_label()
+        
         formatted_data = []
         for log in sorted_logs:
             snapshot_urls = [f"http://localhost:3000/api/snapshots/{s.filename}" for s in log.snapshots]
@@ -268,7 +309,7 @@ async def get_viewed_event_logs_logic(filters=None):
             formatted_data.append({
                 "id": str(log.id),
                 "type": log.event_class.class_name if log.event_class else "Unknown",
-                "location": _location_label(log.camera),
+                "location": location_label,
                 "timestamp": log.timestamp.isoformat(),
                 "snapshot_url": snapshot_urls[0] if snapshot_urls else None,
                 "all_snapshots": snapshot_urls,
@@ -387,13 +428,14 @@ async def export_logs_by_date_logic(date_str: str):
             },
             order={'timestamp': 'desc'},
             include={
-                'camera': {'include': {'location': True}},
                 'event_class': True,
                 'snapshots': {'orderBy': {'timestamp': 'asc'}}
             }
         )
         
         print(f"[export_logs] Found {len(logs)} events for {date_str}")
+        
+        location_label = await _get_location_label()
         
         # Format the data
         formatted_data = []
@@ -403,7 +445,7 @@ async def export_logs_by_date_logic(date_str: str):
             formatted_data.append({
                 "id": str(log.id),
                 "type": log.event_class.class_name if log.event_class else "Unknown",
-                "location": _location_label(log.camera),
+                "location": location_label,
                 "timestamp": log.timestamp.isoformat(),
                 "snapshot_url": snapshot_urls[0] if snapshot_urls else None,
                 "all_snapshots": snapshot_urls,
@@ -460,29 +502,34 @@ async def get_missed_alerts_logic(timestamp_ms: int):
         
         print(f"[get_missed_alerts] Fetching alerts since {since_datetime.isoformat()}")
         
-        # Query alerts created since the timestamp (order newest first for priority)
-        alerts = await db.eventlog.find_many(
-            where={
-                'timestamp': {
-                    'gt': since_datetime  # Greater than (strict) to avoid duplicates
-                }
-            },
-            order={'timestamp': 'desc'},  # Newest first
-            include={'camera': {'include': {'location': True}}, 'event_class': True}
+        # Use raw SQL since Prisma client doesn't properly reflect schema changes
+        result = await db.query_raw(
+            f"""
+            SELECT el.id, el.timestamp, el.event_status, el.file_path, ec.class_name
+            FROM event_logs el
+            LEFT JOIN event_class ec ON el.event_class_id = ec.id
+            WHERE el.timestamp > '{since_datetime.isoformat()}'
+            AND el.deleted_at IS NULL
+            ORDER BY el.timestamp DESC
+            """
         )
         
+        alerts = result if result else []
         print(f"[get_missed_alerts] Found {len(alerts)} missed alerts")
+        
+        location_label = await _get_location_label()
         
         # Format the data to match Socket.IO 'new_alert' payload
         formatted_alerts = []
         for alert in alerts:
+            alert_dict = dict(alert) if hasattr(alert, 'keys') else alert
             formatted_alerts.append({
-                'id': str(alert.id),
-                'type': alert.event_class.class_name if alert.event_class else 'unknown',
-                'location': _location_label(alert.camera),
-                'timestamp': alert.timestamp.isoformat(),
-                'snapshot_url': alert.file_path,
-                'status': alert.event_status or 'unacknowledged'
+                'id': str(alert_dict.get('id')),
+                'type': alert_dict.get('class_name') or 'unknown',
+                'location': location_label,
+                'timestamp': alert_dict.get('timestamp').isoformat() if alert_dict.get('timestamp') else '',
+                'snapshot_url': alert_dict.get('file_path'),
+                'status': alert_dict.get('event_status') or 'unacknowledged'
             })
         
         return {
@@ -493,4 +540,6 @@ async def get_missed_alerts_logic(timestamp_ms: int):
         
     except Exception as e:
         print(f"Error fetching missed alerts: {e}")
+        import traceback
+        traceback.print_exc()
         return {'status': 'error', 'message': str(e)}, 500

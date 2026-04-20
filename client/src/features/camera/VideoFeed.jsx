@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, memo } from 'react';
 import { FaBrain } from 'react-icons/fa';
+import { fetchApi } from '../../services/apiService';
 
 function VideoFeed({ camId, cameraName, location, streamUrl, rtspUrl }) {
   const [currentDateTime, setCurrentDateTime] = useState(new Date());
@@ -112,7 +113,21 @@ function VideoFeed({ camId, cameraName, location, streamUrl, rtspUrl }) {
         </div>
 
         <div className="absolute top-2 right-2 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity z-20">
-          <button onClick={(e) => { e.stopPropagation(); fetch(`/api/cameras/${camId}/publish`, { method: 'POST' }).then(() => window.open('http://localhost:3000', '_blank')).catch(err => console.error('Failed to start AI:', err)); }} className="p-2 bg-green-600/80 rounded-full text-white hover:bg-green-700 transition-colors" title="View AI Detection"><FaBrain /></button>
+          <button 
+            onClick={async (e) => { 
+              e.stopPropagation(); 
+              try {
+                await fetchApi('/settings/camera/start', 'POST');
+                window.open('http://localhost:3000', '_blank');
+              } catch (err) { 
+                console.error('Failed to start AI:', err); 
+              }
+            }} 
+            className="p-2 bg-green-600/80 rounded-full text-white hover:bg-green-700 transition-colors" 
+            title="Start Camera Detection"
+          >
+            <FaBrain />
+          </button>
         </div>
       </div>
     </div>

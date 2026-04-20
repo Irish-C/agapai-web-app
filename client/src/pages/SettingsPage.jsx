@@ -1,29 +1,26 @@
 // src/pages/Settings.jsx
 import React, { useState } from 'react';
-import { FaUserCog, FaCogs, FaUsers, FaConnectdevelop} from 'react-icons/fa'; 
+import { FaUserCog, FaCogs, FaUsers, FaCamera, FaMapMarkerAlt } from 'react-icons/fa'; 
 
 import { normalizeRole } from '../utils/roleUtils.js';
 
 import AccountSettingsForm from '../features/form/AccountSettingsForm.jsx';
 import UserManager from '../features/manager/UserManager.jsx'; 
-import ManagementDashboard from "../features/manager/ManagementDashboard.jsx";
+import CameraSettingsForm from '../features/form/CameraSettingsForm.jsx';
+import LocationManager from '../features/manager/LocationManager.jsx';
 
 export default function Settings({ user }) {
     const isAdmin = normalizeRole(user?.role) === 'admin'; 
     const isSupervisor = normalizeRole(user?.role) === 'supervisor';
     const isGuard = normalizeRole(user?.role) === 'guard';
     
-    const [activeSection, setActiveSection] = useState('my_account'); 
-    const [locations, setLocations] = useState([]);
-
-    const handleLocationsUpdate = (newLocations) => {
-        setLocations(newLocations);
-    };
+    const [activeSection, setActiveSection] = useState('my_account');
 
     // 2. Define the navigation structure with roles
     const fullNavItems = [
         { id: 'my_account', name: 'My Account', icon: FaUserCog, role: 'all' },
-        { id: 'devloc_management', name: 'Device and Location', icon: FaConnectdevelop, role: 'admin_supervisor_guard' }, 
+        { id: 'camera_settings', name: 'Camera Settings', icon: FaCamera, role: 'admin_supervisor_guard' }, 
+        { id: 'locations', name: 'Locations', icon: FaMapMarkerAlt, role: 'admin_or_supervisor' },
         { id: 'user_management', name: 'User Management', icon: FaUsers, role: 'admin_or_supervisor' }, 
     ];
     
@@ -42,15 +39,18 @@ export default function Settings({ user }) {
             case 'my_account':
                 return <AccountSettingsForm user={user} />;
             
-            case 'devloc_management':
+            case 'camera_settings':
                 return (isAdmin || isSupervisor || isGuard) ? (
-                    <ManagementDashboard 
-                        locations={locations} 
-                        onLocationsUpdated={handleLocationsUpdate}
-                        readOnly={!isAdmin}
-                    />
+                    <CameraSettingsForm readOnly={!isAdmin} onNavigateToLocations={() => setActiveSection('locations')} />
                 ) : (
-                    <p className="text-red-500">Access Denied: You must be an Administrator, Supervisor, or Guard to view devices and locations.</p>
+                    <p className="text-red-500">Access Denied: You must be an Administrator, Supervisor, or Guard to view camera settings.</p>
+                );
+
+            case 'locations':
+                return (isAdmin || isSupervisor) ? (
+                    <LocationManager />
+                ) : (
+                    <p className="text-red-500">Access Denied: You must be an Administrator or Supervisor to manage locations.</p>
                 );
 
             case 'user_management': 

@@ -116,20 +116,17 @@ function notifyBufferFlush(alerts) {
 }
 
 // ============================================
-// AUTO-RESUBSCRIBE TO CAMERAS
+// AUTO-RESUBSCRIBE TO THE SINGLE CAMERA
 // ============================================
-async function resubscribeToAllCameras() {
-  const cameras = getSubscribedCameras();
-  console.log('[SocketIO Reconnect] Re-subscribing to', cameras.length, 'cameras');
+async function resubscribeToCamera() {
+  console.log('[SocketIO Reconnect] Re-subscribing to single camera (id=1)');
   const authToken = getStoredAuthToken();
   
-  for (const cameraId of cameras) {
-    try {
-      socket.emit('subscribe_camera', { camera_id: cameraId, token: authToken });
-      await new Promise(resolve => setTimeout(resolve, 50)); // Small delay between subscriptions
-    } catch (err) {
-      console.error('[SocketIO Reconnect] Failed to resubscribe to camera', cameraId, err);
-    }
+  try {
+    // Always subscribe to camera 1 (single-camera architecture)
+    socket.emit('subscribe_camera', { camera_id: 1, token: authToken });
+  } catch (err) {
+    console.error('[SocketIO Reconnect] Failed to resubscribe to camera', err);
   }
 }
 
@@ -282,8 +279,8 @@ socket.on('connect', async () => {
   // Start health checks
   startSocketHealthCheck();
   
-  // Re-subscribe to all previously subscribed cameras
-  await resubscribeToAllCameras();
+  // Re-subscribe to the single camera
+  await resubscribeToCamera();
   
   // Fetch missed alerts if we were disconnected
   if (wasBuffering) {

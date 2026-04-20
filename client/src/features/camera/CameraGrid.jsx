@@ -1,9 +1,9 @@
-import React, { useEffect, useState, useMemo, useCallback } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import VideoFeed from './VideoFeed.jsx';
 import TodayReport from '../dashboard/TodayReport.jsx';
 import { useCameraSocket } from '../../hooks/useCamera.js';
 import { FaSpinner, FaVideo, FaSync, FaEthernet, FaUsb } from 'react-icons/fa';
-import { fetchCameraList } from '../../services/apiService.js';
+import { fetchCameraConfig } from '../../services/apiService.js';
 
 // Helper: Extract IP and password from RTSP URL
 // rtsp://admin:password@192.168.2.211/cam/realmonitor?channel=1&subtype=1
@@ -22,51 +22,29 @@ function parseRtspUrl(rtspUrl) {
 }
 
 // Helper: Construct direct Flask video feed URL
-function getVideoFeedUrl(streamUrl, cameraId = null) {
+function getVideoFeedUrl(streamUrl) {
   const parsed = parseRtspUrl(streamUrl);
   if (parsed) {
-    let url = `http://localhost:3000/video_feed?ip=${parsed.ip}&pass=${parsed.password}&t=${new Date().getTime()}`;
-    if (cameraId) {
-      url += `&camera_id=${cameraId}`;
-    }
-    return url;
+    return `http://localhost:3000/video_feed?ip=${parsed.ip}&pass=${parsed.password}&camera_id=1&t=${new Date().getTime()}`;
   }
   return null;
 }
 
 export default function CameraGrid() {
-  const { cameraData, alerts, isConnected } = useCameraSocket();
+  const { alerts, isConnected } = useCameraSocket();
 
-  const [cameraList, setCameraList] = useState([]);
+  const [camera, setCamera] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [mediamtxHealth, setMediamtxHealth] = useState(null);
   const [cameraStatus, setCameraStatus] = useState(null);
   const [hardwareStatus, setHardwareStatus] = useState(null);
-
-  useEffect(() => {
-    let mounted = true;
-    const check = async () => {
-      try {
-        const resp = await fetch('/mediamtx_health');
-        if (!resp.ok) return;
-        const j = await resp.json();
-        if (!mounted) return;
-        setMediamtxHealth(j);
-      } catch (e) {
-        // ignore
-      }
-    };
-    check();
-    return () => { mounted = false; };
-  }, []);
 
   // Poll camera stream health
   useEffect(() => {
     let mounted = true;
     const pollCamera = async () => {
       try {
-        const resp = await fetch('http://localhost:3000/stream_health');
+        const resp = await fetch('http://localhost:5000/api/stream_health');
         if (!resp.ok) return;
         const data = await resp.json();
         if (mounted) setCameraStatus(data);
@@ -87,7 +65,7 @@ export default function CameraGrid() {
     let mounted = true;
     const pollHardware = async () => {
       try {
-        const resp = await fetch('http://localhost:3000/hardware_health');
+        const resp = await fetch('http://localhost:5000/api/hardware_health');
         if (!resp.ok) return;
         const data = await resp.json();
         if (mounted) setHardwareStatus(data);
@@ -103,58 +81,49 @@ export default function CameraGrid() {
     };
   }, []);
 
+  // Fetch single camera configuration
   useEffect(() => {
     let mounted = true;
 
-    const getCameras = async () => {
+    const getCamera = async () => {
       setIsLoading(true);
       setError(null);
       try {
-        const data = await fetchCameraList();
+        const data = await fetchCameraConfig();
         if (!mounted) return;
 
-        if (data?.status === 'success' && Array.isArray(data.cameras)) {
-          setCameraList(data.cameras);
+        if (data && data.id) {
+          setCamera(data);
         } else {
-          setError('API did not return a valid camera list.');
+          setError('Camera configuration not found.');
         }
       } catch (err) {
         if (!mounted) return;
-        setError(`Failed to load camera list: ${err?.message || 'Unknown error'}`);
+        setError(`Failed to load camera: ${err?.message || 'Unknown error'}`);
       } finally {
         if (mounted) setIsLoading(false);
       }
     };
 
-    getCameras();
+    getCamera();
     return () => {
       mounted = false;
     };
   }, []);
 
-
-  // All cameras become visible automatically (no publish step needed)
-  const visibleCameraList = useMemo(
-    () => cameraList,
-    [cameraList]
-  );
-
-  // Streaming URL generation removed; frontend will render placeholders only.
-  const getStreamPath = (camera) => camera.stream_path || camera.path || `cam${camera.id}`;
-
-  // Refresh cameras function
-  const refreshCameras = useCallback(async () => {
+  // Refresh camera function
+  const refreshCamera = useCallback(async () => {
     setIsLoading(true);
     setError(null);
     try {
-      const data = await fetchCameraList();
-      if (data?.status === 'success' && Array.isArray(data.cameras)) {
-        setCameraList(data.cameras);
+      const data = await fetchCameraConfig();
+      if (data && data.id) {
+        setCamera(data);
       } else {
-        setError('API did not return a valid camera list.');
+        setError('Camera configuration not found.');
       }
     } catch (err) {
-      setError(`Failed to load camera list: ${err?.message || 'Unknown error'}`);
+      setError(`Failed to load camera: ${err?.message || 'Unknown error'}`);
     } finally {
       setIsLoading(false);
     }
@@ -191,14 +160,14 @@ export default function CameraGrid() {
       </div>
       <div className="flex items-center gap-2">
         <button
-          onClick={refreshCameras}
+          onClick={refreshCamera}
           disabled={isLoading}
           className={`flex items-center gap-2 px-4 py-2 rounded-lg font-semibold transition-colors ${
             isLoading
               ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
               : 'bg-cyan-800 text-white hover:bg-gray-500'
           }`}
-          title="Refresh all cameras"
+          title="Refresh camera"
         >
           <FaSync className={isLoading ? 'animate-spin' : ''} />
           {isLoading ? 'Refreshing...' : 'Refresh'}
@@ -207,21 +176,14 @@ export default function CameraGrid() {
     </div>
   );
 
-  const mediamtxBanner = mediamtxHealth && !mediamtxHealth.ok ? (
-    <div className="p-3 mb-4 rounded bg-yellow-100 border border-yellow-300 text-yellow-800">
-      <div className="font-semibold">MediaMTX connectivity issues</div>
-      <ul className="text-sm">
-        {mediamtxHealth.messages && mediamtxHealth.messages.map((m, i) => <li key={i}>- {m}</li>)}
-      </ul>
-    </div>
-  ) : null;
+  // Connection status indicators in header
 
-  if (isLoading && cameraList.length === 0) {
+  if (isLoading) {
     return (
       <div className="p-6">
         {header}
         <div className="flex items-center justify-center p-12 text-xl text-gray-700">
-          <FaSpinner className="animate-spin mr-2" /> Loading streams ...
+          <FaSpinner className="animate-spin mr-2" /> Loading camera ...
         </div>
       </div>
     );
@@ -242,32 +204,15 @@ export default function CameraGrid() {
     <div className="flex flex-col lg:flex-row gap-4 p-4">
       <div className="flex-grow lg:w-3/4">
         {header}
-        {!isLoading && visibleCameraList.length > 0 && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-0">
-            {visibleCameraList.map((camera) => {
-              const location = camera.location_name || camera.location || camera.loc_name;
-              
-              // Determine stream URL for direct Flask video feed
-              const dynamicStreamUrl = getVideoFeedUrl(camera.stream_url, camera.id);
-              
-              console.log(`[CameraGrid] [STREAM] Grid camera ${camera.id}: ${dynamicStreamUrl}`);
-              return (
-                <div key={camera.id} className={visibleCameraList.length === 1 ? 'md:col-span-2' : ''}>
-                  <VideoFeed
-                    camId={camera.id}
-                    cameraName={camera.name}
-                    streamUrl={dynamicStreamUrl}
-                    rtspUrl={camera.stream_url}
-                    location={location}
-                  />
-                </div>
-              );
-            })}
-          </div>
-        )}
-        {!isLoading && visibleCameraList.length === 0 && (
-          <div className="p-8 bg-gray-50 border border-gray-200 rounded-lg text-center text-gray-600">
-            <p>No cameras available. Go to <strong>Management</strong> tab to add cameras.</p>
+        {camera && (
+          <div>
+            <VideoFeed
+              camId={1}
+              cameraName={camera.name}
+              streamUrl={getVideoFeedUrl(camera.stream_url)}
+              rtspUrl={camera.stream_url}
+              location={camera.location_name}
+            />
           </div>
         )}
       </div>

@@ -27,8 +27,6 @@ from src.routes.contact_routes import router as contact_router
 from src.routes.video_routes import router as video_router
 from src.utils.auth import get_token_user_id_from_header
 
-# Streaming controller imports
-# from src.controllers.camera_controller import ensure_mediamtx_running, start_camera_processing, analyze_camera_snapshot, YOLO_MODEL
 import cv2
 import numpy as np
 
@@ -72,20 +70,22 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         print(f'[WARN] Failed to start Redis detection consumer: {e}')
 
-    # Auto-start processing workers for all active cameras
+    # Auto-start single camera if configured
     try:
-        from src.controllers.camera_controller import publish_camera_to_mediamtx
-        active_cameras = await db.camera.find_many(where={"cam_status": True})
-        print(f"[INFO] Found {len(active_cameras)} active camera(s) to resume")
-        for cam in active_cameras:
-            # Skip deleted cameras
-            if (cam.cam_name or '').startswith('[DELETED] '):
-                continue
-            try:
-                result, code = await publish_camera_to_mediamtx(cam.id)
-                print(f"[INFO] Auto-started camera {cam.id} ({cam.cam_name}): {result.get('status', 'started') if isinstance(result, dict) else 'started'}")
-            except Exception as e:
-                print(f"[WARN] Failed to auto-start camera {cam.id}: {e}")
+        # Use raw SQL since Prisma Python client generation has issues
+        result = await db.query_raw(
+            'SELECT status FROM camera_config WHERE id = 1 LIMIT 1'
+        )
+        if result:
+            config = result[0] if isinstance(result, list) else result
+            status = config.get('status') if isinstance(config, dict) else None
+            if status == "active":
+                from src.controllers.camera_controller import start_camera_detection_logic
+                result_data, code = await start_camera_detection_logic()
+                if code == 200:
+                    print(f"[INFO] Auto-started single camera detection")
+                else:
+                    print(f"[WARN] Failed to auto-start camera: {result_data.get('message', 'Unknown error')}")
     except Exception as e:
         print(f"[WARN] Error during camera startup: {e}")
 
@@ -125,7 +125,7 @@ app.include_router(event_router, prefix='/api')
 app.include_router(settings_router, prefix='/api')
 app.include_router(location_router, prefix='/api')
 app.include_router(contact_router, prefix="/api")
-app.include_router(video_router)
+app.include_router(video_router, prefix='/api')
 
 # --- 4. DB lifecycle + Camera Startup ---
 # Startup/shutdown handled by lifespan above
@@ -138,29 +138,15 @@ app.include_router(video_router)
 async def health_check():
     return {'status': 'ok', 'database_connected': db.is_connected()}
 
-# --- 10. Admin Set Active Camera Endpoint (moved to camera_routes.py) ---
 
-# --- 11. Get Active Camera Endpoint ---
 @app.get('/api/get_active_camera')
 async def get_active_camera():
+    """Get the currently active camera (single-camera mode always returns 1)."""
     r = RedisConnectionPool.get()
     camera_id = r.get('active_camera_id')
     if camera_id:
         camera_id = camera_id.decode()
     return {'active_camera_id': camera_id}
-
-# --- Published Cameras Sync Endpoints (moved to camera_routes.py) ---
-
-@app.get('/api/get_published_cameras')
-async def get_published_cameras():
-    """Get list of published cameras from backend."""
-    try:
-        r = RedisConnectionPool.get()
-        camera_ids = r.smembers('published_cameras')
-        return {'status': 'success', 'cameras': list(camera_ids)}
-    except Exception as e:
-        return JSONResponse(status_code=500, content={'error': str(e)})
-
 
 # Streaming MJPEG endpoint removed per user request
 
@@ -183,12 +169,15 @@ else:
 
 # --- 8. Socket.IO events (moved to src/services/socket_manager.py) ---
 
-# ASGI app entrypoint
+# Create ASGI app entrypoint with Socket.IO support
 asgi_app = socketio.ASGIApp(
     socketio_server, 
     other_asgi_app=app, 
     socketio_path='/socket.io'
 )
+
+# Export the ASGI app as the default entrypoint
+app = asgi_app
 
 if __name__ == '__main__':
     import uvicorn

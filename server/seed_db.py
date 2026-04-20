@@ -116,100 +116,92 @@ async def seed_database():
                     )
         print(" ✓ Event types/classes processed.")
 
-        # ===== 5. SEED CAMERAS =====
-        # print("\nSeeding cameras...")
-        # for loc_name, loc_id in created_locs.items():
-        #     cam_name = f"{loc_name} Camera"
-        #     existing_cam = await db.camera.find_first(where={'cam_name': cam_name})
-        #     if not existing_cam:
-        #         await db.camera.create(
-        #             data={
-        #                 'cam_name': cam_name,
-        #                 'cam_status': True,
-        #                 'stream_url': f"rtsp://{loc_name.lower().replace(' ', '')}.local/stream",
-        #                 'loc_id': loc_id
-        #             }
-        #         )
+        # ===== 5. CLEAN UP OLD CAMERAS & EVENTS (For Single-Camera Migration) =====
+        print("\nCleaning up old multi-camera data...")
+        # Delete all event logs (they reference old cameras)
+        deleted_logs = await db.eventlog.delete_many()
+        print(f" ✓ Deleted {deleted_logs} old event logs.")
+        
+        # ===== 6. SEED SINGLE CAMERA CONFIG =====
+        print("\nSeeding single camera configuration...")
+        try:
+            # Get the first location for the camera
+            first_location = await db.location.find_first()
+            loc_id = first_location.id if first_location else None
+            
+            # Use raw SQL to insert camera config (bypassing schema issues)
+            if loc_id:
+                await db.execute_raw(
+                    f"INSERT INTO camera_config (id, cam_name, stream_url, loc_id, status, created_at, updated_at) "
+                    f"VALUES (1, 'Main Camera', 'rtsp://localhost:8554/stream', {loc_id}, 'active', NOW(), NOW()) "
+                    f"ON CONFLICT (id) DO UPDATE SET "
+                    f"cam_name = 'Main Camera', stream_url = 'rtsp://localhost:8554/stream', status = 'active', updated_at = NOW()"
+                )
+            else:
+                await db.execute_raw(
+                    f"INSERT INTO camera_config (id, cam_name, stream_url, status, created_at, updated_at) "
+                    f"VALUES (1, 'Main Camera', 'rtsp://localhost:8554/stream', 'active', NOW(), NOW()) "
+                    f"ON CONFLICT (id) DO UPDATE SET "
+                    f"cam_name = 'Main Camera', stream_url = 'rtsp://localhost:8554/stream', status = 'active', updated_at = NOW()"
+                )
+            print(f" ✓ Camera config created/updated")
+        except Exception as e:
+            print(f" ⚠ Warning: Could not seed camera config: {e}")
 
-        # ===== 6. SEED EVENT LOGS FOR REPORTS =====
+        # ===== 7. SEED EVENT LOGS FOR REPORTS =====
         print("\nSeeding report logs...")
-        existing_logs = await db.eventlog.count()
-        if existing_logs == 0:
-            cameras = await db.camera.find_many()
+        try:
             classes = await db.eventclass.find_many()
             users = await db.user.find_many()
 
-            cam_by_name = {camera.cam_name: camera for camera in cameras}
             class_by_name = {event_class.class_name: event_class for event_class in classes}
             user_by_username = {user.username: user for user in users}
 
             now = datetime.now(UTC)
             logs_to_seed = [
                 {
-                    'cam_name': 'Main Lobby Camera',
                     'class_name': 'Forward Fall',
                     'minutes_ago': 8,
                     'status': 'unacknowledged',
                     'ack_user': None,
-                    'snapshot': '/static/snapshots/main-lobby-fall-1.jpg'
+                    'snapshot': '/static/snapshots/fall-1.jpg'
                 },
                 {
-                    'cam_name': 'Dining Hall Camera',
-                    'class_name': 'Inactive (medium)',
+                    'class_name': 'Inactivity (Low)',
                     'minutes_ago': 25,
                     'status': 'acknowledged',
                     'ack_user': 'kathnava',
-                    'snapshot': '/static/snapshots/dining-hall-inactive-1.jpg'
+                    'snapshot': '/static/snapshots/inactive-1.jpg'
                 },
                 {
-                    'cam_name': 'Sebastian Camera',
-                    'class_name': 'Side Fall',
+                    'class_name': 'Backward Fall',
                     'minutes_ago': 42,
                     'status': 'acknowledged',
                     'ack_user': 'reginedahan',
-                    'snapshot': '/static/snapshots/sebastian-side-fall-1.jpg'
+                    'snapshot': '/static/snapshots/fall-2.jpg'
                 },
                 {
-                    'cam_name': 'Emmanuel Camera',
-                    'class_name': 'Backward Fall',
+                    'class_name': 'Inactivity (Medium)',
                     'minutes_ago': 71,
                     'status': 'unacknowledged',
                     'ack_user': None,
-                    'snapshot': '/static/snapshots/emmanuel-backward-fall-1.jpg'
+                    'snapshot': '/static/snapshots/inactive-2.jpg'
                 },
                 {
-                    'cam_name': 'Rose of Lima Camera',
-                    'class_name': 'Inactive (critical)',
+                    'class_name': 'Inactivity (High)',
                     'minutes_ago': 95,
                     'status': 'acknowledged',
                     'ack_user': 'marycam',
-                    'snapshot': '/static/snapshots/rose-of-lima-inactive-critical-1.jpg'
-                },
-                {
-                    'cam_name': 'Gabriel Camera',
-                    'class_name': 'Inactive (low)',
-                    'minutes_ago': 130,
-                    'status': 'unacknowledged',
-                    'ack_user': None,
-                    'snapshot': '/static/snapshots/gabriel-inactive-low-1.jpg'
-                },
-                {
-                    'cam_name': 'Charbel Camera',
-                    'class_name': 'Inactive (high)',
-                    'minutes_ago': 180,
-                    'status': 'acknowledged',
-                    'ack_user': 'kathnava',
-                    'snapshot': '/static/snapshots/charbel-inactive-high-1.jpg'
+                    'snapshot': '/static/snapshots/inactive-3.jpg'
                 },
             ]
 
             created_count = 0
             for item in logs_to_seed:
-                camera = cam_by_name.get(item['cam_name'])
                 event_class = class_by_name.get(item['class_name'])
                 ack_user = user_by_username.get(item['ack_user']) if item['ack_user'] else None
 
-                if not camera or not event_class:
+                if not event_class:
                     continue
 
                 await db.eventlog.create(
@@ -217,7 +209,6 @@ async def seed_database():
                         'timestamp': now - timedelta(minutes=item['minutes_ago']),
                         'event_status': item['status'],
                         'file_path': item['snapshot'],
-                        'cam_id': camera.id,
                         'event_class_id': event_class.id,
                         'ack_by_user_id': ack_user.id if ack_user else None,
                     }
@@ -225,8 +216,10 @@ async def seed_database():
                 created_count += 1
 
             print(f" ✓ Seeded {created_count} report logs.")
-        else:
-            print(f" ✓ Report logs already exist: {existing_logs}")
+        except Exception as e:
+            print(f" ⚠ Warning: Could not seed report logs: {e}")
+
+
         
         print("\n✅ Database seeding completed successfully!")
         return {"status": "success", "message": "Database seeded completely"}
