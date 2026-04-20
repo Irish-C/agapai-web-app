@@ -132,6 +132,7 @@ else:
 # ==========================================
 current_rtsp_url = None
 current_camera_id = None
+current_location_name = "Unknown"  # Default location name for alerts
 
 esp32 = None
 if SERIAL_PORT:
@@ -413,7 +414,7 @@ def generate_error_frame(error_message, frame_width=1280, frame_height=720):
     cv2.rectangle(frame, (0, 0), (frame_width-1, frame_height-1), (0, 0, 255), 5)
     
     # Title
-    cv2.putText(frame, "Connection Error", (50, 100), cv2.FONT_HERSHEY_BOLD, 1.5, (0, 0, 255), 2)
+    cv2.putText(frame, "Connection Error", (50, 100), cv2.FONT_HERSHEY_DUPLEX, 1.5, (0, 0, 255), 2)
     
     # Error message
     y = 180
@@ -758,32 +759,54 @@ def generate_frames(rtsp_url):
     global active_alerts, hardware_muted, hardware_on_until
     global stream_connected, stream_last_success_time, consecutive_failed_reads, stream_error_message
     
-    os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "rtsp_transport;tcp|timeout;2000000"
-    cap = cv2.VideoCapture(rtsp_url, cv2.CAP_FFMPEG)
-    cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)  # Minimize buffer for low latency
+    print(f"[generate_frames] Attempting to open RTSP stream: {rtsp_url[:60]}...")
     
-    if not cap.isOpened():
-        error_msg = f"[ERROR] Could not connect to stream: {rtsp_url}"
+    # Setup FFMPEG options with explicit timeout (in microseconds)
+    os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "rtsp_transport;tcp|timeout;5000000"  # 5 second timeout
+    
+    # Try to open the video source with timeout handling
+    cap = None
+    try:
+        cap = cv2.VideoCapture(rtsp_url, cv2.CAP_FFMPEG)
+        cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)  # Minimize buffer for low latency
+        
+        # Try to read one frame with a timeout to detect connection issues early
+        # Set a short timeout before first read attempt
+        cap.set(cv2.CAP_PROP_READ_TIMEOUT_MSEC, 5000)  # 5 second read timeout
+        
+        # Attempt first frame read to check connection
+        success, test_frame = cap.read()
+        if not success:
+            raise Exception("Could not read first frame from stream")
+            
+        print(f"[generate_frames] ✓ Successfully opened RTSP stream")
+        
+    except Exception as e:
+        error_msg = f"[ERROR] Failed to open RTSP stream: {str(e)}"
         print(error_msg)
+        
+        # Release resources
+        if cap:
+            cap.release()
+        
         with stream_lock:
             stream_connected = False
-            stream_error_message = "Failed to open stream"
+            stream_error_message = f"Connection failed: {str(e)[:40]}"
             consecutive_failed_reads = 0
         
-        # Extract camera details from URL for error message
+        # Extract camera IP for error message
         try:
-            # rtsp://admin:password@192.168.2.211:554/...
             url_parts = rtsp_url.split('@')
             camera_ip = url_parts[-1].split(':')[0] if '@' in rtsp_url else 'unknown'
         except:
             camera_ip = 'unknown'
         
-        # Yield error frames to prevent empty response/request cancellation
-        error_detail = f"Cannot establish RTSP connection\nCamera IP: {camera_ip}\nURL: {rtsp_url[:60]}..."
+        # Yield error frames to notify frontend
+        error_detail = f"Connection Failed\nIP: {camera_ip}\nError: {str(e)[:30]}"
         error_frame = generate_error_frame(error_detail)
         
         error_start = time.time()
-        while time.time() - error_start < 5:  # Show error for 5 seconds (reduced from 30s for faster reconnection)
+        while time.time() - error_start < 10:  # Show error for 10 seconds
             success, buffer = cv2.imencode('.jpg', error_frame, [cv2.IMWRITE_JPEG_QUALITY, 70])
             if success:
                 yield (b'--frame\r\n'
@@ -987,7 +1010,7 @@ def generate_frames(rtsp_url):
             
             # If there is a new alert and we haven't muted it, push the timer 10 seconds into the future
             if len(active_alerts) > 0 and not hardware_muted:
-                hardware_on_until = current_time + 50.0
+                hardware_on_until = current_time + 10.0
             
             # If the 10 seconds have safely passed and no alerts remain, reset the mute state
             if current_time >= hardware_on_until and len(active_alerts) == 0:
@@ -1016,19 +1039,20 @@ def index():
 
 @app.route('/api/start', methods=['POST'])
 def api_start():
-    """Initialize AI detection for a camera (called from backend when camera is added)."""
-    global current_rtsp_url, current_camera_id
+    """Initialize AI detection for the single camera."""
+    global current_rtsp_url, current_camera_id, current_location_name
     
     data = request.json
-    camera_id = data.get('camera_id')
     rtsp_url = data.get('rtsp_url')
+    location_name = data.get('location_name', 'Unknown')  # Optional location name
     
-    if not camera_id or not rtsp_url:
-        return jsonify({"status": "error", "message": "Missing camera_id or rtsp_url"}), 400
+    if not rtsp_url:
+        return jsonify({"status": "error", "message": "Missing rtsp_url"}), 400
     
-    # Store RTSP URL globally
+    # Always use camera_id = 1 for single-camera architecture
+    current_camera_id = 1
     current_rtsp_url = rtsp_url
-    current_camera_id = camera_id
+    current_location_name = location_name  # Store location for alerts
     
     # Reset detection state
     with state_lock:
@@ -1039,8 +1063,8 @@ def api_start():
         hardware_muted = False
         hardware_on_until = 0.0
     
-    print(f"[API] ✓ AI service initialized for camera {camera_id}")
-    return jsonify({"status": "success", "message": f"Detection ready for camera {camera_id}"}), 200
+    print(f"[API] ✓ AI service initialized for camera at location: {current_location_name}")
+    return jsonify({"status": "success", "message": "Detection ready"}), 200
 
 @app.route('/api/stop', methods=['POST'])
 def api_stop():
@@ -1064,24 +1088,29 @@ def api_stop():
 
 @app.route('/video_feed')
 def video_feed():
-    global current_camera_id
+    global current_camera_id, current_rtsp_url
     
     ip = request.args.get('ip')
     pw = request.args.get('pass')
     camera_id = request.args.get('camera_id')  # Get camera_id from request
     
-    if not ip or not pw:
-        # Check if backend initialized camera
-        if current_rtsp_url:
-            return Response(generate_frames(current_rtsp_url), mimetype='multipart/x-mixed-replace; boundary=frame')
-        return jsonify({"error": "No camera configured"}), 400
+    # Determine which RTSP URL to use
+    rtsp_url = None
+    if ip and pw:
+        # Frontend provided IP and password - construct RTSP URL
+        rtsp_url = f"rtsp://admin:{pw}@{ip}:554/cam/realmonitor?channel=1&subtype=0"
+        if camera_id:
+            current_camera_id = camera_id
+    elif current_rtsp_url:
+        # Use the URL that was set by backend via /api/start
+        rtsp_url = current_rtsp_url
+    else:
+        # No camera configured
+        print("[VIDEO_FEED] No camera configured (no ip/pw provided and no current_rtsp_url set)")
+        return jsonify({"error": "No camera configured. Call /api/start first."}), 400
     
-    # Set current_camera_id for alert tracking
-    if camera_id:
-        current_camera_id = camera_id
-    
-    url = f"rtsp://admin:{pw}@{ip}:554/cam/realmonitor?channel=1&subtype=0"
-    return Response(generate_frames(url), mimetype='multipart/x-mixed-replace; boundary=frame')
+    print(f"[VIDEO_FEED] Starting stream for camera_id={camera_id or 'unknown'}, URL={rtsp_url[:50]}...")
+    return Response(generate_frames(rtsp_url), mimetype='multipart/x-mixed-replace; boundary=frame')
 
 @app.route('/get_alerts')
 def get_alerts():
