@@ -188,7 +188,7 @@ export default function TodayReport({ incidents = [], alerts = [], user }) {
 
     const getIncidentTimestamp = (incident) => {
         const ts = getIncidentEpochMs(incident);
-        return ts ? new Date(ts).toLocaleTimeString() : 'Unknown';
+        return ts ? new Date(ts).toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'}) : 'Unknown';
     };
 
     const getSnapshotUrl = (incident) => {

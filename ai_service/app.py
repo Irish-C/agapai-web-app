@@ -121,11 +121,7 @@ def find_esp32_port():
     
     return None
 
-SERIAL_PORT = find_esp32_port()
-if SERIAL_PORT:
-    print(f"[HARDWARE] Auto-detected ESP32 on {SERIAL_PORT} ✓")
-else:
-    print(f"[HARDWARE] No ESP32 detected on common serial ports")
+esp32 = None
 
 # ==========================================
 # --- CAMERA RTSP STORAGE (Auto-Start) ---
@@ -134,45 +130,59 @@ current_rtsp_url = None
 current_camera_id = None
 current_location_name = "Unknown"  # Default location name for alerts
 
-esp32 = None
-if SERIAL_PORT:
-    try:
-        print(f"[HARDWARE] Connecting to ESP32 on {SERIAL_PORT}...")
-        esp32 = serial.Serial(SERIAL_PORT, BAUD_RATE, timeout=0.1)
-        time.sleep(2) 
-        print("[HARDWARE] ESP32 Connected!")
-
-        # --- INSERT LISTENER HERE ---
-        def serial_listener():
-            global esp32, hardware_muted, hardware_on_until, hardware_connected, hardware_error_message, SERIAL_PORT
-            while True:
+# --- HOT-PLUG ESP32 DETECTION THREAD ---
+def esp32_hotplug_monitor():
+    global esp32, SERIAL_PORT, hardware_connected, hardware_error_message
+    last_port = None
+    while True:
+        port = find_esp32_port()
+        if port and (SERIAL_PORT != port or not (esp32 and esp32.is_open)):
+            try:
                 if esp32 and esp32.is_open:
-                    try:
-                        if esp32.in_waiting > 0:
-                            # Listen for the message from ESP32
-                            line = esp32.readline().decode('utf-8').strip()
-                            if line == "BUTTON_PRESSED":
-                                print("[HARDWARE] Physical Button Pressed! Muting Alert.")
-                                with state_lock:
-                                    hardware_muted = True
-                                    hardware_on_until = 0.0 # Resets the 10s timer
-                    except Exception as e:
-                        # Error reading from serial - port may have disconnected
-                        print(f"[HARDWARE LISTENER] Error reading from {SERIAL_PORT}: {str(e)[:50]}")
-                        with hardware_lock:
-                            hardware_connected = False
-                            hardware_error_message = f"Listener error: {str(e)[:30]}"
-                        esp32 = None  # Signal reconnection needed
-                time.sleep(0.1) # Small sleep to prevent high CPU usage
+                    esp32.close()
+                esp32 = serial.Serial(port, BAUD_RATE, timeout=0.1)
+                SERIAL_PORT = port
+                time.sleep(2)
+                print(f"[HARDWARE] Hot-plug: Connected to ESP32 on {port}")
+                hardware_connected = True
+                hardware_error_message = "Connected"
+            except Exception as e:
+                hardware_connected = False
+                hardware_error_message = f"Hot-plug connect failed: {str(e)[:30]}"
+                esp32 = None
+        elif not port:
+            if esp32 and esp32.is_open:
+                esp32.close()
+            esp32 = None
+            SERIAL_PORT = None
+            hardware_connected = False
+            hardware_error_message = "Not initialized"
+        time.sleep(3)
 
-        # Start the thread immediately
-        threading.Thread(target=serial_listener, daemon=True).start()
-        # ----------------------------
-        
-    except Exception as e:
-        print(f"[HARDWARE ERROR] Could not connect: {e}")
-else:
-    print("[HARDWARE] Skipping ESP32 initialization - no port detected")
+# --- SERIAL LISTENER THREAD ---
+def serial_listener():
+    global esp32, hardware_muted, hardware_on_until, hardware_connected, hardware_error_message, SERIAL_PORT
+    while True:
+        if esp32 and esp32.is_open:
+            try:
+                if esp32.in_waiting > 0:
+                    line = esp32.readline().decode('utf-8').strip()
+                    if line == "BUTTON_PRESSED":
+                        print("[HARDWARE] Physical Button Pressed! Muting Alert.")
+                        with state_lock:
+                            hardware_muted = True
+                            hardware_on_until = 0.0 # Resets the 10s timer
+            except Exception as e:
+                print(f"[HARDWARE LISTENER] Error reading from {SERIAL_PORT}: {str(e)[:50]}")
+                with hardware_lock:
+                    hardware_connected = False
+                    hardware_error_message = f"Listener error: {str(e)[:30]}"
+                esp32 = None
+        time.sleep(0.1)
+
+# Start hot-plug monitor and serial listener threads
+threading.Thread(target=esp32_hotplug_monitor, daemon=True).start()
+threading.Thread(target=serial_listener, daemon=True).start()
 
 def trigger_hardware(state):
     """Sends ON/OFF signals to the ESP32 and tracks connection health."""
@@ -282,22 +292,36 @@ def publish_alert_to_backend(camera_id, alert_message, frame=None, event_type="D
                 print(f"[SNAPSHOT ERROR] Could not save snapshot: {e}")
                 snapshot_filename = ''
         
+        # DEBUG: Log the raw alert message
+        print(f"[ALERT DEBUG] Raw alert_message: '{alert_message}'")
+        print(f"[ALERT DEBUG] Location: '{location_name}'")
+        
         # Extract the actual detected class name from alert message
-        # Alert messages are like: "Floor: Backward Fall Detected!" or "Zone 1: Critical Inactivity (...)"
+        # Alert messages are like: "Floor: Backward Fall Detected!" or "Zone 1: Inactivity (High) (30:45)"
         class_name = None
         event_class_id = 1  # Default
         
         if "Floor:" in alert_message:
             # Extract fall type: "Floor: Backward Fall Detected!" → "Backward Fall"
-            parts = alert_message.split("Floor: ")[1].split(" Detected")[0]
-            class_name = parts
-            event_class_id = 2  # Falls
+            try:
+                parts = alert_message.split("Floor: ")[1].split(" Detected")[0]
+                class_name = parts
+                event_class_id = 2  # Falls
+                print(f"[ALERT DEBUG] ✓ FLOOR matched: class_name='{class_name}'")
+            except Exception as e:
+                print(f"[ALERT DEBUG] ✗ FLOOR extraction failed: {e}, msg='{alert_message}'")
         elif "Inactivity" in alert_message:
-            # Extract inactivity level: "Zone 1: Inactivity (High) (30:45)" → "Inactivity (High)"
-            if "Inactivity" in alert_message:
+            try:
                 parts = alert_message.split(": ")[1].split(" (")[0]
                 class_name = parts  # "Inactivity (High)", "Inactivity (Medium)", etc.
-            event_class_id = 3  # Inactivity
+                event_class_id = 3  # Inactivity
+                print(f"[ALERT DEBUG] ✓ INACTIVITY matched: class_name='{class_name}'")
+            except Exception as e:
+                print(f"[ALERT DEBUG] ✗ INACTIVITY extraction failed: {e}, msg='{alert_message}'")
+        else:
+            print(f"[ALERT DEBUG] ✗ NO PATTERN MATCHED: msg='{alert_message}'")
+        
+        print(f"[ALERT QUEUED] class_name='{class_name}', location='{location_name}'")
         
         # **Queue it instead of sending directly**
         payload = {
@@ -1004,9 +1028,8 @@ def generate_frames(rtsp_url):
             # Publish new alerts to backend for logging and Socket.IO
             if len(current_frame_alerts) > 0:
                 for alert in current_frame_alerts:
-                    # Get the actual camera location for snapshot filename
-                    location = get_camera_location(current_camera_id)
-                    publish_alert_to_backend(current_camera_id, alert, frame=frame, location_name=location)
+                    # Use current_location_name set by backend via /api/start (no cache staleness)
+                    publish_alert_to_backend(current_camera_id, alert, frame=frame, location_name=current_location_name)
             
             # If there is a new alert and we haven't muted it, push the timer 10 seconds into the future
             if len(active_alerts) > 0 and not hardware_muted:

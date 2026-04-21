@@ -402,7 +402,7 @@ export default function ReportsPage() {
             <tr>
                 <td colSpan="6" className="py-20 text-center text-teal-600">
                     <FaSpinner className="animate-spin inline mr-3 text-2xl" />
-                    <span className="text-lg font-medium">Syncing with Database...</span>
+                    <span className="text-lg font-medium">Loading Event Logs...</span>
                 </td>
             </tr>
         );

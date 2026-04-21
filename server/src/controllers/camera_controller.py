@@ -102,6 +102,14 @@ async def update_camera_config_logic(data):
         
         # Return updated config
         result, status = await get_camera_config_logic()
+
+        # Emit real-time update event via Socket.IO
+        try:
+            from src.services.socket_manager import socketio_server
+            await socketio_server.emit('camera_updated', result, broadcast=True)
+        except Exception as emit_err:
+            print(f"[update_camera_config] Socket.IO emit error: {emit_err}")
+
         return result, status
     except ValueError:
         return {"status": "error", "message": "Invalid location ID format"}, 400
@@ -132,17 +140,24 @@ async def start_camera_detection_logic():
         
         # Fetch location name if location is set
         location_name = "Unknown"
+        print(f"[start_camera] DEBUG: loc_id from database = {loc_id}")
         if loc_id:
             try:
                 loc_result = await db.query_raw(
                     f'SELECT loc_name FROM location WHERE id = {loc_id} LIMIT 1'
                 )
+                print(f"[start_camera] DEBUG: loc_result = {loc_result}")
                 if loc_result:
                     loc = loc_result[0] if isinstance(loc_result, list) else loc_result
                     location_name = loc.get('loc_name') if isinstance(loc, dict) else loc
+                    print(f"[start_camera] DEBUG: Extracted location_name = {location_name}")
+                else:
+                    print(f"[start_camera] DEBUG: loc_result was empty")
                 print(f"[start_camera] Location: {location_name}")
             except Exception as loc_err:
                 print(f"[start_camera] Warning: Could not fetch location: {loc_err}")
+        else:
+            print(f"[start_camera] DEBUG: loc_id is None or falsy, using default 'Unknown'")
         
         # Trigger AI service to start detection with location
         try:
@@ -157,7 +172,7 @@ async def start_camera_detection_logic():
                 timeout=10  # Increased timeout to 10 seconds for connection attempts
             )
             if response.status_code == 200:
-                print(f"[start_camera] ✓ AI service started successfully for location: {location_name}")
+                print(f"[start_camera] AI service started successfully for location: {location_name}")
                 return {"status": "success", "message": "Detection started"}, 200
             else:
                 print(f"[start_camera] ⚠ AI service returned {response.status_code}: {response.text[:100]}")

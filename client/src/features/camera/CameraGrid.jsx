@@ -1,9 +1,10 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useContext } from 'react';
 import VideoFeed from './VideoFeed.jsx';
 import TodayReport from '../dashboard/TodayReport.jsx';
 import { useCameraSocket } from '../../hooks/useCamera.js';
 import { FaSpinner, FaVideo, FaSync, FaEthernet, FaUsb } from 'react-icons/fa';
 import { fetchCameraConfig } from '../../services/apiService.js';
+import { PersistentVideoContext } from '../../components/PersistentVideoContext.jsx';
 
 // Helper: Extract IP and password from RTSP URL
 // rtsp://admin:password@192.168.2.211/cam/realmonitor?channel=1&subtype=1
@@ -32,6 +33,7 @@ function getVideoFeedUrl(streamUrl) {
 
 export default function CameraGrid() {
   const { alerts, isConnected } = useCameraSocket();
+  const { setStreamUrl } = useContext(PersistentVideoContext);
 
   const [camera, setCamera] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -94,6 +96,9 @@ export default function CameraGrid() {
 
         if (data && data.id) {
           setCamera(data);
+          // Update persistent video context so stream survives page navigation
+          const videoUrl = getVideoFeedUrl(data.stream_url);
+          setStreamUrl(videoUrl);
         } else {
           setError('Camera configuration not found.');
         }
@@ -109,7 +114,7 @@ export default function CameraGrid() {
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [setStreamUrl]);
 
   // Refresh camera function
   const refreshCamera = useCallback(async () => {
@@ -119,6 +124,9 @@ export default function CameraGrid() {
       const data = await fetchCameraConfig();
       if (data && data.id) {
         setCamera(data);
+        // Update persistent video context
+        const videoUrl = getVideoFeedUrl(data.stream_url);
+        setStreamUrl(videoUrl);
       } else {
         setError('Camera configuration not found.');
       }
@@ -127,7 +135,7 @@ export default function CameraGrid() {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [setStreamUrl]);
 
   const header = (
     <div className="flex items-center justify-between mb-4 pb-2">

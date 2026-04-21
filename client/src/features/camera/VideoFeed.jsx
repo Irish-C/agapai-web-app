@@ -1,8 +1,10 @@
-import React, { useState, useEffect, useRef, memo } from 'react';
+import React, { useState, useEffect, useRef, memo, useContext } from 'react';
 import { FaBrain } from 'react-icons/fa';
 import { fetchApi } from '../../services/apiService';
+import { PersistentVideoContext } from '../../components/PersistentVideoContext.jsx';
 
 function VideoFeed({ camId, cameraName, location, streamUrl, rtspUrl }) {
+  const { streamUrl: persistentStreamUrl } = useContext(PersistentVideoContext);
   const [currentDateTime, setCurrentDateTime] = useState(new Date());
   const [noDisplay, setNoDisplay] = useState(() => {
     try { return localStorage.getItem(`camera_${camId}_no_display`) === '1'; } catch (e) { return false; }
@@ -18,8 +20,10 @@ function VideoFeed({ camId, cameraName, location, streamUrl, rtspUrl }) {
   }, []);
 
   // Set up stream from Flask AI service
+  // Uses persistent stream URL from context so it stays alive when navigating away
   useEffect(() => {
-    if (!streamUrl) return;
+    const activeStreamUrl = persistentStreamUrl || streamUrl;
+    if (!activeStreamUrl) return;
 
     const handleError = () => {
       setStreamError(true);
@@ -27,7 +31,7 @@ function VideoFeed({ camId, cameraName, location, streamUrl, rtspUrl }) {
       const timer = setTimeout(() => {
         // Try to reconnect by triggering a reload
         if (imgRef.current && imgRef.current.src) {
-          imgRef.current.src = streamUrl + `&t=${Date.now()}`;
+          imgRef.current.src = activeStreamUrl + `&t=${Date.now()}`;
         }
       }, 5000);
       return () => clearTimeout(timer);
@@ -45,9 +49,10 @@ function VideoFeed({ camId, cameraName, location, streamUrl, rtspUrl }) {
         imgRef.current.removeEventListener('load', () => setStreamError(false));
       }
     };
-  }, [streamUrl]);
+  }, [persistentStreamUrl, streamUrl]);
 
-  const cameraStatus = streamUrl && !streamError ? 'online' : 'offline';
+  const activeStreamUrl = persistentStreamUrl || streamUrl;
+  const cameraStatus = activeStreamUrl && !streamError ? 'online' : 'offline';
 
   let content = null;
 
@@ -60,13 +65,13 @@ function VideoFeed({ camId, cameraName, location, streamUrl, rtspUrl }) {
         </div>
       </div>
     );
-  } else if (streamUrl && !streamError) {
+  } else if (activeStreamUrl && !streamError) {
     // MJPEG stream from AI service - use img tag for MJPEG support
     content = (
       <img
         ref={imgRef}
         className="w-full h-full object-contain"
-        src={streamUrl}
+        src={activeStreamUrl}
         alt={cameraName}
         onError={() => setStreamError(true)}
         onLoad={() => setStreamError(false)}
@@ -94,7 +99,7 @@ function VideoFeed({ camId, cameraName, location, streamUrl, rtspUrl }) {
         </div>
       </div>
 
-      <div className="w-full bg-gray-900 flex items-center justify-center relative overflow-hidden aspect-video">
+      <div className="w-full bg-gray-900 flex items-center justify-center relative overflow-hidden aspect-video min-h-96">
         {(!noDisplay && cameraStatus !== 'online') && (
           <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-black/70 text-white">
             <div className="text-lg font-semibold mb-2">{cameraStatus === 'online' ? 'Online' : 'Offline'}</div>

@@ -322,6 +322,38 @@ socket.on('connect_timeout', (timeout) => {
 });
 
 // ============================================
+// REAL-TIME EVENT LISTENERS REGISTRATION
+// ============================================
+const cameraUpdatedListeners = [];
+const locationUpdatedListeners = [];
+
+export function onCameraUpdated(cb) {
+  cameraUpdatedListeners.push(cb);
+}
+export function offCameraUpdated(cb) {
+  const idx = cameraUpdatedListeners.indexOf(cb);
+  if (idx !== -1) cameraUpdatedListeners.splice(idx, 1);
+}
+export function onLocationUpdated(cb) {
+  locationUpdatedListeners.push(cb);
+}
+export function offLocationUpdated(cb) {
+  const idx = locationUpdatedListeners.indexOf(cb);
+  if (idx !== -1) locationUpdatedListeners.splice(idx, 1);
+}
+
+socket.on('camera_updated', (data) => {
+  cameraUpdatedListeners.forEach(cb => {
+    try { cb(data); } catch (e) { console.error('[SocketIO] camera_updated cb error', e); }
+  });
+});
+socket.on('location_updated', (data) => {
+  locationUpdatedListeners.forEach(cb => {
+    try { cb(data); } catch (e) { console.error('[SocketIO] location_updated cb error', e); }
+  });
+});
+
+// ============================================
 // INITIALIZATION
 // ============================================
 enableNetworkAwareReconnection();

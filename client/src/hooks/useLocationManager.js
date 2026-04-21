@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { onLocationUpdated, offLocationUpdated } from '../services/socket';
 import { fetchApi } from '../services/apiService';
 
 export function useLocationManager() {
@@ -24,6 +25,16 @@ export function useLocationManager() {
       setMessage({ text: `Failed to load locations: ${err.message}`, type: 'error' });
     }
   };
+
+  // Real-time update: listen for location_updated events
+  useEffect(() => {
+    function handleLocationUpdated(data) {
+      // data.locations is the updated locations array
+      if (data && Array.isArray(data.locations)) setLocations(data.locations);
+    }
+    onLocationUpdated(handleLocationUpdated);
+    return () => offLocationUpdated(handleLocationUpdated);
+  }, []);
 
   const addLocation = async (name) => {
     setMessage({ text: '', type: '' });

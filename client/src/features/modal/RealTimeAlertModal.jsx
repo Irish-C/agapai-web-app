@@ -9,8 +9,7 @@ export default function RealTimeAlertModal({ incident, onDismiss }) {
 
     const formattedTime = new Date(incident.timestamp * 1000).toLocaleTimeString('en-US', {
         hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit'
+        minute: '2-digit'
     });
     
     // Handle dismiss button click

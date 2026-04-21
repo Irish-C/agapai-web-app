@@ -43,6 +43,7 @@ async def create_event_logic(data):
         
         # Check for recent matching incident (within 60 seconds)
         time_window = datetime.now(timezone.utc) - timedelta(seconds=60)
+        gap_threshold_seconds = 30  # Gap threshold: if >= 30s since last event, treat as NEW
         
         print(f"  [DEDUP] Checking for recent events:")
         print(f"    - Event Class ID: {event_class_id}")
@@ -60,7 +61,21 @@ async def create_event_logic(data):
         # Get the camera's current location_id (immutable for this event)
         camera_config = await db.cameraconfig.find_unique(where={'id': 1})
         location_id = camera_config.loc_id if camera_config else None
-        location_display = await _get_location_label()
+        # Use location_name from AI service (always trust it - it's sent with snapshot)
+        # To ensure snapshot filename and alert location are always in sync
+        location_for_alert = location_name if location_name else "Unknown"
+        
+        # NEW: Smart gap detection - check if there's a significant gap since last event
+        if recent_event:
+            time_since_last = datetime.now(timezone.utc) - recent_event.timestamp
+            print(f"  [DEDUP] Found recent event (ID={recent_event.id}), time since last: {time_since_last.total_seconds():.1f}s")
+            
+            if time_since_last.total_seconds() >= gap_threshold_seconds:
+                # Gap detected - reset and create NEW event instead of accumulating
+                print(f"  [DEDUP] Gap detected ({time_since_last.total_seconds():.1f}s >= {gap_threshold_seconds}s) - treating as NEW event")
+                recent_event = None  # Reset to trigger new event creation
+            else:
+                print(f"  [DEDUP] Within gap window ({time_since_last.total_seconds():.1f}s < {gap_threshold_seconds}s) - accumulating to existing event")
         
         if recent_event:
             # Accumulate snapshot to existing event
@@ -92,7 +107,7 @@ async def create_event_logic(data):
             payload = {
                 'id': str(updated_event.id),
                 'type': updated_event.event_class.class_name if updated_event.event_class else "Unknown",
-                'location': location_display,
+                'location': location_for_alert,
                 'timestamp': updated_event.timestamp.isoformat(),
                 'snapshot_url': display_snapshot_url,
                 'all_snapshots': snapshot_urls,
@@ -135,7 +150,7 @@ async def create_event_logic(data):
             payload = {
                 'id': str(new_event.id),
                 'type': new_event.event_class.class_name if new_event.event_class else "Unknown",
-                'location': location_display,
+                'location': location_for_alert,
                 'timestamp': new_event.timestamp.isoformat(),
                 'snapshot_url': snapshot_urls[0] if snapshot_urls else None,
                 'all_snapshots': snapshot_urls,

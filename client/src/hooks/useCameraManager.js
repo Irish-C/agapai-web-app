@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { onCameraUpdated, offCameraUpdated } from '../services/socket';
 import { fetchApi } from '../services/apiService';
 
 export function useCameraManager(onCameraUpdated) {
@@ -37,6 +38,16 @@ export function useCameraManager(onCameraUpdated) {
       setMessage({ text: `Failed to load cameras: ${err.message}`, type: 'error' });
     }
   };
+
+  // Real-time update: listen for camera_updated events
+  useEffect(() => {
+    function handleCameraUpdated(data) {
+      // data is the updated camera config (single camera)
+      setCameras([data]);
+    }
+    onCameraUpdated(handleCameraUpdated);
+    return () => offCameraUpdated(handleCameraUpdated);
+  }, []);
 
   const addCamera = async (cameraData) => {
     setMessage({ text: '', type: '' });

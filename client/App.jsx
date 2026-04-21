@@ -53,12 +53,13 @@ export default function App() {
             setAlertIncident(incident);
         };
 
-        // Only show modal for NEW alerts, not accumulated ones (same class within 60s)
-        // alert_accumulated events are handled silently by TodayReport via useCamera hook
+        // Show modal for both NEW alerts and ACCUMULATED alerts (smart gap detection resets on 30s+ gap)
         socket.on('new_alert', handleAlert);
+        socket.on('alert_accumulated', handleAlert);
 
         return () => {
             socket.off('new_alert', handleAlert);
+            socket.off('alert_accumulated', handleAlert);
         };
     }, []);
 
