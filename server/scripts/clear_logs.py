@@ -24,8 +24,8 @@ async def clear_event_logs():
         deleted_files = 0
         
         for event in all_events:
-            for snapshot in event.get("snapshots", []):
-                snapshot_path = os.path.join(snapshots_dir, snapshot["filename"])
+            for snapshot in getattr(event, "snapshots", []):
+                snapshot_path = os.path.join(snapshots_dir, snapshot.filename)
                 try:
                     if os.path.exists(snapshot_path):
                         os.remove(snapshot_path)
