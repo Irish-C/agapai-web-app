@@ -5,6 +5,7 @@ import time
 import threading
 import serial
 import requests
+import subprocess
 from datetime import datetime, timezone
 from flask import Flask, Response, request, render_template_string, jsonify, send_from_directory
 from ultralytics import YOLO
@@ -147,6 +148,16 @@ def esp32_hotplug_monitor():
                 print(f"[HARDWARE] Hot-plug: Connected to ESP32 on {port}")
                 hardware_connected = True
                 hardware_error_message = "Connected"
+
+                # # Execute PowerShell script
+                # try:
+                #     subprocess.run([
+                #         "powershell", "-ExecutionPolicy", "Bypass", "-File", "C:\\startup-usb-monitor.ps1"
+                #     ], check=True)
+                #     print("[SCRIPT] PowerShell script executed successfully.")
+                # except subprocess.CalledProcessError as e:
+                #     print(f"[SCRIPT ERROR] Failed to execute PowerShell script: {e}")
+
             except Exception as e:
                 hardware_connected = False
                 hardware_error_message = f"Hot-plug connect failed: {str(e)[:30]}"
@@ -515,19 +526,64 @@ HTML_PAGE = """
                         <button onclick="clearROIs()" class="flex-1 bg-red-600 hover:bg-red-500 py-2 rounded text-xs font-bold transition-all shadow active:scale-95">CLEAR ALL (X)</button>
                     </div>
 
-                    <label class="block text-xs font-bold text-slate-500 mb-2 uppercase">Inactivity Thresholds (seconds)</label>
+                    <label class="block text-xs font-bold text-slate-500 mb-2 uppercase">Inactivity Thresholds (minutes)</label>
                     <div class="space-y-2 mb-3">
                         <div>
                             <label class="text-[10px] text-slate-400">Low (min):</label>
-                            <input id="lowSec" type="number" value="1800" class="w-full bg-slate-800 p-2 rounded text-sm border border-slate-600 focus:border-blue-500 outline-none transition-colors">
+                            <select id="lowMin" class="w-full bg-slate-800 p-2 rounded text-sm border border-slate-600 focus:border-blue-500 outline-none transition-colors">
+                                <option value="0">Off</option>
+                                <option value="30" selected>30 minutes</option>
+                                <option value="60">1 hour</option>
+                                <option value="120">2 hours</option>
+                                <option value="180">3 hours</option>
+                                <option value="240">4 hours</option>
+                                <option value="300">5 hours</option>
+                                <option value="360">6 hours</option>
+                                <option value="420">7 hours</option>
+                                <option value="480">8 hours</option>
+                                <option value="540">9 hours</option>
+                                <option value="600">10 hours</option>
+                                <option value="660">11 hours</option>
+                                <option value="720">12 hours</option>
+                            </select>
                         </div>
                         <div>
                             <label class="text-[10px] text-slate-400">Medium (min):</label>
-                            <input id="medSec" type="number" value="3600" class="w-full bg-slate-800 p-2 rounded text-sm border border-slate-600 focus:border-blue-500 outline-none transition-colors">
+                            <select id="medMin" class="w-full bg-slate-800 p-2 rounded text-sm border border-slate-600 focus:border-blue-500 outline-none transition-colors">
+                                <option value="0">Off</option>
+                                <option value="30">30 minutes</option>
+                                <option value="60" selected>1 hour</option>
+                                <option value="120">2 hours</option>
+                                <option value="180">3 hours</option>
+                                <option value="240">4 hours</option>
+                                <option value="300">5 hours</option>
+                                <option value="360">6 hours</option>
+                                <option value="420">7 hours</option>
+                                <option value="480">8 hours</option>
+                                <option value="540">9 hours</option>
+                                <option value="600">10 hours</option>
+                                <option value="660">11 hours</option>
+                                <option value="720">12 hours</option>
+                            </select>
                         </div>
                         <div>
                             <label class="text-[10px] text-slate-400">High (min):</label>
-                            <input id="highSec" type="number" value="7200" class="w-full bg-slate-800 p-2 rounded text-sm border border-slate-600 focus:border-blue-500 outline-none transition-colors">
+                            <select id="highMin" class="w-full bg-slate-800 p-2 rounded text-sm border border-slate-600 focus:border-blue-500 outline-none transition-colors">
+                                <option value="0">Off</option>
+                                <option value="30">30 minutes</option>
+                                <option value="60">1 hour</option>
+                                <option value="120" selected>2 hours</option>
+                                <option value="180">3 hours</option>
+                                <option value="240">4 hours</option>
+                                <option value="300">5 hours</option>
+                                <option value="360">6 hours</option>
+                                <option value="420">7 hours</option>
+                                <option value="480">8 hours</option>
+                                <option value="540">9 hours</option>
+                                <option value="600">10 hours</option>
+                                <option value="660">11 hours</option>
+                                <option value="720">12 hours</option>
+                            </select>
                         </div>
                         <button onclick="updateInactivityThresholds()" class="w-full bg-green-600 hover:bg-green-500 py-2 rounded text-xs font-bold transition-all shadow active:scale-95">
                             UPDATE THRESHOLDS
@@ -728,40 +784,38 @@ HTML_PAGE = """
 
         // --- INACTIVITY THRESHOLDS UPDATE ---
         async function updateInactivityThresholds() {
-            const lowSec = parseInt(document.getElementById('lowSec').value);
-            const medSec = parseInt(document.getElementById('medSec').value);
-            const highSec = parseInt(document.getElementById('highSec').value);
-            
-            if (lowSec < 10 || medSec < 10 || highSec < 10) {
-                alert('All values must be at least 10 seconds');
-                return;
-            }
-            
-            if (lowSec >= medSec || medSec >= highSec) {
-                alert('Requirement: Low < Medium < High');
-                return;
-            }
-            
-            try {
-                const response = await fetch('/api/inactivity-config', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        low_sec: lowSec,
-                        med_sec: medSec,
-                        high_sec: highSec
-                    })
-                });
-                
-                const data = await response.json();
-                if (data.status === 'success') {
+            const lowMin = document.getElementById('lowMin').value;
+            const medMin = document.getElementById('medMin').value;
+            const highMin = document.getElementById('highMin').value;
+
+            // Convert minutes to seconds
+            const lowSec = parseInt(lowMin) * 60;
+            const medSec = parseInt(medMin) * 60;
+            const highSec = parseInt(highMin) * 60;
+
+            // Send the converted values to the backend
+            fetch('/api/inactivity-config', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    low_sec: lowSec,
+                    med_sec: medSec,
+                    high_sec: highSec,
+                }),
+            })
+            .then(response => {
+                if (response.ok) {
                     alert(`✓ Thresholds Updated!\nLow: ${lowSec}s, Med: ${medSec}s, High: ${highSec}s`);
                 } else {
-                    alert('Update failed: ' + data.message);
+                    alert('Failed to update thresholds. Please try again.');
                 }
-            } catch (err) {
-                alert('Error: ' + err.message);
-            }
+            })
+            .catch(error => {
+                console.error('Error updating thresholds:', error);
+                alert('An error occurred while updating thresholds.');
+            });
         }
 
         // --- KEYBOARD SHORTCUTS ---
@@ -1158,7 +1212,7 @@ def stream_health():
 def hardware_health():
     """Return current hardware (ESP32) health status"""
     with hardware_lock:
-        time_since_last_send = time.time() - hardware_last_successful_send if hardware_last_successful_send else 0
+        time_since_last_send = time.time() - hardware_last_successful_send if hardware_last_successful_send > 0 else 0
         return jsonify({
             "connected": hardware_connected,
             "error_message": hardware_error_message,

@@ -1,8 +1,14 @@
-import asyncio
 import os
-from datetime import UTC, datetime, timedelta
-from database import db
+import sys
 from pathlib import Path
+
+# Add the server directory to the Python path
+server_root = Path(__file__).resolve().parent.parent
+if str(server_root) not in sys.path:
+    sys.path.insert(0, str(server_root))
+
+from database import db
+from datetime import UTC, datetime, timedelta
 from dotenv import load_dotenv
 from werkzeug.security import generate_password_hash
 
