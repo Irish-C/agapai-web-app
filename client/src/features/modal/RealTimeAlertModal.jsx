@@ -1,10 +1,13 @@
 // src/components/RealTimeAlertModal.jsx
-import React from 'react';
+import React, { useState } from 'react';
 
 /**
  * A full-screen, persistent modal to display an urgent fall alert.
  */
 export default function RealTimeAlertModal({ incident, onDismiss }) {
+    const [imageLoaded, setImageLoaded] = useState(false);
+    const [imageError, setImageError] = useState(false);
+
     if (!incident) return null;
 
     const formattedTime = new Date(incident.timestamp * 1000).toLocaleTimeString('en-US', {
@@ -12,9 +15,43 @@ export default function RealTimeAlertModal({ incident, onDismiss }) {
         minute: '2-digit'
     });
     
+    // Get the snapshot URL using the same base as the API
+    // This ensures it works in both dev (with full URL) and prod (relative path)
+    const getSnapshotUrl = (filename) => {
+        if (!filename) return null;
+        if (filename.startsWith('http')) return filename;
+        
+        // Get the API base URL
+        const apiBase = import.meta.env.VITE_API_URL || '/api';
+        const apiBaseWithoutEndpoint = apiBase.replace(/\/api\/?$/, '');
+        
+        // If we have an explicit backend URL, use it for snapshots
+        if (apiBaseWithoutEndpoint && apiBaseWithoutEndpoint !== '/api') {
+            return `${apiBaseWithoutEndpoint}/static/snapshots/${filename}`;
+        }
+        
+        // Otherwise, use relative path (works when served from same domain)
+        return `/static/snapshots/${filename}`;
+    };
+    
+    const imageUrl = getSnapshotUrl(incident.snapshot_url);
+
+    console.log('[RealTimeAlertModal] incident.snapshot_url:', incident.snapshot_url);
+    console.log('[RealTimeAlertModal] imageUrl:', imageUrl);
+    
     // Handle dismiss button click
     const handleDismissClick = () => {
         onDismiss();
+    };
+
+    const handleImageLoad = () => {
+        console.log('[RealTimeAlertModal] Image loaded successfully');
+        setImageLoaded(true);
+    };
+
+    const handleImageError = (e) => {
+        console.error('[RealTimeAlertModal] Image failed to load:', imageUrl);
+        setImageError(true);
     };
 
     return (
@@ -32,16 +69,27 @@ export default function RealTimeAlertModal({ incident, onDismiss }) {
                 </div>
 
                 {/* Snapshot Preview - responsive height */}
-                {incident.snapshot_url && (
+                {!imageError && incident.snapshot_url && (
                     <div className="mt-6 rounded-lg overflow-hidden bg-gray-200 border-2 border-gray-300">
                         <img 
-                            src={incident.snapshot_url} 
+                            src={imageUrl} 
                             alt="Alert snapshot" 
                             className="w-full max-h-64 sm:max-h-80 object-cover"
-                            onError={(e) => {
-                                e.target.style.display = 'none';
-                            }}
+                            onLoad={handleImageLoad}
+                            onError={handleImageError}
                         />
+                    </div>
+                )}
+
+                {imageError && (
+                    <div className="mt-6 rounded-lg overflow-hidden bg-red-100 border-2 border-red-300 p-4">
+                        <p className="text-red-700 text-sm">⚠️ Snapshot unavailable: {imageUrl}</p>
+                    </div>
+                )}
+
+                {!incident.snapshot_url && (
+                    <div className="mt-6 rounded-lg overflow-hidden bg-yellow-100 border-2 border-yellow-300 p-4">
+                        <p className="text-yellow-700 text-sm">⚠️ No snapshot captured for this alert</p>
                     </div>
                 )}
 

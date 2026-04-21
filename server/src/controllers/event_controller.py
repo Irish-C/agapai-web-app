@@ -61,9 +61,8 @@ async def create_event_logic(data):
         # Get the camera's current location_id (immutable for this event)
         camera_config = await db.cameraconfig.find_unique(where={'id': 1})
         location_id = camera_config.loc_id if camera_config else None
-        # Use location_name from AI service (always trust it - it's sent with snapshot)
-        # To ensure snapshot filename and alert location are always in sync
-        location_for_alert = location_name if location_name else "Unknown"
+        # Always use latest camera location from DB for alerts
+        location_for_alert = await _get_location_label()
         
         # NEW: Smart gap detection - check if there's a significant gap since last event
         if recent_event:
@@ -101,7 +100,7 @@ async def create_event_logic(data):
                 }
             )
             
-            snapshot_urls = [f"http://localhost:3000/api/snapshots/{s.filename}" for s in updated_event.snapshots]
+            snapshot_urls = [s.filename for s in updated_event.snapshots]
             display_snapshot_url = snapshot_urls[0] if snapshot_urls else None
             
             payload = {
@@ -144,7 +143,7 @@ async def create_event_logic(data):
                         'timestamp': datetime.now(timezone.utc)
                     }
                 )
-                snapshot_urls = [f"http://localhost:3000/api/snapshots/{snapshot_filename}"]
+                snapshot_urls = [snapshot_filename]
                 print(f"  [SNAPSHOT] Created snapshot record: {snapshot_filename}")
             
             payload = {
@@ -319,7 +318,7 @@ async def get_viewed_event_logs_logic(filters=None):
         
         formatted_data = []
         for log in sorted_logs:
-            snapshot_urls = [f"http://localhost:3000/api/snapshots/{s.filename}" for s in log.snapshots]
+            snapshot_urls = [s.filename for s in log.snapshots]
             
             formatted_data.append({
                 "id": str(log.id),
@@ -455,7 +454,7 @@ async def export_logs_by_date_logic(date_str: str):
         # Format the data
         formatted_data = []
         for log in logs:
-            snapshot_urls = [f"http://localhost:3000/api/snapshots/{s.filename}" for s in log.snapshots]
+            snapshot_urls = [s.filename for s in log.snapshots]
             
             formatted_data.append({
                 "id": str(log.id),

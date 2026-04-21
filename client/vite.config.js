@@ -31,11 +31,12 @@ export default defineConfig({
     // Note: This proxy only matters for 'npm run dev' on your laptop. 
     // Your Nginx config handles the proxying in the Docker image.
     proxy: {
-      // Snapshots from AI Service (port 3000) - MUST BE BEFORE /api rule
-      '/api/snapshots': {
-        target: 'http://127.0.0.1:3000',
+      // Snapshots from backend (port 5000) - MUST BE BEFORE /api rule
+      '/static/snapshots': {
+        target: 'http://127.0.0.1:5000',
         changeOrigin: true,
-        secure: false
+        secure: false,
+        rewrite: (path) => path  // Keep full path (/static/snapshots/...)
       },
       // MJPEG streams from AI Service (port 3000)
       '/mjpeg': {

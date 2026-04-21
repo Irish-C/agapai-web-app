@@ -30,7 +30,7 @@ except Exception as e:
 app = Flask(__name__)
 
 # Setup snapshots directory
-SNAPSHOTS_DIR = os.path.join(os.path.dirname(__file__), 'snapshots')
+SNAPSHOTS_DIR = os.path.join(os.path.dirname(__file__), '..', 'server', 'static', 'snapshots')
 os.makedirs(SNAPSHOTS_DIR, exist_ok=True)
 
 # Serve snapshots as static files
@@ -122,6 +122,7 @@ def find_esp32_port():
     return None
 
 esp32 = None
+SERIAL_PORT = None
 
 # ==========================================
 # --- CAMERA RTSP STORAGE (Auto-Start) ---

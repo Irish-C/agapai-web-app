@@ -759,7 +759,7 @@ export default function ReportsPage() {
                                     <h3 className="text-sm font-bold text-gray-600 uppercase tracking-widest mb-4">Snapshots ({detailsModal.event.all_snapshots.length})</h3>
                                     <div className="grid grid-cols-2 gap-4">
                                         {detailsModal.event.all_snapshots.map((snapshot, idx) => (
-                                            <img key={idx} src={snapshot} alt={`Snapshot ${idx + 1}`} className="w-full h-56 object-cover rounded-lg border border-gray-200 hover:border-teal-500 transition-all cursor-pointer" />
+                                            <img key={idx} src={snapshot.startsWith('http') ? snapshot : `/api/snapshots/${snapshot}`} alt={`Snapshot ${idx + 1}`} className="w-full h-56 object-cover rounded-lg border border-gray-200 hover:border-teal-500 transition-all cursor-pointer" />
                                         ))}
                                     </div>
                                 </div>

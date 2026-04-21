@@ -132,6 +132,12 @@ app.include_router(video_router, prefix='/api')
 
 # --- 5. Utility routes ---
 
+# Snapshot serving endpoint
+SNAPSHOTS_DIR = os.path.join(os.path.dirname(__file__), 'static', 'snapshots')
+os.makedirs(SNAPSHOTS_DIR, exist_ok=True)
+
+# Mount snapshots BEFORE SPA to take priority
+app.mount('/static/snapshots', StaticFiles(directory=SNAPSHOTS_DIR), name='snapshots')
 
 # --- 6. Health / readiness endpoints ---
 @app.get('/health')
@@ -150,12 +156,7 @@ async def get_active_camera():
 
 # Streaming MJPEG endpoint removed per user request
 
-# --- 7. Snapshot static folder (used for alert snapshots) ---
-SNAPSHOTS_DIR = os.path.join(os.path.dirname(__file__), 'static', 'snapshots')
-os.makedirs(SNAPSHOTS_DIR, exist_ok=True)
-app.mount('/snapshots', StaticFiles(directory=SNAPSHOTS_DIR), name='snapshots')
-
-# --- 8. Static + SPA fallback ---
+# --- 7. Static + SPA fallback ---
 _DIST_DIR = os.path.join(os.path.dirname(__file__), '../client/dist')
 if os.path.isdir(_DIST_DIR):
     app.mount('/', StaticFiles(directory=_DIST_DIR, html=True), name='static')

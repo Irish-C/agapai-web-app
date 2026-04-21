@@ -2,6 +2,23 @@ import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { FaTimes, FaChevronLeft, FaChevronRight } from 'react-icons/fa';
 
+const getSnapshotUrl = (filename) => {
+  if (!filename) return null;
+  if (filename.startsWith('http')) return filename;
+  
+  // Get the API base URL
+  const apiBase = import.meta.env.VITE_API_URL || '/api';
+  const apiBaseWithoutEndpoint = apiBase.replace(/\/api\/?$/, '');
+  
+  // If we have an explicit backend URL, use it for snapshots
+  if (apiBaseWithoutEndpoint && apiBaseWithoutEndpoint !== '/api') {
+    return `${apiBaseWithoutEndpoint}/static/snapshots/${filename}`;
+  }
+  
+  // Otherwise, use relative path (works when served from same domain)
+  return `/static/snapshots/${filename}`;
+};
+
 export default function SnapshotGallery({ isOpen, onClose, snapshots = [], title = "Incident Snapshots" }) {
   const [currentIndex, setCurrentIndex] = useState(0);
 
@@ -61,7 +78,7 @@ export default function SnapshotGallery({ isOpen, onClose, snapshots = [], title
         <div className="bg-slate-950 flex items-center justify-center relative flex-1 min-h-0">
           {currentSnapshot ? (
             <img
-              src={currentSnapshot.startsWith('http') ? currentSnapshot : currentSnapshot}
+              src={getSnapshotUrl(currentSnapshot)}
               alt={`Snapshot ${currentIndex + 1}`}
               className="max-h-full max-w-full object-contain"
               onError={(e) => {
@@ -109,7 +126,7 @@ export default function SnapshotGallery({ isOpen, onClose, snapshots = [], title
                 }`}
               >
                 <img
-                  src={snapshot.startsWith('http') ? snapshot : snapshot}
+                  src={snapshot.startsWith('http') ? snapshot : `/api/snapshots/${snapshot}`}
                   alt={`Thumbnail ${index + 1}`}
                   className="w-full h-full object-cover"
                   onError={(e) => {

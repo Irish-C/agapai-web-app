@@ -4,7 +4,7 @@ from src.utils.input_sanitization import get_sanitized_json
 from src.utils.serialization import safe_json_response
 
 from src.utils.auth import get_current_user_id, require_admin_user_id
-from seed_db import seed_database
+from scripts.seed_db import seed_database
 from src.controllers.camera_controller import (
     get_camera_config_logic,
     start_camera_detection_logic,

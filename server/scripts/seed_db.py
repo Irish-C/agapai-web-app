@@ -164,35 +164,35 @@ async def seed_database():
                     'minutes_ago': 8,
                     'status': 'unacknowledged',
                     'ack_user': None,
-                    'snapshot': '/static/snapshots/fall-1.jpg'
+                    'snapshot': 'fall-1.jpg'
                 },
                 {
                     'class_name': 'Inactivity (Low)',
                     'minutes_ago': 25,
                     'status': 'acknowledged',
                     'ack_user': 'kathnava',
-                    'snapshot': '/static/snapshots/inactive-1.jpg'
+                    'snapshot': 'inactive-1.jpg'
                 },
                 {
                     'class_name': 'Backward Fall',
                     'minutes_ago': 42,
                     'status': 'acknowledged',
                     'ack_user': 'reginedahan',
-                    'snapshot': '/static/snapshots/fall-2.jpg'
+                    'snapshot': 'fall-2.jpg'
                 },
                 {
                     'class_name': 'Inactivity (Medium)',
                     'minutes_ago': 71,
                     'status': 'unacknowledged',
                     'ack_user': None,
-                    'snapshot': '/static/snapshots/inactive-2.jpg'
+                    'snapshot': 'inactive-2.jpg'
                 },
                 {
                     'class_name': 'Inactivity (High)',
                     'minutes_ago': 95,
                     'status': 'acknowledged',
                     'ack_user': 'marycam',
-                    'snapshot': '/static/snapshots/inactive-3.jpg'
+                    'snapshot': 'inactive-3.jpg'
                 },
             ]
 
