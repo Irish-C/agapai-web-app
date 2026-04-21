@@ -1,0 +1,79 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  db:
+    image: postgres:15-alpine
+    container_name: agapai-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: agapai143
+      POSTGRES_DB: agapai_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  # Redis Cache / PubSub
+  redis:
+    image: redis:7-alpine
+    container_name: agapai-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+
+  # FastAPI Backend
+  server:
+    build: 
+      context: ./server
+    container_name: agapai-server
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    environment:
+      # Maps to the 'db' service above
+      - DATABASE_URL=postgresql://postgres:agapai143@db:5432/agapai_db
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      - db
+      - redis
+
+  # AI Service (OpenVINO)
+  ai_service:
+    build:
+      context: ./ai_service
+    container_name: agapai-ai
+    restart: unless-stopped
+    # Use host networking so it can easily pull LAN IP camera streams
+    network_mode: "host" 
+    # Grant access to hot-plugged devices (like serial USBs)
+    privileged: true
+    environment:
+      # Because network_mode is host, it talks to the server via localhost
+      - SERVER_URL=http://localhost:5000 
+    depends_on:
+      - server
+    devices:
+      - "/dev/ttyUSB0:/dev/ttyUSB0"
+      - "/dev/dri:/dev/dri"
+    volumes:
+      # Maps the device directory so USB changes are instantly seen
+      - /dev:/dev
+    group_add:
+      # Allows OpenVINO to use the Intel iGPU
+      - render
+
+  # React Vite Frontend
+  client:
+    build:
+      context: ./client
+    container_name: agapai-client
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      - server
+
+volumes:
+  postgres_data:
