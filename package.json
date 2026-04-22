@@ -6,7 +6,7 @@
   "scripts": {
     "client": "cd client && vite --host",
     "server": "cd server && DEVICE=GPU OPENVINO_DEVICE=HETERO:GPU,CPU ./venv/bin/python -m uvicorn app:asgi_app --reload --port 5000",
-    "dev": "concurrently \"npm run dev-client\" \"npm run dev-server\"",
+    "dev": "concurrently \"npm run client\" \"npm run server\"",
     "ai": "cd ai_service && ./venv/bin/python app.py",
     "db:setup": "cd server && ./venv/bin/prisma py migrate deploy && ./venv/bin/prisma py generate",
     "db:migrate": "cd server && ./venv/bin/prisma py migrate deploy",

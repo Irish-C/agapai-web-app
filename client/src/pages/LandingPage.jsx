@@ -118,7 +118,7 @@ export default function LandingPage() {
                     </span>
                 </div>
                 
-                <div className="hidden md:flex items-center gap-8 text-sm font-medium text-slate-400">
+                {/* <div className="hidden md:flex items-center gap-8 text-sm font-medium text-slate-400">
                     <button onClick={() => setShowFeatures(true)} className="hover:text-teal-300 transition-colors">Features</button>
                     <button onClick={() => setShowAbout(true)} className="hover:text-violet-400 transition-colors">About</button>
                     <button 
@@ -127,7 +127,7 @@ export default function LandingPage() {
                     >
                         Contact Support
                     </button>
-                </div>
+                </div> */}
             </nav>
 
             {/* --- HERO SECTION --- */}

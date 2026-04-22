@@ -14,7 +14,7 @@ def _normalize_for_json(value):
         return str(value) if abs(value) > JS_MAX_SAFE_INTEGER else value
 
     if isinstance(value, (datetime, date)):
-        return value.isoformat()
+        return value.strftime('%Y-%m-%d %H:%M:%S')
 
     if isinstance(value, dict):
         return {k: _normalize_for_json(v) for k, v in value.items()}

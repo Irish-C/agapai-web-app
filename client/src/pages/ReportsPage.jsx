@@ -200,7 +200,7 @@ export default function ReportsPage() {
         };
 
         const rows = filteredLogs.map((log) => {
-            const timestamp = log.timestamp ? new Date(log.timestamp).toISOString() : '';
+            const timestamp = log.timestamp ? log.timestamp.replace('T', ' ') : '';
             const classification = log.event_class_name || log.type || '';
             const location = log.location || '';
             const status = log.status || '';
@@ -218,7 +218,8 @@ export default function ReportsPage() {
         const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
-        const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
+        const now = new Date();
+        const timestamp = `${now.getFullYear()}-${(now.getMonth()+1).toString().padStart(2, '0')}-${now.getDate().toString().padStart(2, '0')}T${now.getHours().toString().padStart(2, '0')}-${now.getMinutes().toString().padStart(2, '0')}-${now.getSeconds().toString().padStart(2, '0')}`;
 
         link.href = url;
         link.download = `event_report_${timestamp}.csv`;
@@ -434,9 +435,9 @@ export default function ReportsPage() {
                 return (
             <tr key={log.id} className="hover:bg-gray-50 transition-all duration-300 group">
                 <td className="px-8 py-6 whitespace-nowrap text-sm text-gray-700 font-semibold font-sans">
-                    {new Date(log.timestamp).toLocaleDateString()} 
+                    {log.timestamp ? log.timestamp.split('T')[0] : '---'}
                     <span className="text-gray-500 ml-2 font-normal font-sans">
-                        {new Date(log.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                        {log.timestamp ? log.timestamp.split('T')[1]?.substring(0, 5) : '---'}
                     </span>
                 </td>
                 <td className="px-8 py-6 whitespace-nowrap text-sm font-bold text-teal-700 font-sans">
@@ -737,7 +738,7 @@ export default function ReportsPage() {
                                 </div>
                                 <div className="col-span-2">
                                     <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">Timestamp</span>
-                                    <p className="text-lg font-bold text-gray-800 mt-1">{new Date(detailsModal.event.timestamp).toLocaleString()}</p>
+                                    <p className="text-lg font-bold text-gray-800 mt-1">{detailsModal.event.timestamp.replace('T', ' ')}</p>
                                 </div>
                                 {(detailsModal.event.status || '').toLowerCase() === 'acknowledged' && (
                                     <div className="col-span-2">

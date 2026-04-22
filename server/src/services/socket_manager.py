@@ -182,7 +182,7 @@ async def handle_ack_alert(sid, data):
             await socketio_server.emit('alert_acknowledged', {
                 'alert_id': alert_id,
                 'acknowledged_by': user_id,
-                'timestamp': datetime.now(timezone.utc).isoformat()
+                'timestamp': datetime.now().strftime('%Y-%m-%dT%H:%M:%S')
             }, broadcast=True)
             print(f"[Socket.IO] ✅ Broadcasted alert_acknowledged to all clients")
         except Exception as e:

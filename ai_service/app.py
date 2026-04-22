@@ -196,7 +196,64 @@ def serial_listener():
 threading.Thread(target=esp32_hotplug_monitor, daemon=True).start()
 threading.Thread(target=serial_listener, daemon=True).start()
 
+# --- ESP32 MEMORY ---
+last_sent_state = None
+last_sent_time = 0.0
+
 def trigger_hardware(state):
+    """Sends ON/OFF signals to the ESP32 and tracks connection health."""
+    global esp32, hardware_connected, hardware_last_successful_send, consecutive_hardware_failures, hardware_error_message, SERIAL_PORT
+    global last_sent_state, last_sent_time
+    
+    current_time = time.time()
+    
+    # --- THE FIX: Stop spamming the ESP32 ---
+    # Only send the signal if the state is CHANGING, or every 2 seconds to keep it alive
+    if state == last_sent_state and (current_time - last_sent_time < 2.0):
+        return
+    
+    # Attempt to reconnect if port was detected before but connection is dead
+    if (esp32 is None or not esp32.is_open) and SERIAL_PORT:
+        try:
+            print(f"[HARDWARE] Attempting to reconnect to {SERIAL_PORT}...")
+            esp32 = serial.Serial(SERIAL_PORT, BAUD_RATE, timeout=0.1)
+            time.sleep(0.5)
+            print(f"[HARDWARE] ✓ Reconnected to {SERIAL_PORT}")
+        except Exception as e:
+            print(f"[HARDWARE] Reconnection failed: {e}")
+            with hardware_lock:
+                hardware_connected = False
+                hardware_error_message = f"Reconnection failed: {str(e)[:30]}"
+            return
+    
+    if esp32 and esp32.is_open:
+        try:
+            # Send the byte WITH a newline character (\n) to prevent buffer lockups
+            esp32.write(b'1\n' if state == "ON" else b'0\n')
+            
+            # Update memory so we don't spam it next frame
+            last_sent_state = state
+            last_sent_time = current_time
+            
+            # Success - update health tracking
+            with hardware_lock:
+                hardware_connected = True
+                hardware_last_successful_send = current_time
+                consecutive_hardware_failures = 0
+                hardware_error_message = "Connected"
+        except Exception as e:
+            with hardware_lock:
+                consecutive_hardware_failures += 1
+                hardware_error_message = f"Write failed: {str(e)[:30]}"
+                if consecutive_hardware_failures >= MAX_HARDWARE_CONSECUTIVE_FAILURES:
+                    hardware_connected = False
+                    last_sent_state = None # Reset memory on failure
+    else:
+        with hardware_lock:
+            hardware_connected = False
+            hardware_error_message = "Serial port closed or not initialized"
+            last_sent_state = None
+            
     """Sends ON/OFF signals to the ESP32 and tracks connection health."""
     global esp32, hardware_connected, hardware_last_successful_send, consecutive_hardware_failures, hardware_error_message, SERIAL_PORT
     
@@ -283,9 +340,9 @@ def publish_alert_to_backend(camera_id, alert_message, frame=None, event_type="D
         if frame is not None:
             try:
                 # Generate filename: cam{id}_{location}_{YYYYMMDD}_{HHMM}.jpg
-                now = datetime.now(timezone.utc)
+                now = datetime.now()
                 date_str = now.strftime('%Y%m%d')
-                time_str = now.strftime('%H%M')
+                time_str = now.strftime('%H%M%S')
                 
                 # Sanitize location name (remove spaces, special chars)
                 location_safe = location_name.lower().replace(' ', '_').replace('/', '_')
@@ -324,9 +381,15 @@ def publish_alert_to_backend(camera_id, alert_message, frame=None, event_type="D
                 print(f"[ALERT DEBUG] ✗ FLOOR extraction failed: {e}, msg='{alert_message}'")
         elif "Inactivity" in alert_message:
             try:
-                parts = alert_message.split(": ")[1].split(" (")[0]
-                class_name = parts  # "Inactivity (High)", "Inactivity (Medium)", etc.
-                event_class_id = 3  # Inactivity
+                # 1. Get everything after "Zone X: "
+                full_text = alert_message.split(": ")[1]
+                
+                # 2. Split from the RIGHT side to safely remove only the time "(00:05)"
+                class_name = full_text.rsplit(" (", 1)[0] 
+                
+                # 3. Use an ID higher than 3 to avoid colliding with Sideward Fall
+                event_class_id = 4  
+                
                 print(f"[ALERT DEBUG] ✓ INACTIVITY matched: class_name='{class_name}'")
             except Exception as e:
                 print(f"[ALERT DEBUG] ✗ INACTIVITY extraction failed: {e}, msg='{alert_message}'")
@@ -343,7 +406,7 @@ def publish_alert_to_backend(camera_id, alert_message, frame=None, event_type="D
             'class_name': class_name,
             'snapshot_filename': snapshot_filename,
             'location_name': location_name,
-            'timestamp': datetime.now(timezone.utc).isoformat()
+            'timestamp': datetime.now().strftime('%Y-%m-%dT%H:%M:%S')
         }
         
         with alert_queue_lock:
@@ -413,9 +476,9 @@ MAX_HARDWARE_CONSECUTIVE_FAILURES = 50  # Increased threshold (matches stream ro
 
 # --- INACTIVITY CONFIGURATION (DYNAMIC) ---
 config_lock = threading.Lock()
-INACTIVITY_LOW_SEC = 1800   # 30 minutes
-INACTIVITY_MED_SEC = 3600   # 60 minutes
-INACTIVITY_HIGH_SEC = 7200 # 120 minutes
+INACTIVITY_LOW_SEC = 5   # 30 minutes
+INACTIVITY_MED_SEC = 10   # 60 minutes
+INACTIVITY_HIGH_SEC = 15 # 120 minutes
 
 safe_bed_classes = ["Lying Down", "Sitting", "Eating"]
 fall_classes = ["Forward Fall", "Backward Fall", "Sideward Fall"]
@@ -532,6 +595,9 @@ HTML_PAGE = """
                             <label class="text-[10px] text-slate-400">Low (min):</label>
                             <select id="lowMin" class="w-full bg-slate-800 p-2 rounded text-sm border border-slate-600 focus:border-blue-500 outline-none transition-colors">
                                 <option value="0">Off</option>
+                                <option value="5s">5 seconds (Test)</option>
+                                <option value="10s">10 seconds (Test)</option>
+                                <option value="30s">30 seconds (Test)</option>
                                 <option value="30" selected>30 minutes</option>
                                 <option value="60">1 hour</option>
                                 <option value="120">2 hours</option>
@@ -551,6 +617,9 @@ HTML_PAGE = """
                             <label class="text-[10px] text-slate-400">Medium (min):</label>
                             <select id="medMin" class="w-full bg-slate-800 p-2 rounded text-sm border border-slate-600 focus:border-blue-500 outline-none transition-colors">
                                 <option value="0">Off</option>
+                                <option value="5s">5 seconds (Test)</option>
+                                <option value="10s">10 seconds (Test)</option>
+                                <option value="30s">30 seconds (Test)</option>
                                 <option value="30">30 minutes</option>
                                 <option value="60" selected>1 hour</option>
                                 <option value="120">2 hours</option>
@@ -570,6 +639,9 @@ HTML_PAGE = """
                             <label class="text-[10px] text-slate-400">High (min):</label>
                             <select id="highMin" class="w-full bg-slate-800 p-2 rounded text-sm border border-slate-600 focus:border-blue-500 outline-none transition-colors">
                                 <option value="0">Off</option>
+                                <option value="5s">5 seconds (Test)</option>
+                                <option value="10s">10 seconds (Test)</option>
+                                <option value="30s">30 seconds (Test)</option>
                                 <option value="30">30 minutes</option>
                                 <option value="60">1 hour</option>
                                 <option value="120" selected>2 hours</option>
@@ -788,10 +860,17 @@ HTML_PAGE = """
             const medMin = document.getElementById('medMin').value;
             const highMin = document.getElementById('highMin').value;
 
-            // Convert minutes to seconds
-            const lowSec = parseInt(lowMin) * 60;
-            const medSec = parseInt(medMin) * 60;
-            const highSec = parseInt(highMin) * 60;
+            // Helper function to handle both seconds and minutes
+            function parseTime(val) {
+                if (val === "0") return 0;
+                if (val.endsWith('s')) return parseInt(val); // It's already in seconds
+                return parseInt(val) * 60; // Convert minutes to seconds
+            }
+
+            // Calculate final seconds
+            const lowSec = parseTime(lowMin);
+            const medSec = parseTime(medMin);
+            const highSec = parseTime(highMin);
 
             // Send the converted values to the backend
             fetch('/api/inactivity-config', {
@@ -1005,8 +1084,10 @@ def generate_frames(rtsp_url):
                         with state_lock:
                             tracker = bed_trackers[roi_idx]
                             if tracker["label"] != label:
+                                # Only start a new timer if they were previously NOT in the zone
+                                if tracker["label"] is None:
+                                    tracker["start_time"] = current_time
                                 tracker["label"] = label
-                                tracker["start_time"] = current_time
                             tracker["last_seen"] = current_time
                             tracker["box"] = (bx1, by1, bx2, by2)
                     else:
@@ -1049,9 +1130,11 @@ def generate_frames(rtsp_url):
                         elif elapsed >= med_threshold:
                             box_color = (0, 165, 255)     
                             status_text = f"MED INACT [{time_str}]"
+                            current_frame_alerts.append(f"Zone {i+1}: Inactivity (Medium) ({time_str})")
                         elif elapsed >= low_threshold:
                             box_color = (0, 255, 255)     
                             status_text = f"LOW INACT [{time_str}]"
+                            current_frame_alerts.append(f"Zone {i+1}: Inactivity (Low) ({time_str})")
                         else:
                             if tracker["label"] == "Lying Down":
                                 box_color = (139, 69, 19) 
@@ -1322,9 +1405,9 @@ def update_inactivity_config():
         med = int(data.get('med_sec', 3600))
         high = int(data.get('high_sec', 7200))
         
-        # Validate
-        if low < 10 or med < 10 or high < 10:
-            return jsonify({"status": "error", "message": "All values must be >= 10 seconds"}), 400
+        # Validate (Lowered to 1 second for testing)
+        if low < 1 or med < 1 or high < 1:
+            return jsonify({"status": "error", "message": "All values must be >= 1 second"}), 400
         if low >= med or med >= high:
             return jsonify({"status": "error", "message": "Must be: Low < Medium < High"}), 400
         

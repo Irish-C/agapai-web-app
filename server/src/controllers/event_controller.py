@@ -42,7 +42,7 @@ async def create_event_logic(data):
                 print(f"  [LOOKUP] ✗ NOT FOUND in database! Using default event_class_id={event_class_id}")
         
         # Check for recent matching incident (within 60 seconds)
-        time_window = datetime.now(timezone.utc) - timedelta(seconds=60)
+        time_window = datetime.now() - timedelta(seconds=60)
         gap_threshold_seconds = 30  # Gap threshold: if >= 30s since last event, treat as NEW
         
         print(f"  [DEDUP] Checking for recent events:")
@@ -66,7 +66,7 @@ async def create_event_logic(data):
         
         # NEW: Smart gap detection - check if there's a significant gap since last event
         if recent_event:
-            time_since_last = datetime.now(timezone.utc) - recent_event.timestamp
+            time_since_last = datetime.now() - recent_event.timestamp
             print(f"  [DEDUP] Found recent event (ID={recent_event.id}), time since last: {time_since_last.total_seconds():.1f}s")
             
             if time_since_last.total_seconds() >= gap_threshold_seconds:
@@ -86,7 +86,7 @@ async def create_event_logic(data):
                     data={
                         'filename': snapshot_filename,
                         'event_log_id': recent_event.id,
-                        'timestamp': datetime.now(timezone.utc)
+                        'timestamp': datetime.now()
                     }
                 )
                 print(f"  [SNAPSHOT] Created snapshot record: {snapshot_filename}")
@@ -107,7 +107,7 @@ async def create_event_logic(data):
                 'id': str(updated_event.id),
                 'type': updated_event.event_class.class_name if updated_event.event_class else "Unknown",
                 'location': location_for_alert,
-                'timestamp': updated_event.timestamp.isoformat(),
+                'timestamp': updated_event.timestamp.strftime('%Y-%m-%dT%H:%M:%S'),
                 'snapshot_url': display_snapshot_url,
                 'all_snapshots': snapshot_urls,
                 'occurrence_count': len(snapshot_urls),
@@ -126,7 +126,7 @@ async def create_event_logic(data):
                 data={
                     'event_class_id': event_class_id,
                     'location_id': location_id,  # Store location at event creation time
-                    'timestamp': datetime.now(timezone.utc)
+                    'timestamp': datetime.now()
                 },
                 include={
                     'event_class': True
@@ -140,7 +140,7 @@ async def create_event_logic(data):
                     data={
                         'filename': snapshot_filename,
                         'event_log_id': new_event.id,
-                        'timestamp': datetime.now(timezone.utc)
+                        'timestamp': datetime.now()
                     }
                 )
                 snapshot_urls = [snapshot_filename]
@@ -150,7 +150,7 @@ async def create_event_logic(data):
                 'id': str(new_event.id),
                 'type': new_event.event_class.class_name if new_event.event_class else "Unknown",
                 'location': location_for_alert,
-                'timestamp': new_event.timestamp.isoformat(),
+                'timestamp': new_event.timestamp.strftime('%Y-%m-%dT%H:%M:%S'),
                 'snapshot_url': snapshot_urls[0] if snapshot_urls else None,
                 'all_snapshots': snapshot_urls,
                 'occurrence_count': len(snapshot_urls),
@@ -196,14 +196,14 @@ async def get_event_logs_logic(filters=None):
                         hour=0, minute=0, second=0, microsecond=0,
                     )
                     start_dt = local_start + timedelta(minutes=tz_offset_minutes)
-                    where_parts.append(f"el.timestamp >= '{start_dt.isoformat()}'")
+                    where_parts.append(f"el.timestamp >= '{start_dt.strftime('%Y-%m-%dT%H:%M:%S')}'")
 
                 if end_date:
                     local_end = datetime.strptime(end_date, '%Y-%m-%d').replace(
                         hour=0, minute=0, second=0, microsecond=0,
                     ) + timedelta(days=1)
                     end_dt = local_end + timedelta(minutes=tz_offset_minutes)
-                    where_parts.append(f"el.timestamp < '{end_dt.isoformat()}'")
+                    where_parts.append(f"el.timestamp < '{end_dt.strftime('%Y-%m-%dT%H:%M:%S')}'")
 
                 # Validate date range
                 if start_date and end_date:
@@ -266,10 +266,10 @@ async def get_event_logs_logic(filters=None):
                     if filename:
                         snapshot_urls.append(f"http://localhost:3000/api/snapshots/{filename}")
             
-            # Timestamp from raw SQL is already an isoformat string
+            # Timestamp from raw SQL is already an strftime string
             timestamp_val = log_dict.get('timestamp')
-            if hasattr(timestamp_val, 'isoformat'):
-                timestamp_str = timestamp_val.isoformat()
+            if hasattr(timestamp_val, 'strftime'):
+                timestamp_str = timestamp_val.strftime('%Y-%m-%d %H:%M:%S')
             else:
                 timestamp_str = str(timestamp_val) if timestamp_val else ''
             
@@ -324,7 +324,7 @@ async def get_viewed_event_logs_logic(filters=None):
                 "id": str(log.id),
                 "type": log.event_class.class_name if log.event_class else "Unknown",
                 "location": location_label,
-                "timestamp": log.timestamp.isoformat(),
+                "timestamp": log.timestamp.strftime('%Y-%m-%dT%H:%M:%S'),
                 "snapshot_url": snapshot_urls[0] if snapshot_urls else None,
                 "all_snapshots": snapshot_urls,
                 "occurrence_count": len(snapshot_urls),
@@ -399,7 +399,7 @@ async def delete_event_logic(log_id):
         # Soft delete: set deleted_at timestamp
         deleted_event = await db.eventlog.update(
             where={'id': int(log_id)},
-            data={'deleted_at': datetime.now(timezone.utc)}
+            data={'deleted_at': datetime.now()}
         )
         
         print(f"[DELETE EVENT] ✓ Success - Event {log_id} soft-deleted")
@@ -460,7 +460,7 @@ async def export_logs_by_date_logic(date_str: str):
                 "id": str(log.id),
                 "type": log.event_class.class_name if log.event_class else "Unknown",
                 "location": location_label,
-                "timestamp": log.timestamp.isoformat(),
+                "timestamp": log.timestamp.strftime('%Y-%m-%dT%H:%M:%S'),
                 "snapshot_url": snapshot_urls[0] if snapshot_urls else None,
                 "all_snapshots": snapshot_urls,
                 "occurrence_count": len(snapshot_urls),
@@ -514,7 +514,7 @@ async def get_missed_alerts_logic(timestamp_ms: int):
         # Convert milliseconds to datetime
         since_datetime = datetime.utcfromtimestamp(timestamp_ms / 1000.0)
         
-        print(f"[get_missed_alerts] Fetching alerts since {since_datetime.isoformat()}")
+        print(f"[get_missed_alerts] Fetching alerts since {since_datetime.strftime('%Y-%m-%dT%H:%M:%S')}")
         
         # Use raw SQL since Prisma client doesn't properly reflect schema changes
         result = await db.query_raw(
@@ -522,7 +522,7 @@ async def get_missed_alerts_logic(timestamp_ms: int):
             SELECT el.id, el.timestamp, el.event_status, el.file_path, ec.class_name
             FROM event_logs el
             LEFT JOIN event_class ec ON el.event_class_id = ec.id
-            WHERE el.timestamp > '{since_datetime.isoformat()}'
+            WHERE el.timestamp > '{since_datetime.strftime("%Y-%m-%dT%H:%M:%S")}'
             AND el.deleted_at IS NULL
             ORDER BY el.timestamp DESC
             """
@@ -541,7 +541,7 @@ async def get_missed_alerts_logic(timestamp_ms: int):
                 'id': str(alert_dict.get('id')),
                 'type': alert_dict.get('class_name') or 'unknown',
                 'location': location_label,
-                'timestamp': alert_dict.get('timestamp').isoformat() if alert_dict.get('timestamp') else '',
+                'timestamp': alert_dict.get('timestamp').strftime('%Y-%m-%d %H:%M:%S') if alert_dict.get('timestamp') else '',
                 'snapshot_url': alert_dict.get('file_path'),
                 'status': alert_dict.get('event_status') or 'unacknowledged'
             })
