@@ -4,7 +4,7 @@ export const contactSupport = (data) => {
 };
 // src/services/apiService.js
 
-const BASE_API_URL = import.meta.env.VITE_API_URL || '/api';
+const BASE_API_URL = 'http://localhost:5000/api';
 const AUTH_TOKEN_KEY = 'authToken'; 
 
 /**
