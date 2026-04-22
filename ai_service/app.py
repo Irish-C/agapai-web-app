@@ -202,17 +202,17 @@ last_sent_time = 0.0
 
 def trigger_hardware(state):
     """Sends ON/OFF signals to the ESP32 and tracks connection health."""
-    global esp32, hardware_connected, hardware_last_successful_send, consecutive_hardware_failures, hardware_error_message, SERIAL_PORT
+    global esp32, hardware_connected, hardware_last_successful_send
+    global consecutive_hardware_failures, hardware_error_message, SERIAL_PORT
     global last_sent_state, last_sent_time
     
     current_time = time.time()
     
-    # --- THE FIX: Stop spamming the ESP32 ---
-    # Only send the signal if the state is CHANGING, or every 2 seconds to keep it alive
+    # 1. Anti-spam logic: Only send if state changed or 2 seconds passed
     if state == last_sent_state and (current_time - last_sent_time < 2.0):
         return
     
-    # Attempt to reconnect if port was detected before but connection is dead
+    # 2. Attempt to reconnect if port was detected before but connection is dead
     if (esp32 is None or not esp32.is_open) and SERIAL_PORT:
         try:
             print(f"[HARDWARE] Attempting to reconnect to {SERIAL_PORT}...")
@@ -226,16 +226,17 @@ def trigger_hardware(state):
                 hardware_error_message = f"Reconnection failed: {str(e)[:30]}"
             return
     
+    # 3. Send the command
     if esp32 and esp32.is_open:
         try:
-            # Send the byte WITH a newline character (\n) to prevent buffer lockups
+            # Send with newline (\n) to prevent buffer lockups
             esp32.write(b'1\n' if state == "ON" else b'0\n')
             
-            # Update memory so we don't spam it next frame
+            # Update memory
             last_sent_state = state
             last_sent_time = current_time
             
-            # Success - update health tracking
+            # Update health tracking
             with hardware_lock:
                 hardware_connected = True
                 hardware_last_successful_send = current_time
@@ -247,49 +248,12 @@ def trigger_hardware(state):
                 hardware_error_message = f"Write failed: {str(e)[:30]}"
                 if consecutive_hardware_failures >= MAX_HARDWARE_CONSECUTIVE_FAILURES:
                     hardware_connected = False
-                    last_sent_state = None # Reset memory on failure
+                    last_sent_state = None 
     else:
         with hardware_lock:
             hardware_connected = False
-            hardware_error_message = "Serial port closed or not initialized"
+            hardware_error_message = "Serial port closed"
             last_sent_state = None
-            
-    """Sends ON/OFF signals to the ESP32 and tracks connection health."""
-    global esp32, hardware_connected, hardware_last_successful_send, consecutive_hardware_failures, hardware_error_message, SERIAL_PORT
-    
-    # Attempt to reconnect if port was detected before but connection is dead
-    if (esp32 is None or not esp32.is_open) and SERIAL_PORT:
-        try:
-            print(f"[HARDWARE] Attempting to reconnect to {SERIAL_PORT}...")
-            esp32 = serial.Serial(SERIAL_PORT, BAUD_RATE, timeout=0.1)
-            time.sleep(0.5)
-            print(f"[HARDWARE] ✓ Reconnected to {SERIAL_PORT}")
-        except Exception as e:
-            print(f"[HARDWARE] Reconnection failed: {e}")
-            with hardware_lock:
-                hardware_connected = False
-                hardware_error_message = f"Reconnection failed: {str(e)[:30]}"
-            return
-    
-    if esp32 and esp32.is_open:
-        try:
-            esp32.write(b'1' if state == "ON" else b'0')
-            # Success - update health tracking
-            with hardware_lock:
-                hardware_connected = True
-                hardware_last_successful_send = time.time()
-                consecutive_hardware_failures = 0
-                hardware_error_message = "Connected"
-        except Exception as e:
-            with hardware_lock:
-                consecutive_hardware_failures += 1
-                hardware_error_message = f"Write failed: {str(e)[:30]}"
-                if consecutive_hardware_failures >= MAX_HARDWARE_CONSECUTIVE_FAILURES:
-                    hardware_connected = False
-    else:
-        with hardware_lock:
-            hardware_connected = False
-            hardware_error_message = "Serial port closed or not initialized"
 
 # ==========================================
 # --- ALERT PUBLISHING QUEUE (Background) ---
@@ -476,9 +440,9 @@ MAX_HARDWARE_CONSECUTIVE_FAILURES = 50  # Increased threshold (matches stream ro
 
 # --- INACTIVITY CONFIGURATION (DYNAMIC) ---
 config_lock = threading.Lock()
-INACTIVITY_LOW_SEC = 5   # 30 minutes
-INACTIVITY_MED_SEC = 10   # 60 minutes
-INACTIVITY_HIGH_SEC = 15 # 120 minutes
+INACTIVITY_LOW_SEC = 1800   # 30 minutes
+INACTIVITY_MED_SEC = 3600   # 60 minutes
+INACTIVITY_HIGH_SEC = 7200 # 120 minutes
 
 safe_bed_classes = ["Lying Down", "Sitting", "Eating"]
 fall_classes = ["Forward Fall", "Backward Fall", "Sideward Fall"]
