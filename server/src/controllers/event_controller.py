@@ -48,33 +48,22 @@ async def create_event_logic(data):
         print(f"  Location: {location_name}")
         print(f"  Snapshot: {snapshot_filename}")
         
-        # Parse timestamp from AI service (ISO format with timezone: 2026-05-08T00:29:45+08:00 or 2026-05-08T16:29:45Z)
-        event_timestamp = datetime.now(timezone.utc)  # Default to current time
+        # Parse timestamp from AI service (ISO format with timezone: 2026-05-08T00:41:23+08:00 or 2026-05-08T16:41:23Z)
+        event_timestamp = datetime.now(timezone.utc)  # Default to current UTC time
         if data.get('timestamp'):
             try:
                 ts_str = data.get('timestamp')
                 print(f"  [TIMESTAMP] Parsing incoming timestamp: '{ts_str}'")
-                # Handle both Z (UTC) and +HH:MM (timezone offset) formats
-                if ts_str.endswith('Z'):
-                    # UTC format: convert Z to +00:00, then replace with local PH offset for storage
-                    parsed_ts = datetime.fromisoformat(ts_str.replace('Z', '+00:00'))
-                    # Convert from UTC to Philippine Time for storage
-                    ph_tz = timezone(timedelta(hours=8))
-                    event_timestamp = parsed_ts.astimezone(ph_tz).replace(tzinfo=None)  # Store as naive PH time
-                    print(f"  [TIMESTAMP] ✓ Converted from UTC to Philippine Time: {event_timestamp}")
-                else:
-                    # Already has timezone offset like +08:00
-                    parsed_ts = datetime.fromisoformat(ts_str)
-                    # Store as naive Philippine Time (just strip the timezone)
-                    event_timestamp = parsed_ts.replace(tzinfo=None)
-                    print(f"  [TIMESTAMP] ✓ Storing as Philippine Time (naive): {event_timestamp}")
+                # Parse the timestamp (handles both Z and +HH:MM formats)
+                parsed_ts = datetime.fromisoformat(ts_str.replace('Z', '+00:00'))
+                # Convert to UTC (SINGLE conversion - this is the key!)
+                event_timestamp = ensure_utc_aware(parsed_ts).astimezone(timezone.utc)
+                print(f"  [TIMESTAMP] ✓ Converted to UTC: {event_timestamp.isoformat()}")
             except Exception as e:
                 print(f"  [TIMESTAMP] ✗ Failed to parse '{data.get('timestamp')}': {e}")
-                print(f"  [TIMESTAMP] Falling back to current server time")
-                event_timestamp = datetime.now()  # Naive, assume PH time
+                print(f"  [TIMESTAMP] Falling back to current UTC time")
         else:
             print(f"  [TIMESTAMP] ⚠ No timestamp in payload, using current time")
-            event_timestamp = datetime.now()  # Naive, assume PH time
         
         if class_name:
             print(f"  [LOOKUP] Searching for class_name='{class_name}'...")
@@ -131,7 +120,14 @@ async def create_event_logic(data):
         if recent_event:
             # Accumulate snapshot to existing event
             print(f"  [DEDUP] Found recent event (ID={recent_event.id})")
-            
+
+            # UPDATE the event's timestamp to the latest from AI service
+            await db.eventlog.update(
+                where={'id': recent_event.id},
+                data={'timestamp': event_timestamp}
+            )
+            print(f"  [DEDUP] Updated event timestamp to: {event_timestamp.isoformat()}")
+
             if snapshot_filename:
                 # Create snapshot record
                 await db.snapshot.create(
@@ -142,7 +138,7 @@ async def create_event_logic(data):
                     }
                 )
                 print(f"  [SNAPSHOT] Created snapshot record: {snapshot_filename}")
-            
+
             # Get all snapshots for this event
             updated_event = await db.eventlog.find_unique(
                 where={'id': recent_event.id},
@@ -151,23 +147,23 @@ async def create_event_logic(data):
                     'snapshots': {'orderBy': {'timestamp': 'asc'}}
                 }
             )
-            
+
             snapshot_urls = [s.filename for s in updated_event.snapshots]
             display_snapshot_url = snapshot_urls[0] if snapshot_urls else None
-            
+
             # Convert timestamp to milliseconds
-            # Stored as naive but represents Philippine Time (UTC+8)
-            # To get milliseconds: treat as PH time, convert to UTC, then get milliseconds
+            # Retrieved naive timestamp from DB represents UTC
             if updated_event.timestamp:
                 ts = updated_event.timestamp
-                # Treat naive timestamp as Philippine Time (UTC+8)
-                ph_tz = timezone(timedelta(hours=8))
-                ts_with_tz = ts.replace(tzinfo=ph_tz)
-                # Convert to UTC milliseconds (will be correct for frontend display)
-                timestamp_ms = int(ts_with_tz.timestamp() * 1000)
+                # Make UTC explicit - native datetime from DB is already UTC
+                if ts.tzinfo is None:
+                    ts = ts.replace(tzinfo=timezone.utc)
+                else:
+                    ts = ensure_utc_aware(ts)
+                timestamp_ms = int(ts.timestamp() * 1000)
             else:
                 timestamp_ms = 0
-            
+
             payload = {
                 'id': str(updated_event.id),
                 'type': updated_event.event_class.class_name if updated_event.event_class else "Unknown",
@@ -181,10 +177,10 @@ async def create_event_logic(data):
             }
             print(f"  [STORED] Updated EventLog ID={updated_event.id}, snapshots={len(snapshot_urls)}")
             print(f"[EVENT_CREATE] END\n")
-            
+
             from src.services.socket_manager import socketio_server
             await socketio_server.emit('alert_accumulated', payload)
-            
+
             return {"status": "success", "data": payload, "accumulated": True}, 200
         else:
             # Create new event with location_id immutably stored
@@ -213,15 +209,15 @@ async def create_event_logic(data):
                 print(f"  [SNAPSHOT] Created snapshot record: {snapshot_filename}")
             
             # Convert timestamp to milliseconds
-            # Stored as naive but represents Philippine Time (UTC+8)
-            # To get milliseconds: treat as PH time, convert to UTC, then get milliseconds
+            # Retrieved naive timestamp from DB represents UTC
             if new_event.timestamp:
                 ts = new_event.timestamp
-                # Treat naive timestamp as Philippine Time (UTC+8)
-                ph_tz = timezone(timedelta(hours=8))
-                ts_with_tz = ts.replace(tzinfo=ph_tz)
-                # Convert to UTC milliseconds (will be correct for frontend display)
-                timestamp_ms = int(ts_with_tz.timestamp() * 1000)
+                # Make UTC explicit - naive datetime from DB is already UTC
+                if ts.tzinfo is None:
+                    ts = ts.replace(tzinfo=timezone.utc)
+                else:
+                    ts = ensure_utc_aware(ts)
+                timestamp_ms = int(ts.timestamp() * 1000)
             else:
                 timestamp_ms = 0
             
@@ -352,10 +348,9 @@ async def get_event_logs_logic(filters=None):
             timestamp_ms = 0
             
             if hasattr(timestamp_val, 'timestamp'):  # datetime object
-                # Naive datetime from DB represents Philippine Time (UTC+8)
-                ph_tz = timezone(timedelta(hours=8))
+                # Naive datetime from DB represents UTC
                 if timestamp_val.tzinfo is None:
-                    timestamp_val = timestamp_val.replace(tzinfo=ph_tz)
+                    timestamp_val = timestamp_val.replace(tzinfo=timezone.utc)
                 else:
                     timestamp_val = ensure_utc_aware(timestamp_val)
                 # Convert to UTC milliseconds
@@ -368,10 +363,8 @@ async def get_event_logs_logic(filters=None):
                     # Try to parse as ISO format
                     from datetime import datetime as dt
                     parsed = dt.fromisoformat(timestamp_val.replace('Z', '+00:00'))
-                    if parsed.tzinfo is None:
-                        parsed = parsed.replace(tzinfo=timezone(timedelta(hours=8)))
-                    else:
-                        parsed = ensure_utc_aware(parsed)
+                    # Ensure UTC-aware
+                    parsed = ensure_utc_aware(parsed)
                     timestamp_ms = int(parsed.timestamp() * 1000)
                 except:
                     timestamp_ms = 0
@@ -425,12 +418,11 @@ async def get_viewed_event_logs_logic(filters=None):
             snapshot_urls = [s.filename for s in log.snapshots]
             
             # Convert timestamp to milliseconds (unix timestamp)
-            # Naive datetimes from DB represent Philippine Time (UTC+8)
+            # Naive datetimes from DB represent UTC
             if log.timestamp:
                 ts = log.timestamp
-                ph_tz = timezone(timedelta(hours=8))
                 if ts.tzinfo is None:
-                    ts = ts.replace(tzinfo=ph_tz)
+                    ts = ts.replace(tzinfo=timezone.utc)
                 else:
                     ts = ensure_utc_aware(ts)
                 timestamp_ms = int(ts.timestamp() * 1000)
@@ -575,12 +567,11 @@ async def export_logs_by_date_logic(date_str: str):
             snapshot_urls = [s.filename for s in log.snapshots]
             
             # Convert timestamp to milliseconds (unix timestamp)
-            # Naive datetimes from DB represent Philippine Time (UTC+8)
+            # Naive datetimes from DB represent UTC
             if log.timestamp:
                 ts = log.timestamp
-                ph_tz = timezone(timedelta(hours=8))
                 if ts.tzinfo is None:
-                    ts = ts.replace(tzinfo=ph_tz)
+                    ts = ts.replace(tzinfo=timezone.utc)
                 else:
                     ts = ensure_utc_aware(ts)
                 timestamp_ms = int(ts.timestamp() * 1000)
@@ -674,10 +665,9 @@ async def get_missed_alerts_logic(timestamp_ms: int):
             timestamp_val = alert_dict.get('timestamp')
             timestamp_ms = 0
             if hasattr(timestamp_val, 'timestamp'):
-                # Naive datetimes from DB represent Philippine Time (UTC+8)
-                ph_tz = timezone(timedelta(hours=8))
+                # Naive datetimes from DB represent UTC
                 if timestamp_val.tzinfo is None:
-                    timestamp_val = timestamp_val.replace(tzinfo=ph_tz)
+                    timestamp_val = timestamp_val.replace(tzinfo=timezone.utc)
                 else:
                     timestamp_val = ensure_utc_aware(timestamp_val)
                 timestamp_ms = int(timestamp_val.timestamp() * 1000)
