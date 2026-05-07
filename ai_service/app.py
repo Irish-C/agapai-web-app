@@ -325,23 +325,19 @@ def publish_alert_to_backend(camera_id, alert_message, frame=None, event_type="D
     global alert_queue
     
     try:
+        # Always get the latest location from backend cache if possible
+        if camera_id is not None:
+            location_name = get_camera_location(camera_id)
         # Save snapshot if frame is provided
         snapshot_filename = ''
         if frame is not None:
             try:
-                # Generate filename: cam{id}_{location}_{YYYYMMDD}_{HHMM}.jpg
-                # Use Philippine Time (UTC+8) to capture actual event time
-                now = datetime.now(PH_TZ)  # Philippine Time with UTC+8 offset
+                now = datetime.now(PH_TZ)
                 date_str = now.strftime('%Y%m%d')
                 time_str = now.strftime('%H%M%S')
-                
-                # Sanitize location name (remove spaces, special chars)
                 location_safe = location_name.lower().replace(' ', '_').replace('/', '_')
-                
                 snapshot_filename = f"cam{camera_id}_{location_safe}_{date_str}_{time_str}.jpg"
                 snapshot_path = os.path.join(SNAPSHOTS_DIR, snapshot_filename)
-                
-                # Save the frame as JPEG
                 success = cv2.imwrite(snapshot_path, frame, [cv2.IMWRITE_JPEG_QUALITY, 85])
                 if success:
                     print(f"[SNAPSHOT SAVED] {snapshot_filename}")
@@ -351,19 +347,12 @@ def publish_alert_to_backend(camera_id, alert_message, frame=None, event_type="D
             except Exception as e:
                 print(f"[SNAPSHOT ERROR] Could not save snapshot: {e}")
                 snapshot_filename = ''
-        
-        # DEBUG: Log the raw alert message
         print(f"[ALERT DEBUG] Raw alert_message: '{alert_message}'")
         print(f"[ALERT DEBUG] Location: '{location_name}'")
         print(f"[ALERT DEBUG] Camera ID: {camera_id}")
-        
-        # Extract the actual detected class name from alert message
-        # Alert messages are like: "Floor: Backward Fall Detected!" or "Zone 1: Inactivity (High) (30:45)"
         class_name = None
         event_class_id = 1  # Default
-        
         if "Floor:" in alert_message:
-            # Extract fall type: "Floor: Backward Fall Detected!" → "Backward Fall"
             try:
                 parts = alert_message.split("Floor: ")[1].split(" Detected")[0]
                 class_name = parts
@@ -373,28 +362,17 @@ def publish_alert_to_backend(camera_id, alert_message, frame=None, event_type="D
                 print(f"[ALERT DEBUG] ✗ FLOOR extraction failed: {e}, msg='{alert_message}'")
         elif "Inactivity" in alert_message:
             try:
-                # Message format: "Zone 1: Inactivity (High) (00:30)"
-                # 1. Get everything after "Zone X: "
                 full_text = alert_message.split(": ")[1]
                 print(f"[ALERT DEBUG] Inactivity full_text: '{full_text}'")
-                
-                # 2. Split from the RIGHT side to safely remove only the time "(00:05)"
-                class_name = full_text.rsplit(" (", 1)[0] 
+                class_name = full_text.rsplit(" (", 1)[0]
                 print(f"[ALERT DEBUG] Extracted class_name: '{class_name}'")
-                
-                # 3. Use event_class_id lookup - don't hardcode an ID
                 event_class_id = 4  # Placeholder - backend will look up by class_name
-                
                 print(f"[ALERT DEBUG] ✓ INACTIVITY matched: class_name='{class_name}'")
             except Exception as e:
                 print(f"[ALERT DEBUG] ✗ INACTIVITY extraction failed: {e}, msg='{alert_message}'")
         else:
             print(f"[ALERT DEBUG] ✗ NO PATTERN MATCHED: msg='{alert_message}'")
-        
         print(f"[ALERT DEBUG] Ready to queue: class_name='{class_name}', event_class_id={event_class_id}, location='{location_name}'")
-        
-        # **Queue it instead of sending directly**
-        # Use Philippine Time (UTC+8) so events are timestamped correctly
         local_timestamp = datetime.now(PH_TZ).isoformat()
         print(f"[TIMESTAMP] Recording Philippine Time: {local_timestamp}")
         payload = {
@@ -404,13 +382,11 @@ def publish_alert_to_backend(camera_id, alert_message, frame=None, event_type="D
             'class_name': class_name,
             'snapshot_filename': snapshot_filename,
             'location_name': location_name,
-            'timestamp': local_timestamp  # Local time with timezone offset (e.g., 2026-05-08T00:29:45+08:00)
+            'timestamp': local_timestamp
         }
-        
         with alert_queue_lock:
             alert_queue.append(payload)
             print(f"[ALERT QUEUED ✓] Queue size now: {len(alert_queue)}, message: '{alert_message}'")
-            
     except Exception as e:
         print(f"[ALERT QUEUE ERROR] {e}")
 
