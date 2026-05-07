@@ -6,6 +6,7 @@ import threading
 import serial
 import requests
 import subprocess
+
 from datetime import datetime, timezone
 from flask import Flask, Response, request, render_template_string, jsonify, send_from_directory
 from ultralytics import YOLO
@@ -28,7 +29,9 @@ except Exception as e:
     os.environ['OPENVINO_DEVICE'] = 'CPU'
     print(f"[DEVICE] Could not detect devices, using CPU: {e}")
 
-app = Flask(__name__)
+# Configure Flask static folder for offline Tailwind CSS
+static_folder = os.path.join(os.path.dirname(__file__), 'static')
+app = Flask(__name__, static_folder=static_folder, static_url_path='/static')
 
 # Setup snapshots directory
 SNAPSHOTS_DIR = os.path.join(os.path.dirname(__file__), '..', 'server', 'static', 'snapshots')
@@ -208,9 +211,10 @@ def trigger_hardware(state):
     
     current_time = time.time()
     
-    # 1. Anti-spam logic: Only send if state changed or 2 seconds passed
-    if state == last_sent_state and (current_time - last_sent_time < 2.0):
-        return
+    # 1. Anti-spam logic: Only send if state changed or 10 seconds passed
+    if state == "ON":
+        if last_sent_time is not None and (current_time - last_sent_time < 10.0) and state == last_sent_state:
+            return
     
     # 2. Attempt to reconnect if port was detected before but connection is dead
     if (esp32 is None or not esp32.is_open) and SERIAL_PORT:
@@ -234,8 +238,12 @@ def trigger_hardware(state):
             
             # Update memory
             last_sent_state = state
-            last_sent_time = current_time
+            if state == 'ON' and hardware_muted:
+                last_sent_time = current_time
+                print(f"[HARDWARE] >>> ON Signal Sent (10s Cooldown Started)")
             
+            last_sent_state = state
+
             # Update health tracking
             with hardware_lock:
                 hardware_connected = True
@@ -451,7 +459,7 @@ try:
     model = YOLO(MODEL_PATH, task="detect")
     AI_AVAILABLE = True
     print(f"[SYSTEM] Model loaded successfully")
-    print(f"[DEVICE] Using device: CPU (OpenVINO will use GPU if available via env vars)")
+    print(f"[DEVICE] Using device: {os.environ.get('OPENVINO_DEVICE', 'CPU')}")
 except Exception as e:
     AI_AVAILABLE = False
     print(f"[ERROR] Could not load model: {e}")
@@ -500,7 +508,7 @@ HTML_PAGE = """
 <head>
     <title>Agapai Multi-Zone Monitor</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='45' fill='%230ea5e9'/><circle cx='50' cy='50' r='35' fill='%23020617'/><text x='50' y='60' font-size='40' font-weight='bold' fill='%230ea5e9' text-anchor='middle'>A</text></svg>">
-    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="/static/tailwind.css">
     <style>
         @keyframes flashRed {
             0%, 100% { border-color: rgb(15 23 42); box-shadow: inset 0 2px 4px 0 rgb(59 130 246 / 0.2); }

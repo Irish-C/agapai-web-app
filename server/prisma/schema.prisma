@@ -28,8 +28,6 @@ model User {
   password            String     @db.VarChar(255)
   is_active           Boolean    @default(true)
   role_id             BigInt?
-  email_notifications Boolean    @default(false)
-  alert_threshold     Int        @default(0)
   acknowledged_logs   EventLog[]
   role                Role?      @relation(fields: [role_id], references: [id])
 
@@ -106,14 +104,4 @@ model EventLog {
   snapshots       Snapshot[]
 
   @@map("event_logs")
-}
-
-model Threshold {
-  id         BigInt   @id @default(autoincrement())
-  low        Int      @default(0)
-  medium     Int      @default(0)
-  high       Int      @default(0)
-  created_at DateTime @default(now())
-
-  @@map("thresholds")
 }

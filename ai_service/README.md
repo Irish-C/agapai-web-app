@@ -21,6 +21,31 @@ AI_SERVICE_PORT=3001      # Port this service runs on
 AI_SERVICE_HOST=0.0.0.0   # Bind address
 ```
 
+## CSS & Frontend Assets
+
+### Offline Tailwind CSS
+
+The web interface uses a locally-built Tailwind CSS file (no CDN required):
+
+**Generate/Update CSS:**
+```bash
+npm run build:ai-css
+```
+
+**Watch for Changes (Development):**
+```bash
+npm run build:ai-css:watch
+```
+
+This scans `ai_service/app.py` for Tailwind classes and builds `ai_service/static/tailwind.css`.
+
+**Files:**
+- `tailwind.ai-service.config.js` — Tailwind configuration
+- `ai_service/styles.css` — Tailwind input file
+- `ai_service/static/tailwind.css` — Generated CSS (not committed, ~90KB)
+
+The app works completely offline after the CSS is built.
+
 ## Running the Service
 
 ### Standalone Mode

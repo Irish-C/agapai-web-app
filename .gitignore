@@ -44,6 +44,7 @@ server/.prisma/
 # Static snapshots and uploads (runtime generated)
 static/snapshots/
 server/static/snapshots/
+ai_service/static/tailwind.css
 
 # OpenVINO and runtime caches
 server/ov_cache/
