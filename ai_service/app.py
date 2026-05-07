@@ -7,9 +7,12 @@ import serial
 import requests
 import subprocess
 
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from flask import Flask, Response, request, render_template_string, jsonify, send_from_directory
 from ultralytics import YOLO
+
+# Philippine Time timezone (UTC+8)
+PH_TZ = timezone(timedelta(hours=8))
 
 # ==========================================
 # --- OPENVINO DEVICE CONFIGURATION ---
@@ -133,7 +136,7 @@ SERIAL_PORT = None
 # ==========================================
 current_rtsp_url = None
 current_camera_id = None
-current_location_name = "Unknown"  # Default location name for alerts
+current_location_name = "Cam"  # Default location name for alerts
 
 # --- HOT-PLUG ESP32 DETECTION THREAD ---
 def esp32_hotplug_monitor():
@@ -327,7 +330,8 @@ def publish_alert_to_backend(camera_id, alert_message, frame=None, event_type="D
         if frame is not None:
             try:
                 # Generate filename: cam{id}_{location}_{YYYYMMDD}_{HHMM}.jpg
-                now = datetime.utcnow()
+                # Use Philippine Time (UTC+8) to capture actual event time
+                now = datetime.now(PH_TZ)  # Philippine Time with UTC+8 offset
                 date_str = now.strftime('%Y%m%d')
                 time_str = now.strftime('%H%M%S')
                 
@@ -390,6 +394,9 @@ def publish_alert_to_backend(camera_id, alert_message, frame=None, event_type="D
         print(f"[ALERT DEBUG] Ready to queue: class_name='{class_name}', event_class_id={event_class_id}, location='{location_name}'")
         
         # **Queue it instead of sending directly**
+        # Use Philippine Time (UTC+8) so events are timestamped correctly
+        local_timestamp = datetime.now(PH_TZ).isoformat()
+        print(f"[TIMESTAMP] Recording Philippine Time: {local_timestamp}")
         payload = {
             'camera_id': camera_id,
             'event_class_id': event_class_id,
@@ -397,7 +404,7 @@ def publish_alert_to_backend(camera_id, alert_message, frame=None, event_type="D
             'class_name': class_name,
             'snapshot_filename': snapshot_filename,
             'location_name': location_name,
-            'timestamp': datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%SZ')  # ISO format with UTC indicator
+            'timestamp': local_timestamp  # Local time with timezone offset (e.g., 2026-05-08T00:29:45+08:00)
         }
         
         with alert_queue_lock:
