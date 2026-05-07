@@ -271,6 +271,9 @@ alert_queue_lock = threading.Lock()
 
 def publish_alerts_background():
     """Background thread that publishes alerts without blocking the stream"""
+    consecutive_failures = 0
+    max_consecutive_failures = 10
+    
     while True:
         try:
             with alert_queue_lock:
@@ -281,22 +284,34 @@ def publish_alerts_background():
             
             if payload:
                 try:
+                    print(f"[ALERT WORKER] Attempting to send: {payload.get('class_name')} to http://localhost:5000/api/alerts")
                     response = requests.post(
                         'http://localhost:5000/api/alerts',
                         json=payload,
                         timeout=2
                     )
                     if response.status_code in [200, 201]:
-                        print(f"[ALERT SENT] Camera {payload.get('camera_id')}: {payload.get('alert_message')}")
+                        print(f"[ALERT SENT ✓] Camera {payload.get('camera_id')}: {payload.get('alert_message')}")
+                        consecutive_failures = 0
+                    else:
+                        print(f"[ALERT ERROR] HTTP {response.status_code}: {response.text[:100]}")
+                        # Put it back in queue to retry
+                        with alert_queue_lock:
+                            alert_queue.insert(0, payload)
+                        consecutive_failures += 1
                 except Exception as e:
                     # Put it back in queue to retry
                     with alert_queue_lock:
                         alert_queue.insert(0, payload)
-                    print(f"[ALERT ERROR] Retrying: {str(e)[:50]}")
+                    print(f"[ALERT ERROR] Request failed: {str(e)[:100]}")
+                    consecutive_failures += 1
+                    
+                    if consecutive_failures >= max_consecutive_failures:
+                        print(f"[ALERT WORKER] WARNING: {consecutive_failures} consecutive failures - check backend connection!")
             else:
                 time.sleep(0.1)  # Small sleep when queue is empty
         except Exception as e:
-            print(f"[BACKGROUND ALERT ERROR] {e}")
+            print(f"[BACKGROUND ALERT ERROR] Unexpected error: {e}")
             time.sleep(1)
 
 # Start alert background thread
@@ -312,7 +327,7 @@ def publish_alert_to_backend(camera_id, alert_message, frame=None, event_type="D
         if frame is not None:
             try:
                 # Generate filename: cam{id}_{location}_{YYYYMMDD}_{HHMM}.jpg
-                now = datetime.now()
+                now = datetime.utcnow()
                 date_str = now.strftime('%Y%m%d')
                 time_str = now.strftime('%H%M%S')
                 
@@ -336,6 +351,7 @@ def publish_alert_to_backend(camera_id, alert_message, frame=None, event_type="D
         # DEBUG: Log the raw alert message
         print(f"[ALERT DEBUG] Raw alert_message: '{alert_message}'")
         print(f"[ALERT DEBUG] Location: '{location_name}'")
+        print(f"[ALERT DEBUG] Camera ID: {camera_id}")
         
         # Extract the actual detected class name from alert message
         # Alert messages are like: "Floor: Backward Fall Detected!" or "Zone 1: Inactivity (High) (30:45)"
@@ -353,14 +369,17 @@ def publish_alert_to_backend(camera_id, alert_message, frame=None, event_type="D
                 print(f"[ALERT DEBUG] ✗ FLOOR extraction failed: {e}, msg='{alert_message}'")
         elif "Inactivity" in alert_message:
             try:
+                # Message format: "Zone 1: Inactivity (High) (00:30)"
                 # 1. Get everything after "Zone X: "
                 full_text = alert_message.split(": ")[1]
+                print(f"[ALERT DEBUG] Inactivity full_text: '{full_text}'")
                 
                 # 2. Split from the RIGHT side to safely remove only the time "(00:05)"
                 class_name = full_text.rsplit(" (", 1)[0] 
+                print(f"[ALERT DEBUG] Extracted class_name: '{class_name}'")
                 
-                # 3. Use an ID higher than 3 to avoid colliding with Sideward Fall
-                event_class_id = 4  
+                # 3. Use event_class_id lookup - don't hardcode an ID
+                event_class_id = 4  # Placeholder - backend will look up by class_name
                 
                 print(f"[ALERT DEBUG] ✓ INACTIVITY matched: class_name='{class_name}'")
             except Exception as e:
@@ -368,7 +387,7 @@ def publish_alert_to_backend(camera_id, alert_message, frame=None, event_type="D
         else:
             print(f"[ALERT DEBUG] ✗ NO PATTERN MATCHED: msg='{alert_message}'")
         
-        print(f"[ALERT QUEUED] class_name='{class_name}', location='{location_name}'")
+        print(f"[ALERT DEBUG] Ready to queue: class_name='{class_name}', event_class_id={event_class_id}, location='{location_name}'")
         
         # **Queue it instead of sending directly**
         payload = {
@@ -378,11 +397,12 @@ def publish_alert_to_backend(camera_id, alert_message, frame=None, event_type="D
             'class_name': class_name,
             'snapshot_filename': snapshot_filename,
             'location_name': location_name,
-            'timestamp': datetime.now().strftime('%Y-%m-%dT%H:%M:%S')
+            'timestamp': datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%SZ')  # ISO format with UTC indicator
         }
         
         with alert_queue_lock:
             alert_queue.append(payload)
+            print(f"[ALERT QUEUED ✓] Queue size now: {len(alert_queue)}, message: '{alert_message}'")
             
     except Exception as e:
         print(f"[ALERT QUEUE ERROR] {e}")
@@ -399,7 +419,7 @@ bed_trackers = {}
 active_alerts = [] 
 hardware_muted = False 
 hardware_on_until = 0.0 # NEW: Tracks the 10-second timer
-PATIENCE_SECONDS = 3.0
+PATIENCE_SECONDS = 5.0
 
 # --- CAMERA LOCATION CACHE ---
 camera_locations = {}  # {camera_id: location_name}
@@ -953,7 +973,7 @@ def generate_frames(rtsp_url):
 
     frame_skip_counter = 0
     last_inference_time = time.time()
-    inference_interval = 0.25  # Run YOLO every 250ms (4 FPS - optimized for CPU)
+    inference_interval = 0.20  # Inference every 200ms (5 FPS)
     
     # FPS tracking
     frame_count = 0
@@ -1023,12 +1043,12 @@ def generate_frames(rtsp_url):
         draw_text_outline(frame, fps_text, (20, 15), (0, 0, 0))
         draw_text_outline(frame, instruction_text, (20, 30), (0, 0, 0))
 
-        # --- AI INFERENCE (Only every 250ms, not every frame) ---
+        # --- AI INFERENCE (Only every 200ms, not every frame) ---
         floor_detections = []
         if should_infer and AI_AVAILABLE:
             last_inference_time = current_time
             with model_lock:
-                results = model(frame, verbose=False, conf=0.5, imgsz=640) 
+                results = model(frame, verbose=False, conf=0.65, imgsz=640) 
             
             for r in results:
                 for box in r.boxes:

@@ -50,6 +50,36 @@ export default function ReportsPage() {
             : { start: end, end: start };
     };
 
+    // --- HELPER: Format timestamp (handles both numeric ms and string ISO formats) ---
+    // Uses system local timezone and locale settings for display
+    const formatTimestamp = (timestamp) => {
+        if (!timestamp) return '';
+        
+        let date;
+        if (typeof timestamp === 'number') {
+            // Numeric timestamp in milliseconds - already in UTC, will be converted to local time
+            date = new Date(timestamp);
+        } else if (typeof timestamp === 'string') {
+            // String format - try to parse
+            date = new Date(timestamp);
+        } else {
+            return '';
+        }
+        
+        if (isNaN(date.getTime())) return '';
+        
+        // Use system's local timezone and locale for formatting
+        return date.toLocaleString('en-US', {
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+            hour12: false  // Use 24-hour format
+        });
+    };
+
     // --- DATA FETCHING ---
     useEffect(() => {
         const loadPageData = async () => {
@@ -200,7 +230,8 @@ export default function ReportsPage() {
         };
 
         const rows = filteredLogs.map((log) => {
-            const timestamp = log.timestamp ? log.timestamp.replace('T', ' ') : '';
+            const formattedTs = formatTimestamp(log.timestamp);
+            const timestamp = formattedTs || '';  // formatTimestamp already returns a formatted string
             const classification = log.event_class_name || log.type || '';
             const location = log.location || '';
             const status = log.status || '';
@@ -435,10 +466,21 @@ export default function ReportsPage() {
                 return (
             <tr key={log.id} className="hover:bg-gray-50 transition-all duration-300 group">
                 <td className="px-8 py-6 whitespace-nowrap text-sm text-gray-700 font-semibold font-sans">
-                    {log.timestamp ? log.timestamp.split('T')[0] : '---'}
-                    <span className="text-gray-500 ml-2 font-normal font-sans">
-                        {log.timestamp ? log.timestamp.split('T')[1]?.substring(0, 5) : '---'}
-                    </span>
+                    {(() => {
+                        const formatted = formatTimestamp(log.timestamp);
+                        // Format is "MM/DD/YYYY, HH:MM:SS"
+                        const parts = formatted.split(', ');
+                        const date = parts[0] || '---';
+                        const time = parts[1] || '---';
+                        return (
+                            <>
+                                {date}
+                                <span className="text-gray-500 ml-2 font-normal font-sans">
+                                    {time}
+                                </span>
+                            </>
+                        );
+                    })()}
                 </td>
                 <td className="px-8 py-6 whitespace-nowrap text-sm font-bold text-teal-700 font-sans">
                     {log.event_class_name || log.type}
@@ -738,7 +780,7 @@ export default function ReportsPage() {
                                 </div>
                                 <div className="col-span-2">
                                     <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">Timestamp</span>
-                                    <p className="text-lg font-bold text-gray-800 mt-1">{detailsModal.event.timestamp.replace('T', ' ')}</p>
+                                    <p className="text-lg font-bold text-gray-800 mt-1">{formatTimestamp(detailsModal.event.timestamp)}</p>
                                 </div>
                                 {(detailsModal.event.status || '').toLowerCase() === 'acknowledged' && (
                                     <div className="col-span-2">

@@ -28,6 +28,9 @@ async def create_alert_from_flask(request: Request):
     """Receive alerts from Flask AI service and broadcast via Socket.IO"""
     try:
         data = await get_sanitized_json(request)
+        print(f"[BACKEND ALERT ENDPOINT] ✓ Received alert from AI service")
+        print(f"[BACKEND ALERT ENDPOINT] class_name='{data.get('class_name')}', alert='{data.get('alert_message')}'")
+        
         # Flask sends: camera_id, alert_message, event_class_id, class_name, snapshot_filename, location_name, timestamp
         # Convert to event_logic format
         event_data = {
@@ -39,14 +42,18 @@ async def create_alert_from_flask(request: Request):
             'location_name': data.get('location_name', 'Unknown'),  # NEW: location from AI service
             'timestamp': data.get('timestamp')
         }
+        print(f"[BACKEND ALERT ENDPOINT] Calling create_event_logic with: {event_data}")
         result, code = await create_event_logic(event_data)
+        print(f"[BACKEND ALERT ENDPOINT] create_event_logic returned code={code}, result keys={result.keys() if isinstance(result, dict) else 'N/A'}")
         
         # NOTE: create_event_logic already emits the alert via Socket.IO
         # No need to duplicate the emission here - just return the result
         
         return safe_json_response(status_code=code, content=result)
     except Exception as e:
-        print(f"[ALERT ROUTE ERROR] {e}")
+        print(f"[ALERT ROUTE ERROR] ✗ Exception: {e}")
+        import traceback
+        traceback.print_exc()
         return safe_json_response(status_code=500, content={'error': str(e)})
 
 # server/src/routes/event_routes.py
