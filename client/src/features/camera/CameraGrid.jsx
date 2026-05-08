@@ -209,8 +209,8 @@ export default function CameraGrid() {
   }
 
   return (
-    <div className="flex flex-col lg:flex-row gap-4 p-4">
-      <div className="flex-grow lg:w-3/4">
+    <div className="flex flex-col flex-row gap-4 p-4">
+      <div className="flex-grow w-3/5">
         {header}
         {camera && (
           <div>
@@ -225,7 +225,7 @@ export default function CameraGrid() {
         )}
       </div>
 
-      <div className="lg:w-1/4 lg:flex-shrink-0">
+      <div className="w-1/5 flex-shrink-0">
         <TodayReport incidents={alerts} alerts={alerts} />
       </div>
     </div>

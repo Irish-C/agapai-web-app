@@ -521,8 +521,8 @@ HTML_PAGE = """
         .alarm-active { animation: flashRed 1.5s infinite; }
     </style>
 </head>
-<body class="bg-slate-900 text-white p-10 font-sans">
-    <div class="max-w-6xl mx-auto bg-slate-800 p-8 rounded-2xl border border-slate-700 shadow-2xl">
+<body class="bg-slate-900 text-white p-2 font-sans">
+    <div class="w-full bg-slate-800 p-4 rounded-2xl border border-slate-700 shadow-2xl">
         <div class="flex justify-between items-center mb-6 border-b border-slate-700 pb-4">
             <div>
                 <h1 class="text-2xl font-bold text-blue-400">Agapai Multi-Zone Web Monitor</h1>
@@ -548,8 +548,8 @@ HTML_PAGE = """
             </div>
         </div>
         
-        <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
-            <div class="space-y-4">
+        <div class="grid grid-cols-5 gap-2">
+            <div class="col-span-1 space-y-4">
                 <div class="bg-slate-900 p-4 rounded-lg border border-slate-700">
                     <label class="block text-xs font-bold text-slate-500 mb-2 uppercase">Configuration</label>
                     <input id="ip" type="text" value="192.168.2.211" class="w-full bg-slate-800 p-2 rounded mb-3 text-sm border border-slate-600 focus:border-blue-500 outline-none transition-colors">
@@ -565,12 +565,11 @@ HTML_PAGE = """
                         <button onclick="clearROIs()" class="flex-1 bg-red-600 hover:bg-red-500 py-2 rounded text-xs font-bold transition-all shadow active:scale-95">CLEAR ALL (X)</button>
                     </div>
 
-                    <label class="block text-xs font-bold text-slate-500 mb-2 uppercase">Inactivity Thresholds (minutes)</label>
+                    <label class="block text-xs font-bold text-slate-500 mb-2 uppercase">Inactivity Thresholds</label>
                     <div class="space-y-2 mb-3">
                         <div>
                             <label class="text-[10px] text-slate-400">Low (min):</label>
                             <select id="lowMin" class="w-full bg-slate-800 p-2 rounded text-sm border border-slate-600 focus:border-blue-500 outline-none transition-colors">
-                                <option value="0">Off</option>
                                 <option value="5s">5 seconds (Test)</option>
                                 <option value="10s">10 seconds (Test)</option>
                                 <option value="30s">30 seconds (Test)</option>
@@ -592,7 +591,6 @@ HTML_PAGE = """
                         <div>
                             <label class="text-[10px] text-slate-400">Medium (min):</label>
                             <select id="medMin" class="w-full bg-slate-800 p-2 rounded text-sm border border-slate-600 focus:border-blue-500 outline-none transition-colors">
-                                <option value="0">Off</option>
                                 <option value="5s">5 seconds (Test)</option>
                                 <option value="10s">10 seconds (Test)</option>
                                 <option value="30s">30 seconds (Test)</option>
@@ -614,7 +612,6 @@ HTML_PAGE = """
                         <div>
                             <label class="text-[10px] text-slate-400">High (min):</label>
                             <select id="highMin" class="w-full bg-slate-800 p-2 rounded text-sm border border-slate-600 focus:border-blue-500 outline-none transition-colors">
-                                <option value="0">Off</option>
                                 <option value="5s">5 seconds (Test)</option>
                                 <option value="10s">10 seconds (Test)</option>
                                 <option value="30s">30 seconds (Test)</option>
@@ -653,7 +650,7 @@ HTML_PAGE = """
                 </div>
             </div>
 
-            <div class="lg:col-span-3">
+            <div class="col-span-4">
                 <div id="videoWrapper" class="hidden relative rounded-xl border-4 border-slate-900 bg-black aspect-video overflow-hidden shadow-inner shadow-blue-500/20 transition-all duration-300">
                     <img id="display" class="w-full h-full object-fill absolute top-0 left-0" src="">
                     <canvas id="roiCanvas" class="w-full h-full absolute top-0 left-0 cursor-crosshair z-10"></canvas>
