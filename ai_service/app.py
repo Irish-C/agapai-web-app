@@ -207,6 +207,7 @@ last_sent_state = None
 last_sent_time = 0.0
 
 def trigger_hardware(state):
+    print(f"[DEBUG] trigger_hardware called with state={state}, hardware_muted={hardware_muted}, hardware_on_until={hardware_on_until}, active_alerts={active_alerts}")
     """Sends ON/OFF signals to the ESP32 and tracks connection health."""
     global esp32, hardware_connected, hardware_last_successful_send
     global consecutive_hardware_failures, hardware_error_message, SERIAL_PORT
@@ -1134,23 +1135,26 @@ def generate_frames(rtsp_url):
             cv2.rectangle(frame, (fx1, fy1), (fx2, fy2), f_color, 2)
             draw_text_outline(frame, flabel, (fx1, max(10, fy1 - 10)), f_color)
 
-        # --- UPDATED 10-SECOND HARDWARE TIMER LOGIC ---
+        # --- 10-SECOND HARDWARE TIMER LOGIC ---
+  
         with state_lock:
-            active_alerts = current_frame_alerts
-            
-            # Publish new alerts to backend for logging and Socket.IO
+            # NEW: Only update active_alerts if there are NEW alerts this frame
             if len(current_frame_alerts) > 0:
+                # New alert detected - keep it for 10 seconds
+                active_alerts = current_frame_alerts
+                if not hardware_muted:
+                    hardware_on_until = current_time + 10.0
+                
+                # Publish new alerts to backend for logging and Socket.IO
                 for alert in current_frame_alerts:
-                    # Use current_location_name set by backend via /api/start (no cache staleness)
                     publish_alert_to_backend(current_camera_id, alert, frame=frame, location_name=current_location_name)
             
-            # If there is a new alert and we haven't muted it, push the timer 10 seconds into the future
-            if len(active_alerts) > 0 and not hardware_muted:
-                hardware_on_until = current_time + 10.0
-            
-            # If the 10 seconds have safely passed and no alerts remain, reset the mute state
-            if current_time >= hardware_on_until and len(active_alerts) == 0:
+            elif current_time >= hardware_on_until:
+                # Timer expired - only NOW clear the alerts and reset mute state
+                active_alerts = []
                 hardware_muted = False
+            
+            # else: Keep previous active_alerts until the timer expires
             
             # Fire the hardware if we are currently inside the 10-second window and not muted
             if current_time < hardware_on_until and not hardware_muted:
