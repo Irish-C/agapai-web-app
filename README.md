@@ -4,8 +4,8 @@ AGAPAI is a real-time monitoring and alerting web app for elderly care environme
 
 **Key Features:**
 - **Live Streaming** - HLS video feeds from IP cameras via MediaMTX relay
-- 🚨**Fall Detection** - Real-time fall alerts with instant notification to caregivers
-- ⏱ **Inactivity Tracking** - 3-tier alerts (low: 5m, medium: 15m, high: 30m inactivity)
+- **Fall Detection** - Real-time fall alerts with instant notification to caregivers
+- **Inactivity Tracking** - 3-tier alerts (low: 5m, medium: 15m, high: 30m inactivity)
 - **Role-Based Access** - Admin, supervisor, guard, caregiver roles with JWT auth
 - **Event Logging** - All alerts stored in PostgreSQL with acknowledgement tracking
 - **Socket.IO Sync** - Real-time event delivery with auto-reconnect + message buffering
@@ -15,7 +15,7 @@ For UI screenshots and product-level description, see [APP.md](docs/APP.md).
 
 ## Quick Links - Documentation
 
-📍 **[View Full Documentation Hub →](docs/GUIDES.md)** (organized by category)
+**[View Full Documentation Hub →](docs/GUIDES.md)** (organized by category)
 
 Or jump directly to:
 - **[Streaming Setup](docs/STREAMING_SETUP.md)** | **[Alert System](docs/ALERT_SYSTEM.md)** | **[Activity Detection](docs/ACTIVITY_DETECTION_GUIDE.md)**
