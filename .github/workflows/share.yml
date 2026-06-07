@@ -14,7 +14,7 @@ jobs:
         with:
           fetch-depth: 0
           token: ${{ secrets.SYNC_TOKEN }}
-
+          
       - name: Push to Share Repo
         run: |
           git remote add share https://github.com/Irish-C/agapai.git
