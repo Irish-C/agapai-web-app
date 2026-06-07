@@ -1,0 +1,20 @@
+name: Share Branch
+
+on:
+  push:
+    branches:
+      - final
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Push to Share Repo
+        run: |
+          git remote add share https://${{ secrets.SYNC_TOKEN }}@github.com/Irish-C/agapai.git
+          git push share HEAD:main --force
