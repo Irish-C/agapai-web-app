@@ -3,7 +3,7 @@ name: Share Branch
 on:
   push:
     branches:
-      - final #latest branch
+      - final #new branch
 
 jobs:
   sync:
